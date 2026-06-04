@@ -1,0 +1,47 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: ai-workspace
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+jwt:
+  # Base64 encoded secret, minimum 256 bits for HS256 — replace in production
+  secret: YUlXb3Jrc3BhY2VTZWNyZXRLZXlGb3JKV1RUb2tlbkdlbmVyYXRpb24xMjM0NTY=
+  expiration: 86400000  # 24h
+
+fastapi:
+  base-url: http://localhost:8001
+
+minio:
+  endpoint: localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: ai-workspace
+  secure: false
