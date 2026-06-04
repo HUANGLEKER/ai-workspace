@@ -75,7 +75,13 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
     }
 
     @Override
-    public String getPresignedUrl(String filePath) {
+    public String getPresignedUrl(String filePath, Long userId) {
+        // verify the caller owns a file record pointing at this object
+        FileInfo info = lambdaQuery()
+                .eq(FileInfo::getFilePath, filePath)
+                .eq(FileInfo::getUploadBy, userId)
+                .one();
+        if (info == null) throw new BusinessException("文件不存在或无权访问");
         try {
             return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .bucket(bucket)
@@ -89,8 +95,9 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
     }
 
     @Override
-    public Page<FileInfo> pageList(int page, int size, String fileName) {
+    public Page<FileInfo> pageList(int page, int size, String fileName, Long userId) {
         LambdaQueryWrapper<FileInfo> wrapper = new LambdaQueryWrapper<FileInfo>()
+                .eq(FileInfo::getUploadBy, userId)
                 .orderByDesc(FileInfo::getCreateTime);
         if (StringUtils.hasText(fileName)) {
             wrapper.like(FileInfo::getFileName, fileName);

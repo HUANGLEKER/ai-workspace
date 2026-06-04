@@ -38,29 +38,38 @@ export const sendMessageStream = async (
 
     const reader = response.body!.getReader()
     const decoder = new TextDecoder()
+    let buffer = ''
+
+    const handleLine = (line: string): boolean => {
+      if (!line.startsWith('data: ')) return false
+      const data = line.slice(6).trim()
+      if (data === '[DONE]') {
+        onDone()
+        return true
+      }
+      try {
+        const parsed = JSON.parse(data)
+        const text = parsed.content ?? parsed.text ?? parsed.delta ?? ''
+        if (text) onChunk(text)
+      } catch {
+        if (data) onChunk(data)
+      }
+      return false
+    }
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      const chunk = decoder.decode(value, { stream: true })
-      const lines = chunk.split('\n')
+      buffer += decoder.decode(value, { stream: true })
+      // Keep the last (possibly incomplete) line in the buffer until the next read.
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim()
-          if (data === '[DONE]') {
-            onDone()
-            return
-          }
-          try {
-            const parsed = JSON.parse(data)
-            const text = parsed.content ?? parsed.text ?? parsed.delta ?? ''
-            if (text) onChunk(text)
-          } catch {
-            if (data) onChunk(data)
-          }
-        }
+        if (handleLine(line)) return
       }
     }
+    // Flush any remaining buffered line after the stream closes.
+    if (buffer && handleLine(buffer)) return
     onDone()
   } catch (e) {
     onError((e as Error).message || '连接失败')

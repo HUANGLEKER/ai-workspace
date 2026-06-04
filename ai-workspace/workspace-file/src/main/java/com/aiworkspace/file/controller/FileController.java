@@ -36,7 +36,7 @@ public class FileController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String fileName) {
-        Page<FileInfo> p = fileService.pageList(page, size, fileName);
+        Page<FileInfo> p = fileService.pageList(page, size, fileName, currentUserId());
         return Result.ok(PageResult.of(p));
     }
 
@@ -51,7 +51,7 @@ public class FileController {
     @Operation(summary = "获取文件预签名URL")
     @GetMapping("/url")
     public Result<String> url(@RequestParam String filePath) {
-        return Result.ok(fileService.getPresignedUrl(filePath));
+        return Result.ok(fileService.getPresignedUrl(filePath, currentUserId()));
     }
 
     private Long currentUserId() {

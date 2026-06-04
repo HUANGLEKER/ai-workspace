@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getUserInfo } from '@/api/auth'
 import Layout from '@/layout/index.vue'
 
 const router = createRouter({
@@ -74,7 +75,7 @@ const router = createRouter({
           path: 'system/user',
           name: 'SystemUser',
           component: () => import('@/views/system/user/index.vue'),
-          meta: { title: '用户管理', icon: 'User' }
+          meta: { title: '用户管理', icon: 'User', requiresAdmin: true }
         }
       ]
     },
@@ -85,21 +86,37 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
   if (to.meta.requiresAuth === false) {
-    if (to.path === '/login' && authStore.isLoggedIn) {
-      next('/')
-    } else {
-      next()
-    }
-  } else {
-    if (!authStore.isLoggedIn) {
-      next({ path: '/login', query: { redirect: to.fullPath } })
-    } else {
-      next()
+    if (to.path === '/login' && authStore.isLoggedIn) next('/')
+    else next()
+    return
+  }
+
+  if (!authStore.isLoggedIn) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  // ensure user info (incl. roles) is loaded before entering a protected page,
+  // so admin-only guards work on direct navigation / refresh
+  if (!authStore.userInfo) {
+    try {
+      const info = await getUserInfo()
+      authStore.setUserInfo(info)
+    } catch {
+      // token invalid/expired — the response interceptor handles the redirect
     }
   }
+
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next('/dashboard')
+    return
+  }
+
+  next()
 })
 
 export default router

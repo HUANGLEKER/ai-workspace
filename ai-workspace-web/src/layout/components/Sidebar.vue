@@ -67,7 +67,7 @@
         <template #title>监控</template>
       </el-menu-item>
 
-      <el-sub-menu index="system">
+      <el-sub-menu v-if="authStore.isAdmin" index="system">
         <template #title>
           <el-icon><Setting /></el-icon>
           <span>系统管理</span>
@@ -92,11 +92,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 defineProps<{ collapsed: boolean }>()
 defineEmits<{ toggle: [] }>()
 
 const route = useRoute()
+const authStore = useAuthStore()
 const activeMenu = computed(() => route.path)
 </script>
 

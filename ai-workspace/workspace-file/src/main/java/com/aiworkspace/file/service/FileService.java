@@ -11,7 +11,7 @@ public interface FileService extends IService<FileInfo> {
 
     void delete(Long id, Long userId);
 
-    String getPresignedUrl(String filePath);
+    String getPresignedUrl(String filePath, Long userId);
 
-    Page<FileInfo> pageList(int page, int size, String fileName);
+    Page<FileInfo> pageList(int page, int size, String fileName, Long userId);
 }

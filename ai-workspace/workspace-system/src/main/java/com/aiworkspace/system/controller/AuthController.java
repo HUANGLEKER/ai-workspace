@@ -16,6 +16,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Tag(name = "认证管理")
 @RestController
 @RequestMapping("/api/auth")
@@ -50,10 +53,21 @@ public class AuthController {
 
     @Operation(summary = "获取当前用户信息")
     @GetMapping("/info")
-    public Result<SysUser> info() {
+    public Result<Map<String, Object>> info() {
         LoginUser loginUser = (LoginUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         SysUser user = sysUserService.getById(loginUser.getSysUser().getId());
         user.setPassword(null);
-        return Result.ok(user);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", user.getId());
+        data.put("username", user.getUsername());
+        data.put("nickname", user.getNickname());
+        data.put("avatar", user.getAvatar());
+        data.put("email", user.getEmail());
+        data.put("phone", user.getPhone());
+        data.put("status", user.getStatus());
+        data.put("createTime", user.getCreateTime());
+        data.put("roles", loginUser.getRoles());
+        return Result.ok(data);
     }
 }

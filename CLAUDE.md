@@ -118,6 +118,17 @@ When a document is uploaded, `EmbeddingService.buildAsync()` (annotated `@Async(
 
 `kb_document.status` states: `PENDING` → `PROCESSING` → `DONE` / `FAILED`
 
+## Resource Ownership
+
+User-owned resources (knowledge bases, documents, files, chat sessions/messages) are scoped to the current user — every list/get/update/delete/upload path must verify ownership against the caller's user id. Conventions to follow when adding endpoints:
+
+- Services expose a `getOwned(id, userId)` helper that throws `BusinessException` if the row is missing or not owned by `userId`. Mutating endpoints call it before acting.
+- List queries filter by the owner column. Note the column differs by table: KB/document/file use `createBy`; chat uses `userId`.
+- On update, re-set the owner column from the existing row to prevent owner reassignment via the request body.
+- Dashboard counts are scoped to the current user, not global.
+
+`@Async` self-invocation does not go through the Spring proxy, so it runs synchronously. Call async methods (e.g. `EmbeddingService` rebuild/build) via the injected bean reference, not `this.`.
+
 ## Key API Conventions
 
 All Spring Boot REST endpoints are prefixed `/api/`. Standard response wrapper (`code`, `message`, `data`) from `workspace-common/Result.java`.

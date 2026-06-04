@@ -31,6 +31,7 @@ export interface UserInfo {
   phone: string
   status: number
   createTime: string
+  roles: string[]
 }
 
 // 对话相关

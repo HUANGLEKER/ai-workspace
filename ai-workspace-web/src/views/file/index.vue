@@ -78,7 +78,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Search, Refresh, Delete, Download } from '@element-plus/icons-vue'
 import type { FileInfo } from '@/types'
-import { listFiles, deleteFile } from '@/api/file'
+import { listFiles, deleteFile, getFileUrl } from '@/api/file'
 
 const loading = ref(false)
 const files = ref<FileInfo[]>([])
@@ -137,11 +137,14 @@ async function handleDelete(id: number) {
   }
 }
 
-function handleDownload(file: FileInfo) {
-  const link = document.createElement('a')
-  link.href = `/api/file/download/${file.id}`
-  link.download = file.fileName
-  link.click()
+async function handleDownload(file: FileInfo) {
+  try {
+    // backend exposes MinIO presigned URLs; there is no authenticated /download route
+    const url = await getFileUrl(file.filePath)
+    window.open(url, '_blank')
+  } catch {
+    ElMessage.error('下载失败')
+  }
 }
 
 const fileIcon = (type: string) => {
