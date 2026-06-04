@@ -33,10 +33,16 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
 
     @Override
     public void deleteSession(Long id, Long userId) {
+        getOwned(id, userId);
+        removeById(id);
+    }
+
+    @Override
+    public ChatSession getOwned(Long id, Long userId) {
         ChatSession session = getById(id);
         if (session == null || !userId.equals(session.getUserId())) {
             throw new BusinessException("会话不存在或无权限");
         }
-        removeById(id);
+        return session;
     }
 }

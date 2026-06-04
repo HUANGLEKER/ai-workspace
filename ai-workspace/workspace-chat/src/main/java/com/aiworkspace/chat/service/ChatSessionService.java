@@ -12,4 +12,10 @@ public interface ChatSessionService extends IService<ChatSession> {
     ChatSession createSession(Long userId, String title, String modelName);
 
     void deleteSession(Long id, Long userId);
+
+    /**
+     * Returns the session only if it exists and belongs to the given user;
+     * otherwise throws a BusinessException. Used for resource-ownership checks.
+     */
+    ChatSession getOwned(Long id, Long userId);
 }

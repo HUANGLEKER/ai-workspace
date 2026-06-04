@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -30,16 +31,19 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     private final KbDocumentMapper kbDocumentMapper;
     private final KbChunkTaskMapper kbChunkTaskMapper;
     private final ObjectMapper objectMapper;
+    private final EmbeddingService self;
 
     @Value("${fastapi.base-url}")
     private String fastapiBaseUrl;
 
     public EmbeddingServiceImpl(KbDocumentMapper kbDocumentMapper,
                                  KbChunkTaskMapper kbChunkTaskMapper,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 @Lazy EmbeddingService self) {
         this.kbDocumentMapper = kbDocumentMapper;
         this.kbChunkTaskMapper = kbChunkTaskMapper;
         this.objectMapper = objectMapper;
+        this.self = self;
     }
 
     @Async("taskExecutor")
@@ -74,7 +78,7 @@ public class EmbeddingServiceImpl implements EmbeddingService {
         List<KbDocument> docs = kbDocumentMapper.selectList(
                 new LambdaQueryWrapper<KbDocument>().eq(KbDocument::getKbId, kbId));
         for (KbDocument doc : docs) {
-            buildAsync(doc);
+            self.buildAsync(doc);
         }
     }
 

@@ -9,11 +9,11 @@ import java.util.List;
 
 public interface KbDocumentService extends IService<KbDocument> {
 
-    Page<KbDocument> pageByKbId(Long kbId, int page, int size);
+    Page<KbDocument> pageByKbId(Long kbId, int page, int size, Long userId);
 
-    KbDocument upload(Long kbId, MultipartFile file);
+    KbDocument upload(Long kbId, MultipartFile file, Long userId);
 
-    void delete(Long id);
+    void delete(Long id, Long userId);
 
-    List<KbDocument> listByKbId(Long kbId);
+    List<KbDocument> listByKbId(Long kbId, Long userId);
 }

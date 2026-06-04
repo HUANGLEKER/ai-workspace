@@ -64,6 +64,7 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
     public void delete(Long id, Long userId) {
         FileInfo info = getById(id);
         if (info == null) throw new BusinessException("文件不存在");
+        if (!userId.equals(info.getUploadBy())) throw new BusinessException("无权操作该文件");
         try {
             minioClient.removeObject(RemoveObjectArgs.builder()
                     .bucket(bucket).object(info.getFilePath()).build());

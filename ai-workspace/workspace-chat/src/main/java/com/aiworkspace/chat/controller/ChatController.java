@@ -3,6 +3,7 @@ package com.aiworkspace.chat.controller;
 import com.aiworkspace.chat.dto.SendMessageRequest;
 import com.aiworkspace.chat.entity.ChatMessage;
 import com.aiworkspace.chat.service.ChatMessageService;
+import com.aiworkspace.chat.service.ChatSessionService;
 import com.aiworkspace.system.security.LoginUser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executor;
 public class ChatController {
 
     private final ChatMessageService chatMessageService;
+    private final ChatSessionService chatSessionService;
     private final ObjectMapper objectMapper;
     private final Executor taskExecutor;
 
@@ -40,9 +42,11 @@ public class ChatController {
     private String fastapiBaseUrl;
 
     public ChatController(ChatMessageService chatMessageService,
+                          ChatSessionService chatSessionService,
                           ObjectMapper objectMapper,
                           @Qualifier("taskExecutor") Executor taskExecutor) {
         this.chatMessageService = chatMessageService;
+        this.chatSessionService = chatSessionService;
         this.objectMapper = objectMapper;
         this.taskExecutor = taskExecutor;
     }
@@ -51,6 +55,8 @@ public class ChatController {
     @PostMapping(value = "/send", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter send(@RequestBody @Valid SendMessageRequest request) {
         Long userId = currentUserId();
+        // ensure the caller owns the session before reading/writing its messages
+        chatSessionService.getOwned(request.getSessionId(), userId);
         SseEmitter emitter = new SseEmitter(180_000L);
 
         // save user message

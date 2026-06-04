@@ -17,6 +17,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMapper,
     @Override
     public List<KbKnowledgeBase> listByUser(Long userId) {
         return list(new LambdaQueryWrapper<KbKnowledgeBase>()
+                .eq(KbKnowledgeBase::getCreateBy, userId)
                 .orderByDesc(KbKnowledgeBase::getCreateTime));
     }
 
@@ -33,13 +34,23 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMapper,
     @Override
     public void update(KbKnowledgeBase kb, Long userId) {
         if (kb.getId() == null) throw new BusinessException("知识库ID不能为空");
+        KbKnowledgeBase existing = getOwned(kb.getId(), userId);
+        // prevent owner reassignment via request body
+        kb.setCreateBy(existing.getCreateBy());
         updateById(kb);
     }
 
     @Override
     public void delete(Long id, Long userId) {
+        getOwned(id, userId);
+        removeById(id);
+    }
+
+    @Override
+    public KbKnowledgeBase getOwned(Long id, Long userId) {
         KbKnowledgeBase kb = getById(id);
         if (kb == null) throw new BusinessException("知识库不存在");
-        removeById(id);
+        if (!userId.equals(kb.getCreateBy())) throw new BusinessException("无权操作该知识库");
+        return kb;
     }
 }

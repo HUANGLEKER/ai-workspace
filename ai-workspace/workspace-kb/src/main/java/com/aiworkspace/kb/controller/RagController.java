@@ -2,6 +2,7 @@ package com.aiworkspace.kb.controller;
 
 import com.aiworkspace.kb.dto.RagChatRequest;
 import com.aiworkspace.kb.service.EmbeddingService;
+import com.aiworkspace.kb.service.KnowledgeBaseService;
 import com.aiworkspace.system.security.LoginUser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,7 @@ import java.util.concurrent.Executor;
 public class RagController {
 
     private final EmbeddingService embeddingService;
+    private final KnowledgeBaseService knowledgeBaseService;
     private final ObjectMapper objectMapper;
     private final Executor taskExecutor;
 
@@ -37,9 +39,11 @@ public class RagController {
     private String fastapiBaseUrl;
 
     public RagController(EmbeddingService embeddingService,
+                         KnowledgeBaseService knowledgeBaseService,
                          ObjectMapper objectMapper,
                          @Qualifier("taskExecutor") Executor taskExecutor) {
         this.embeddingService = embeddingService;
+        this.knowledgeBaseService = knowledgeBaseService;
         this.objectMapper = objectMapper;
         this.taskExecutor = taskExecutor;
     }
@@ -47,6 +51,8 @@ public class RagController {
     @Operation(summary = "RAG流式问答（SSE）")
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chat(@RequestBody RagChatRequest request) {
+        // verify the caller owns the target knowledge base before querying it
+        knowledgeBaseService.getOwned(request.getKbId(), currentUserId());
         SseEmitter emitter = new SseEmitter(180_000L);
 
         taskExecutor.execute(() -> {
@@ -114,6 +120,7 @@ public class RagController {
             throw new com.aiworkspace.common.exception.BusinessException("kbId is required");
         }
         Long kbId = Long.valueOf(kbIdObj.toString());
+        knowledgeBaseService.getOwned(kbId, currentUserId());
         embeddingService.rebuildKb(kbId);
         return com.aiworkspace.common.response.Result.ok();
     }

@@ -5,6 +5,7 @@ import com.aiworkspace.kb.entity.KbDocument;
 import com.aiworkspace.kb.mapper.KbDocumentMapper;
 import com.aiworkspace.kb.service.EmbeddingService;
 import com.aiworkspace.kb.service.KbDocumentService;
+import com.aiworkspace.kb.service.KnowledgeBaseService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -23,17 +24,22 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
 
     private final MinioClient minioClient;
     private final EmbeddingService embeddingService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     @Value("${minio.bucket}")
     private String bucket;
 
-    public KbDocumentServiceImpl(MinioClient minioClient, EmbeddingService embeddingService) {
+    public KbDocumentServiceImpl(MinioClient minioClient,
+                                 EmbeddingService embeddingService,
+                                 KnowledgeBaseService knowledgeBaseService) {
         this.minioClient = minioClient;
         this.embeddingService = embeddingService;
+        this.knowledgeBaseService = knowledgeBaseService;
     }
 
     @Override
-    public Page<KbDocument> pageByKbId(Long kbId, int page, int size) {
+    public Page<KbDocument> pageByKbId(Long kbId, int page, int size, Long userId) {
+        knowledgeBaseService.getOwned(kbId, userId);
         return page(new Page<>(page, size),
                 new LambdaQueryWrapper<KbDocument>()
                         .eq(KbDocument::getKbId, kbId)
@@ -41,7 +47,8 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
     }
 
     @Override
-    public KbDocument upload(Long kbId, MultipartFile file) {
+    public KbDocument upload(Long kbId, MultipartFile file, Long userId) {
+        knowledgeBaseService.getOwned(kbId, userId);
         String originalName = file.getOriginalFilename();
         String extension = StringUtils.hasText(originalName) && originalName.contains(".")
                 ? originalName.substring(originalName.lastIndexOf(".") + 1).toLowerCase()
@@ -77,9 +84,10 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
     }
 
     @Override
-    public void delete(Long id) {
+    public void delete(Long id, Long userId) {
         KbDocument doc = getById(id);
         if (doc == null) throw new BusinessException("文档不存在");
+        knowledgeBaseService.getOwned(doc.getKbId(), userId);
 
         // remove from MinIO
         try {
@@ -95,7 +103,8 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
     }
 
     @Override
-    public List<KbDocument> listByKbId(Long kbId) {
+    public List<KbDocument> listByKbId(Long kbId, Long userId) {
+        knowledgeBaseService.getOwned(kbId, userId);
         return list(new LambdaQueryWrapper<KbDocument>()
                 .eq(KbDocument::getKbId, kbId)
                 .orderByDesc(KbDocument::getCreateTime));

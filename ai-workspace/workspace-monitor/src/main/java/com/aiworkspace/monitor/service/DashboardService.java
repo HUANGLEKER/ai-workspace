@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Service
 public class DashboardService {
@@ -42,9 +43,22 @@ public class DashboardService {
                         .eq(ChatSession::getUserId, userId)
                         .ge(ChatSession::getCreateTime, startOfToday));
 
-        long kbCount = kbKnowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KbKnowledgeBase>());
-        long docCount = kbDocumentMapper.selectCount(new LambdaQueryWrapper<KbDocument>());
-        long fileCount = fileInfoMapper.selectCount(new LambdaQueryWrapper<FileInfo>());
+        long kbCount = kbKnowledgeBaseMapper.selectCount(
+                new LambdaQueryWrapper<KbKnowledgeBase>()
+                        .eq(KbKnowledgeBase::getCreateBy, userId));
+
+        // documents are owned transitively through the user's knowledge bases
+        List<Long> kbIds = kbKnowledgeBaseMapper.selectList(
+                        new LambdaQueryWrapper<KbKnowledgeBase>()
+                                .select(KbKnowledgeBase::getId)
+                                .eq(KbKnowledgeBase::getCreateBy, userId))
+                .stream().map(KbKnowledgeBase::getId).toList();
+        long docCount = kbIds.isEmpty() ? 0L : kbDocumentMapper.selectCount(
+                new LambdaQueryWrapper<KbDocument>().in(KbDocument::getKbId, kbIds));
+
+        long fileCount = fileInfoMapper.selectCount(
+                new LambdaQueryWrapper<FileInfo>()
+                        .eq(FileInfo::getUploadBy, userId));
 
         DashboardStatsVO vo = new DashboardStatsVO();
         vo.setTodaySessions(todaySessions);
