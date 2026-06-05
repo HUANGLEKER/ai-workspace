@@ -47,6 +47,18 @@
             <artifactId>workspace-job</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.aiworkspace</groupId>
+            <artifactId>workspace-prompt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.aiworkspace</groupId>
+            <artifactId>workspace-tool</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.aiworkspace</groupId>
+            <artifactId>workspace-mcp</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>

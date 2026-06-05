@@ -62,7 +62,17 @@
         <template #title>Agent</template>
       </el-menu-item>
 
-      <el-menu-item index="/monitor">
+      <el-menu-item index="/tool">
+        <el-icon><Tools /></el-icon>
+        <template #title>工具中心</template>
+      </el-menu-item>
+
+      <el-menu-item index="/mcp">
+        <el-icon><Link /></el-icon>
+        <template #title>MCP 服务器</template>
+      </el-menu-item>
+
+      <el-menu-item v-if="authStore.isAdmin" index="/monitor">
         <el-icon><Monitor /></el-icon>
         <template #title>监控</template>
       </el-menu-item>
@@ -79,6 +89,10 @@
         <el-menu-item index="/system/model">
           <el-icon><Cpu /></el-icon>
           <template #title>模型管理</template>
+        </el-menu-item>
+        <el-menu-item index="/system/job">
+          <el-icon><Timer /></el-icon>
+          <template #title>定时任务</template>
         </el-menu-item>
       </el-sub-menu>
     </el-menu>

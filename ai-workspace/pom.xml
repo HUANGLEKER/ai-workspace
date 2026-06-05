@@ -28,6 +28,9 @@
         <module>workspace-workflow</module>
         <module>workspace-monitor</module>
         <module>workspace-job</module>
+        <module>workspace-prompt</module>
+        <module>workspace-tool</module>
+        <module>workspace-mcp</module>
         <module>workspace-admin</module>
     </modules>
 
@@ -111,6 +114,21 @@
             <dependency>
                 <groupId>com.aiworkspace</groupId>
                 <artifactId>workspace-job</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aiworkspace</groupId>
+                <artifactId>workspace-prompt</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aiworkspace</groupId>
+                <artifactId>workspace-tool</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aiworkspace</groupId>
+                <artifactId>workspace-mcp</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

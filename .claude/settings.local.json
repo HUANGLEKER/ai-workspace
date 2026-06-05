@@ -13,7 +13,14 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\leker\\\\Desktop\\\\AI Workspace\\\\ai-service\\\\app\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize)",
       "PowerShell(if \\(Test-Path \"C:\\\\Users\\\\leker\\\\Desktop\\\\AI Workspace\\\\ai-workspace-web\"\\) { Get-ChildItem -Path \"C:\\\\Users\\\\leker\\\\Desktop\\\\AI Workspace\\\\ai-workspace-web\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize })",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\leker\\\\Desktop\\\\AI Workspace\" -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(python -m venv .venv)",
+      "Bash(.venv/Scripts/python.exe -m pip install --upgrade pip)",
+      "Bash(netsh interface *)",
+      "Bash(findstr /C:\"900\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":9001\")",
+      "Bash(findstr \":9000\")"
     ]
   }
 }

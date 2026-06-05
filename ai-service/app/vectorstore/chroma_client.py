@@ -1,11 +1,12 @@
 from functools import lru_cache
 import chromadb
+from chromadb.api import ClientAPI
 from chromadb import Collection
 from app.config.settings import settings
 
 
 @lru_cache(maxsize=1)
-def get_chroma_client() -> chromadb.HttpClient:
+def get_chroma_client() -> ClientAPI:
     return chromadb.HttpClient(
         host=settings.chroma_host,
         port=settings.chroma_port,

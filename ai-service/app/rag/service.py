@@ -19,26 +19,28 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
 
     collection = get_or_create_collection(req.kb_id)
     results = collection.query(
-        query_embeddings=[query_vector],
+        query_embeddings=[query_vector],  # type: ignore
         n_results=req.top_k,
         include=["documents", "metadatas", "distances"],
     )
 
     sources: list[SourceDocument] = []
     context_parts: list[str] = []
-    if results["documents"] and results["documents"][0]:
-        for doc, meta, dist in zip(
-            results["documents"][0],
-            results["metadatas"][0],
-            results["distances"][0],
-        ):
+    documents = results.get("documents")
+    if documents and documents[0]:
+        doc_list = documents[0]
+        metadatas = results.get("metadatas")
+        distances = results.get("distances")
+        meta_list = metadatas[0] if metadatas else [{}] * len(doc_list)
+        dist_list = distances[0] if distances else [0.0] * len(doc_list)
+        for doc, meta, dist in zip(doc_list, meta_list, dist_list):
             sources.append(SourceDocument(
-                document_id=meta.get("document_id", ""),
-                file_name=meta.get("file_name", ""),
+                document_id=str(meta.get("document_id", "")) if meta else "",
+                file_name=str(meta.get("file_name", "")) if meta else "",
                 content=doc,
                 score=round(1 - dist, 4),
             ))
-            context_parts.append(f"[{meta.get('file_name', '')}]\n{doc}")
+            context_parts.append(f"[{meta.get('file_name', '') if meta else ''}]\n{doc}")
 
     context = "\n\n---\n\n".join(context_parts) if context_parts else "暂无相关文档"
     system_msg = SystemMessage(content=_RAG_SYSTEM_PROMPT.format(context=context))

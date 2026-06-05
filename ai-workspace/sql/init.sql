@@ -164,6 +164,137 @@ CREATE TABLE IF NOT EXISTS file_info (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件信息表';
 
 -- =====================================================
+-- 5. Agent 模块
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS agent (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name          VARCHAR(100) NOT NULL COMMENT 'Agent名称',
+    description   VARCHAR(500) COMMENT '描述',
+    system_prompt TEXT         COMMENT '系统提示词',
+    model         VARCHAR(100) COMMENT '使用的模型（为空走AI服务默认）',
+    tools         VARCHAR(500) COMMENT '工具名JSON数组，如["search"]',
+    mcp_servers   VARCHAR(500) COMMENT 'MCP服务器名JSON数组',
+    enabled       TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用',
+    create_by     BIGINT       COMMENT '创建人ID',
+    deleted       TINYINT      NOT NULL DEFAULT 0,
+    create_time   DATETIME     COMMENT '创建时间',
+    update_time   DATETIME     COMMENT '更新时间',
+    INDEX idx_create_by (create_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent定义表';
+
+-- =====================================================
+-- 6. 工作流模块
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS workflow (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name        VARCHAR(100) NOT NULL COMMENT '工作流名称',
+    description VARCHAR(500) COMMENT '描述',
+    definition  LONGTEXT     COMMENT '工作流定义JSON（节点/连线）',
+    model       VARCHAR(100) COMMENT '使用的模型（为空走AI服务默认）',
+    enabled     TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用',
+    create_by   BIGINT       COMMENT '创建人ID',
+    deleted     TINYINT      NOT NULL DEFAULT 0,
+    create_time DATETIME     COMMENT '创建时间',
+    update_time DATETIME     COMMENT '更新时间',
+    INDEX idx_create_by (create_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工作流定义表';
+
+-- =====================================================
+-- 7. 定时任务模块（管理员）
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS sys_job (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    job_name        VARCHAR(100) NOT NULL COMMENT '任务名称',
+    job_group       VARCHAR(50)  DEFAULT 'DEFAULT' COMMENT '任务分组',
+    invoke_target   VARCHAR(100) NOT NULL COMMENT '调用的JobHandler名称',
+    cron_expression VARCHAR(100) NOT NULL COMMENT 'Spring 6段cron表达式',
+    job_params      VARCHAR(500) COMMENT '传给处理器的参数',
+    status          TINYINT      NOT NULL DEFAULT 1 COMMENT '0=运行中 1=暂停',
+    remark          VARCHAR(500) COMMENT '备注',
+    create_by       BIGINT       COMMENT '创建人ID',
+    deleted         TINYINT      NOT NULL DEFAULT 0,
+    create_time     DATETIME     COMMENT '创建时间',
+    update_time     DATETIME     COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务表';
+
+CREATE TABLE IF NOT EXISTS sys_job_log (
+    id             BIGINT PRIMARY KEY AUTO_INCREMENT,
+    job_id         BIGINT       COMMENT '任务ID',
+    job_name       VARCHAR(100) COMMENT '任务名称',
+    invoke_target  VARCHAR(100) COMMENT '调用目标',
+    job_params     VARCHAR(500) COMMENT '参数',
+    status         TINYINT      COMMENT '0=成功 1=失败',
+    job_message    VARCHAR(500) COMMENT '执行信息',
+    exception_info TEXT         COMMENT '异常堆栈',
+    cost_ms        BIGINT       COMMENT '耗时(毫秒)',
+    create_time    DATETIME     COMMENT '创建时间',
+    INDEX idx_job_id (job_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行日志表';
+
+-- 内置示例任务（默认暂停，invoke_target 对应 SampleJobHandler）
+INSERT INTO sys_job (job_name, job_group, invoke_target, cron_expression, status, remark, create_by, deleted, create_time, update_time)
+VALUES ('示例心跳任务', 'DEFAULT', 'sampleJob', '0 0/5 * * * ?', 1, '每5分钟输出一次心跳日志', 1, 0, NOW(), NOW());
+
+-- =====================================================
+-- 8. 提示词中心
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS prompt (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    title       VARCHAR(150) NOT NULL COMMENT '标题',
+    content     LONGTEXT     NOT NULL COMMENT '提示词内容',
+    category    VARCHAR(50)  COMMENT '分类',
+    description VARCHAR(500) COMMENT '描述',
+    create_by   BIGINT       COMMENT '创建人ID',
+    deleted     TINYINT      NOT NULL DEFAULT 0,
+    create_time DATETIME     COMMENT '创建时间',
+    update_time DATETIME     COMMENT '更新时间',
+    INDEX idx_create_by (create_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提示词表';
+
+-- =====================================================
+-- 9. 工具中心
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS tool (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name        VARCHAR(100) NOT NULL COMMENT '工具名称',
+    description VARCHAR(500) COMMENT '描述',
+    tool_type   VARCHAR(30)  NOT NULL DEFAULT 'http' COMMENT '类型：http/builtin',
+    endpoint    VARCHAR(500) COMMENT 'http工具调用地址',
+    config      LONGTEXT     COMMENT 'JSON参数schema/配置',
+    enabled     TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用',
+    create_by   BIGINT       COMMENT '创建人ID',
+    deleted     TINYINT      NOT NULL DEFAULT 0,
+    create_time DATETIME     COMMENT '创建时间',
+    update_time DATETIME     COMMENT '更新时间',
+    INDEX idx_create_by (create_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工具注册表';
+
+-- =====================================================
+-- 10. MCP 服务器
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS mcp_server (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name        VARCHAR(100) NOT NULL COMMENT '名称',
+    description VARCHAR(500) COMMENT '描述',
+    transport   VARCHAR(20)  NOT NULL DEFAULT 'sse' COMMENT '传输方式：sse/stdio',
+    url         VARCHAR(500) COMMENT 'sse传输的服务地址',
+    command     VARCHAR(500) COMMENT 'stdio传输的启动命令',
+    config      LONGTEXT     COMMENT 'JSON配置（headers/env/args）',
+    enabled     TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用',
+    create_by   BIGINT       COMMENT '创建人ID',
+    deleted     TINYINT      NOT NULL DEFAULT 0,
+    create_time DATETIME     COMMENT '创建时间',
+    update_time DATETIME     COMMENT '更新时间',
+    INDEX idx_create_by (create_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MCP服务器表';
+
+-- =====================================================
 -- 初始数据
 -- =====================================================
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.models.embedding import EmbeddingBuildRequest, EmbeddingBuildResponse, EmbeddingDeleteRequest
+from app.models.embedding import EmbeddingBuildRequest, EmbeddingDeleteRequest
 from app.embedding.service import build_embedding
 from app.vectorstore.chroma_client import delete_by_document, delete_collection
 from app.utils.response import Result

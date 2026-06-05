@@ -66,10 +66,22 @@ const router = createRouter({
           meta: { title: 'Agent', icon: 'Cpu' }
         },
         {
+          path: 'tool',
+          name: 'Tool',
+          component: () => import('@/views/tool/index.vue'),
+          meta: { title: '工具中心', icon: 'Tools' }
+        },
+        {
+          path: 'mcp',
+          name: 'Mcp',
+          component: () => import('@/views/mcp/index.vue'),
+          meta: { title: 'MCP 服务器', icon: 'Link' }
+        },
+        {
           path: 'monitor',
           name: 'Monitor',
           component: () => import('@/views/monitor/index.vue'),
-          meta: { title: '监控', icon: 'Monitor' }
+          meta: { title: '监控', icon: 'Monitor', requiresAdmin: true }
         },
         {
           path: 'system/user',
@@ -82,6 +94,12 @@ const router = createRouter({
           name: 'SystemModel',
           component: () => import('@/views/system/model/index.vue'),
           meta: { title: '模型管理', icon: 'Cpu', requiresAdmin: true }
+        },
+        {
+          path: 'system/job',
+          name: 'SystemJob',
+          component: () => import('@/views/system/job/index.vue'),
+          meta: { title: '定时任务', icon: 'Timer', requiresAdmin: true }
         }
       ]
     },

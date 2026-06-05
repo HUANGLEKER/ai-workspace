@@ -61,6 +61,8 @@ python main.py                # runs uvicorn on port 8001 with auto-reload
 
 Key `.env` variables (uppercase, matching Pydantic field names): `LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL`, `LLM_EMBEDDING_MODEL`, `REDIS_HOST`, `CHROMA_HOST`, `CHROMA_COLLECTION_PREFIX`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`. FastAPI uses Redis DB 1; Spring Boot uses DB 0.
 
+The embedding pipeline writes downloaded documents to hardcoded `/tmp/` paths (`ai-service/app/embedding/service.py`, `_load_document`), which is POSIX-only. Run the AI service under WSL/Linux/Docker for RAG/embedding work — native Windows `python main.py` will fail on those paths.
+
 ### Database
 
 ```bash
@@ -87,14 +89,21 @@ No test suite exists yet. There are no `src/test/` directories in any Spring Boo
 - `workspace-chat` — session and message management
 - `workspace-kb` — knowledge base and document management
 - `workspace-file` — file center (MinIO integration)
-- `workspace-agent`, `workspace-workflow`, `workspace-monitor`, `workspace-job` — scaffolded, not yet implemented
+- `workspace-monitor` — dashboard stats (`DashboardController`) + system monitoring (`MonitorController`: server runtime metrics and dependency health checks, admin-only)
+- `workspace-agent` — user-owned Agent definitions (CRUD) + `POST /api/agent/{id}/run`. On run it resolves the agent's referenced Tool Center tools (`tools`) and MCP servers (`mcp_servers`) — owned + enabled — into rich specs (HTTP endpoint/config, SSE url) and posts them to FastAPI `/agent/run`, which executes a real tool-calling loop. Depends on `workspace-tool` and `workspace-mcp`.
+- `workspace-workflow` — user-owned Workflow definitions (CRUD) + `POST /api/workflow/{id}/run` proxying FastAPI `/workflow/run`
+- `workspace-job` — admin-only dynamic cron scheduler: `SysJob`/`SysJobLog`, runtime (un)scheduling on a `ThreadPoolTaskScheduler` (`JobSchedulerManager`), pluggable `JobHandler` beans resolved by name via `JobHandlerRegistry` (`SampleJobHandler` shipped); running jobs re-armed on startup
+- `workspace-prompt` — user-owned prompt library (CRUD, `/api/prompt`), `createBy`-scoped with title/category search
+- `workspace-tool` — user-owned tool registry (CRUD, `/api/tool`): name/type(http|builtin)/endpoint/config. HTTP tools are executed by the agent at run time (see `workspace-agent`); `config` JSON holds `{method, params:[{name,type,description,required}], headers}`
+- `workspace-mcp` — user-owned MCP server registry (CRUD, `/api/mcp`) with `POST /api/mcp/test/{id}` HTTP reachability check for `sse` transport; `sse` servers' tools are loaded by the agent at run time
 
 **FastAPI (`ai-service/app`):**
 
 - `chat/` — LLM invocation, SSE streaming (`POST /chat`)
 - `rag/` — vector retrieval + answer generation (`POST /rag/chat`)
 - `embedding/` — document chunking, embedding, ChromaDB writes (`POST /embedding/build`, `DELETE /embedding/delete`)
-- `agent/`, `workflow/` — LangGraph-based engines (`POST /agent/run`, `POST /workflow/run`)
+- `agent/` — tool-calling agent (`POST /agent/run`): binds HTTP tools built from `HttpToolSpec` (executed via `httpx`) plus tools loaded from SSE MCP servers via `langchain-mcp-adapters` (`MultiServerMCPClient`), then runs a bounded think→act loop returning the answer and a `steps` trace. MCP import is guarded so the service runs without the optional lib.
+- `workflow/` — LangGraph-based engine (`POST /workflow/run`)
 - `llm/provider.py` — LLM provider abstraction (OpenAI via LangChain)
 - `vectorstore/chroma_client.py` — ChromaDB HTTP client
 - `config/settings.py` — Pydantic `BaseSettings` loading from `.env`
@@ -152,7 +161,14 @@ User management: `/api/user/` (page/add/update/delete/status) in `workspace-syst
 Chat: `POST /api/chat/send` (SSE), session CRUD under `/api/chat/session/`  
 KB/RAG: `/api/kb/`, `/api/document/`, `/api/rag/chat`, `/api/rag/rebuild`  
 Files: `/api/file/` (MinIO-backed)  
-FastAPI internal (called by Spring Boot, not exposed to clients): `POST /chat`, `POST /rag/chat`, `POST /embedding/build`
+Monitor: `GET /api/dashboard/stats` (per-user counts); `GET /api/monitor/server` + `GET /api/monitor/health` in `workspace-monitor` `MonitorController` — admin-only (`@PreAuthorize("hasRole('ADMIN')")`), no DB tables; server metrics come from JDK MXBeans, health probes Redis (via `RedisConnectionFactory.ping`), FastAPI (`/health`), and MinIO (`/minio/health/live`).  
+Agent: `/api/agent/` (list/get/add/update/delete + `POST /api/agent/{id}/run`) — user-owned (`createBy`)
+Workflow: `/api/workflow/` (list/get/add/update/delete + `POST /api/workflow/{id}/run`) — user-owned (`createBy`)
+Job: `/api/job/` (page/handlers/add/update/delete/status + `POST /api/job/run/{id}`, `GET /api/job/log/page`, `DELETE /api/job/log/clean`) — admin-only (`@PreAuthorize("hasRole('ADMIN')")`); cron is Spring 6-field, validated via `CronExpression.isValidExpression`
+Prompt: `/api/prompt/` (list/get/add/update/delete) — user-owned (`createBy`)
+Tool: `/api/tool/` (list/get/add/update/delete) — user-owned (`createBy`)
+MCP: `/api/mcp/` (list/get/add/update/delete + `POST /api/mcp/test/{id}`) — user-owned (`createBy`)
+FastAPI internal (called by Spring Boot, not exposed to clients): `POST /chat`, `POST /rag/chat`, `POST /embedding/build`, `POST /agent/run`, `POST /workflow/run`
 
 Swagger UI: `http://localhost:8080/swagger-ui.html`  
 FastAPI health check: `GET http://localhost:8001/health`
@@ -160,11 +176,17 @@ FastAPI health check: `GET http://localhost:8001/health`
 ## Database Key Tables
 
 - `sys_user`, `sys_role`, `sys_menu`, `sys_user_role`, `sys_role_menu` — RBAC system
-- `chat_session`, `chat_message`, `chat_model` — chat module
+- `chat_session`, `chat_message`, `chat_model` — chat module. The `chat_model` table is owned and managed entirely by Spring Boot (`workspace-chat` `ChatModelController`/`ChatModelService`, admin UI at `views/system/model`). FastAPI does **not** read MySQL; the selected model name is passed through per request in the chat payload (`model` field in `ai-service/app/models/chat.py`), defaulting to the AI service's `LLM_MODEL` when absent.
 - `kb_knowledge_base`, `kb_document`, `kb_chunk_task` — knowledge base + RAG pipeline (`kb_chunk_task.task_status`: PENDING/RUNNING/SUCCESS/FAILED; `kb_document.status`: PENDING/PROCESSING/DONE/FAILED)
 - `file_info` — file center
+- `agent` — Agent definitions (`workspace-agent`), user-owned via `createBy`; `tools` is a JSON-array string
+- `workflow` — Workflow definitions (`workspace-workflow`), user-owned via `createBy`; `definition` is a JSON string
+- `sys_job`, `sys_job_log` — cron jobs + execution logs (`workspace-job`). `sys_job.status`: 0=running/scheduled, 1=paused; `invoke_target` references a `JobHandler` bean name. `sys_job_log` has **no** `deleted` column (physical-delete on "clean logs") and only a `create_time`.
+- `prompt` — prompt library (`workspace-prompt`), user-owned via `createBy`
+- `tool` — tool registry (`workspace-tool`), user-owned via `createBy`; `tool_type` is http/builtin, `config` a JSON string
+- `mcp_server` — MCP server registry (`workspace-mcp`), user-owned via `createBy`; `transport` is sse/stdio
 
-All tables use `BIGINT AUTO_INCREMENT` PKs, soft-delete via `deleted TINYINT`, and `utf8mb4` collation. Timestamps auto-filled by `MetaObjectHandlerConfig`.
+All tables use `BIGINT AUTO_INCREMENT` PKs, soft-delete via `deleted TINYINT`, and `utf8mb4` collation. Timestamps auto-filled by `MetaObjectHandlerConfig` (`sys_job_log` is the exception — append-only, only `create_time` filled).
 
 ## Sprint Roadmap
 
@@ -173,3 +195,6 @@ All tables use `BIGINT AUTO_INCREMENT` PKs, soft-delete via `deleted TINYINT`, a
 3. Sprint 3 ✓ — File center (MinIO) + KB CRUD + document management
 4. Sprint 4 ✓ — RAG pipeline: workspace-chat/file/kb modules implemented; async embedding pipeline; SSE proxy to FastAPI
 5. Sprint 5 ✓ — Dashboard stats: `GET /api/dashboard/stats` in `workspace-monitor`; frontend fetches on mount
+6. Sprint 6 ✓ — System monitoring (`workspace-monitor` `MonitorController`); Agent + Workflow modules (CRUD + run proxy to FastAPI); dynamic cron scheduler (`workspace-job`)
+7. Sprint 7 ✓ — Prompt Center (`workspace-prompt`), Tool Center (`workspace-tool`), MCP server registry (`workspace-mcp`) — user-owned CRUD; MCP connectivity test
+8. Sprint 8 ✓ — Agent runtime tool use: real HTTP tool execution + SSE MCP tool loading wired through Spring → FastAPI tool-calling loop; agent UI picks tools/MCP servers and shows the execution trace

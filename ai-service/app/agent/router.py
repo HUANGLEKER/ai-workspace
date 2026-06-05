@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.models.agent import AgentRunRequest, AgentRunResponse
+from app.models.agent import AgentRunRequest
 from app.agent.service import run_agent
 from app.utils.response import Result
 
