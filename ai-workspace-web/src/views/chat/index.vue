@@ -100,9 +100,12 @@
               size="small"
               style="width: 160px"
             >
-              <el-option label="gpt-4o-mini" value="gpt-4o-mini" />
-              <el-option label="gpt-4o" value="gpt-4o" />
-              <el-option label="gpt-3.5-turbo" value="gpt-3.5-turbo" />
+              <el-option
+                v-for="m in models"
+                :key="m.id"
+                :label="m.modelName"
+                :value="m.modelName"
+              />
             </el-select>
             <span class="input-tip">Ctrl + Enter 发送</span>
           </div>
@@ -137,8 +140,8 @@ import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Cpu, UserFilled, Promotion } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
-import type { ChatSession, ChatMessage } from '@/types'
-import { listSessions, createSession, deleteSession, listMessages, sendMessageStream } from '@/api/chat'
+import type { ChatSession, ChatMessage, ChatModel } from '@/types'
+import { listModels, listSessions, createSession, deleteSession, listMessages, sendMessageStream } from '@/api/chat'
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true })
 const renderMd = (content: string) => md.render(content || '')
@@ -150,8 +153,20 @@ const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const streaming = ref(false)
 const streamingContent = ref('')
-const selectedModel = ref('gpt-4o-mini')
+const models = ref<ChatModel[]>([])
+const selectedModel = ref('')
 const messagesRef = ref<HTMLElement>()
+
+async function loadModels() {
+  try {
+    models.value = await listModels()
+    if (models.value.length && !selectedModel.value) {
+      selectedModel.value = models.value[0].modelName
+    }
+  } catch {
+    models.value = []
+  }
+}
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -160,7 +175,10 @@ const scrollToBottom = async () => {
   }
 }
 
-onMounted(loadSessions)
+onMounted(() => {
+  loadModels()
+  loadSessions()
+})
 
 async function loadSessions() {
   sessionsLoading.value = true

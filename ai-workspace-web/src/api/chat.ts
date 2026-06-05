@@ -1,5 +1,24 @@
 import request from './request'
-import type { ChatSession, ChatMessage } from '@/types'
+import type { ChatSession, ChatMessage, ChatModel, PageResult } from '@/types'
+
+export const listModels = () =>
+  request.get<unknown, ChatModel[]>('/chat/model/list')
+
+// --- 模型管理（管理员） ---
+export const pageModels = (params: { page: number; size: number; modelName?: string }) =>
+  request.get<unknown, PageResult<ChatModel>>('/chat/model/page', { params })
+
+export const addModel = (data: ChatModel) =>
+  request.post<unknown, void>('/chat/model/add', data)
+
+export const updateModel = (data: ChatModel) =>
+  request.put<unknown, void>('/chat/model/update', data)
+
+export const deleteModel = (id: number) =>
+  request.delete<unknown, void>(`/chat/model/delete/${id}`)
+
+export const toggleModelStatus = (id: number, enabled: number) =>
+  request.put<unknown, void>('/chat/model/status', { id, enabled })
 
 export const listSessions = () =>
   request.get<unknown, ChatSession[]>('/chat/session/list')

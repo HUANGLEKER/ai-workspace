@@ -76,6 +76,12 @@ const router = createRouter({
           name: 'SystemUser',
           component: () => import('@/views/system/user/index.vue'),
           meta: { title: '用户管理', icon: 'User', requiresAdmin: true }
+        },
+        {
+          path: 'system/model',
+          name: 'SystemModel',
+          component: () => import('@/views/system/model/index.vue'),
+          meta: { title: '模型管理', icon: 'Cpu', requiresAdmin: true }
         }
       ]
     },

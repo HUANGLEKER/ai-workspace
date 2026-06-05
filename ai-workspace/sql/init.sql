@@ -100,6 +100,12 @@ CREATE TABLE IF NOT EXISTS chat_model (
     update_time DATETIME     COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='模型配置表';
 
+-- 默认模型（前端模型下拉从该表动态加载 enabled=1 的记录）
+INSERT INTO chat_model (model_name, provider, enabled, create_time, update_time) VALUES
+    ('gpt-4o-mini',   'OpenAI', 1, NOW(), NOW()),
+    ('gpt-4o',        'OpenAI', 1, NOW(), NOW()),
+    ('gpt-3.5-turbo', 'OpenAI', 1, NOW(), NOW());
+
 -- =====================================================
 -- 3. 知识库模块
 -- =====================================================

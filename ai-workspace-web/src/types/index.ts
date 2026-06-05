@@ -44,6 +44,17 @@ export interface ChatSession {
   updateTime: string
 }
 
+export interface ChatModel {
+  id?: number
+  modelName: string
+  provider: string
+  apiUrl?: string
+  apiKey?: string
+  enabled: number
+  createTime?: string
+  updateTime?: string
+}
+
 export interface ChatMessage {
   id?: number
   sessionId?: number
