@@ -40,7 +40,7 @@ fastapi:
   base-url: http://localhost:8001
 
 minio:
-  endpoint: localhost:9000
+  endpoint: http://localhost:9000
   access-key: minioadmin
   secret-key: minioadmin
   bucket: ai-workspace

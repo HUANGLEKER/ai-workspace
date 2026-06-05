@@ -1,0 +1,27 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: ai-workspace-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API（后端 / FastAPI 连接）
+      - "9011:9001"   # Web 控制台（宿主机 9011，因 9001 被系统进程占用）
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-workspace-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+
+volumes:
+  minio-data:
+  chroma-data:

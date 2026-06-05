@@ -41,9 +41,11 @@ npm run build    # production build (runs vue-tsc then vite build)
 
 ```bash
 # From ai-workspace/
-./mvnw.cmd clean package -DskipTests   # build
-./mvnw.cmd spring-boot:run             # run (dev profile active by default)
+./mvnw.cmd clean install -DskipTests          # build + install all modules to local repo
+./mvnw.cmd -pl workspace-admin spring-boot:run  # run (dev profile active by default)
 ```
+
+`spring-boot:run` must target the `workspace-admin` module (`-pl workspace-admin`); the root pom is a `pom`-packaging aggregator with no main class, so running it there fails with "Unable to find a suitable main class". Run `install` first so the sibling modules are available to the admin module.
 
 Config: `workspace-admin/src/main/resources/application.yml` (base) and `application-dev.yml` (dev — MySQL, Redis).  
 Default credentials: MySQL `root / 123456`, admin user `admin / admin123`.
@@ -65,6 +67,10 @@ Key `.env` variables (uppercase, matching Pydantic field names): `LLM_API_KEY`, 
 # Run once to create schema and seed default admin
 mysql -u root -p < ai-workspace/sql/init.sql
 ```
+
+### Local infra (MinIO + ChromaDB)
+
+MySQL and Redis run natively on this machine; MinIO and ChromaDB do not. Without them, Chat and RBAC still work, but file upload/download and RAG vector retrieval do not. The README documents bringing up only the two missing components via `docker-compose.infra.yml` (MinIO on 9000/9001, ChromaDB on 8000) — do not containerize MySQL/Redis as well, to avoid port conflicts.
 
 ## Tests
 
@@ -129,11 +135,20 @@ User-owned resources (knowledge bases, documents, files, chat sessions/messages)
 
 `@Async` self-invocation does not go through the Spring proxy, so it runs synchronously. Call async methods (e.g. `EmbeddingService` rebuild/build) via the injected bean reference, not `this.`.
 
+## RBAC / Method Security
+
+`LoginUser` authorities are loaded from role codes (`sys_user_role` → `sys_role.role_code`), where `role_code` already carries the `ROLE_` prefix, so `@PreAuthorize("hasRole('ADMIN')")` works directly. The frontend exposes `isAdmin` from `/auth/info` roles, hides the system menu for non-admins, and guards the route in the router (user info is loaded in the router guard so it survives refresh/direct navigation).
+
+## Resource Ownership note
+
+Ownership column names are inconsistent across modules — `file_info` scopes by `uploadBy`, KB/document by `createBy`, chat by `userId`. Verify the right column before adding filters; an IDOR bug previously leaked files because the list/presign paths weren't scoped to `uploadBy`.
+
 ## Key API Conventions
 
 All Spring Boot REST endpoints are prefixed `/api/`. Standard response wrapper (`code`, `message`, `data`) from `workspace-common/Result.java`.
 
-Auth: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/info`  
+Auth: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/info` (returns roles)  
+User management: `/api/user/` (page/add/update/delete/status) in `workspace-system` `SysUserController` — locked with `@PreAuthorize("hasRole('ADMIN')")`. Passwords BCrypt-encoded; username immutable on update; password re-hashed only when a new one is sent; hashes stripped from list responses.  
 Chat: `POST /api/chat/send` (SSE), session CRUD under `/api/chat/session/`  
 KB/RAG: `/api/kb/`, `/api/document/`, `/api/rag/chat`, `/api/rag/rebuild`  
 Files: `/api/file/` (MinIO-backed)  

@@ -115,12 +115,14 @@ npm run dev
 ### 3. 启动后端项目 (Spring Boot)
 ```bash
 cd ai-workspace
-# 编译并打包
-./mvnw.cmd clean package -DskipTests
-# 启动服务
-./mvnw.cmd spring-boot:run
+# 编译并安装所有模块到本地仓库
+./mvnw.cmd clean install -DskipTests
+# 从入口模块 workspace-admin 启动服务
+./mvnw.cmd -pl workspace-admin spring-boot:run
 # 默认运行在 http://localhost:8080
 ```
+> ⚠️ `spring-boot:run` 必须指定入口模块 `-pl workspace-admin`：根 `pom` 是聚合模块、无主类，直接在根目录运行会报 "Unable to find a suitable main class"。需先执行 `install` 让各子模块进入本地仓库。
+
 *(配置文件位置：`workspace-admin/src/main/resources/application-dev.yml`)*
 
 ### 4. 启动 AI 服务 (FastAPI)
@@ -132,6 +134,146 @@ pip install -r requirements.txt
 python main.py
 # 默认运行在 http://localhost:8001
 ```
+
+## 🐳 部署 MinIO 与 ChromaDB（缺失组件补齐）
+
+当前机器仅有 **MySQL** 和 **Redis**，尚缺文件中心依赖的 **MinIO** 与 RAG 依赖的 **ChromaDB**。
+缺少这两者不影响纯 Chat 与 RBAC，但文件上传/下载、知识库向量检索将不可用。
+
+**推荐方案：用 Docker 单独部署这两个缺失组件**——零编译、隔离干净、随删随起。
+MySQL 和 Redis 已在本机原生运行，**不要**再用容器重复启动，以免端口冲突。
+
+### 1. 安装 Docker Desktop
+
+安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)（Windows 自带 WSL2 后端），确认：
+
+```powershell
+docker version
+```
+
+### 2. 在项目根目录创建 `docker-compose.infra.yml`
+
+```yaml
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: ai-workspace-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API（后端 / FastAPI 连接）
+      - "9011:9001"   # Web 控制台（宿主机 9011，因本机 9001 被系统进程占用）
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-workspace-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+
+volumes:
+  minio-data:
+  chroma-data:
+```
+
+### 3. 启动并初始化
+
+```powershell
+docker compose -f docker-compose.infra.yml up -d
+docker compose -f docker-compose.infra.yml ps
+```
+
+文件中心需要名为 `ai-workspace` 的存储桶，两种方式任选其一创建：
+
+- **控制台**：打开 http://localhost:9011 （本机 9001 被系统进程占用，故控制台映射到宿主机 9011；S3 API 仍为 9000，不受影响），用 `minioadmin / minioadmin` 登录后新建桶 `ai-workspace`。
+- **命令行**：
+
+```powershell
+docker run --rm --network host minio/mc sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/ai-workspace"
+```
+
+ChromaDB 无需手动建集合，FastAPI 首次写入时会按 `CHROMA_COLLECTION_PREFIX` 自动创建。
+
+### 4. 健康检查
+
+```powershell
+curl http://localhost:9000/minio/health/live      # MinIO
+curl http://localhost:8000/api/v2/heartbeat        # ChromaDB
+```
+
+### 5. 配置 `ai-service/.env`
+
+由 `.env.example` 复制后保持以下默认值即可对接上面的容器：
+
+```dotenv
+CHROMA_HOST=localhost
+CHROMA_PORT=8000
+CHROMA_COLLECTION_PREFIX=ai_workspace
+
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=ai-workspace
+MINIO_SECURE=false
+```
+
+> **备选（不使用 Docker）**：MinIO 可从 https://min.io/download 下载 `minio.exe` 运行
+> `.\minio.exe server D:\minio-data --console-address ":9011"`（本机 9001 被系统进程占用）；ChromaDB 可 `pip install chromadb`
+> 后运行 `chroma run --host 0.0.0.0 --port 8000 --path D:\chroma-data`（建议放独立虚拟环境避免依赖冲突）。
+
+> **数据持久化**：容器数据保存在 Docker 卷 `minio-data` / `chroma-data`，`docker compose down` 不加 `-v` 不会丢数据。
+
+## 🐍 Python 依赖安装（已适配 Python 3.14）
+
+`ai-service` 的 `requirements.txt` 已升级并**锁定为在 Python 3.14 上验证可运行的版本**。
+相比最初基线,这是一次大版本升级:langchain `0.3.x → 1.3.x`、chromadb `0.6.x → 1.5.x`、
+langgraph `0.2.x → 1.2.x`、fastapi/pydantic 等同步升级。3.14 上所有包均有预编译 wheel,无需本地编译。
+
+### 安装步骤
+
+```powershell
+cd "C:\Users\leker\Desktop\AI Workspace\ai-service"
+
+# 1. 用 Python 3.14 创建虚拟环境
+python -m venv .venv
+
+# 2. 激活（若报执行策略错误，先跑一次下面被注释的命令）
+.\.venv\Scripts\Activate.ps1
+# Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+# 3. 升级 pip 并安装
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# 4. 配置环境变量
+copy .env.example .env   # 填入 LLM_API_KEY 等
+
+# 5. 启动
+python main.py           # http://localhost:8001
+```
+
+验证:`curl http://localhost:8001/health` 返回 `{"code":200,"message":"ok"}`。
+
+### 升级带来的代码变更
+
+langchain 1.x 拆分了文本分割模块,已相应修改:
+
+- `app/embedding/service.py`:`from langchain.text_splitter ...` → `from langchain_text_splitters import RecursiveCharacterTextSplitter`
+
+### 注意事项
+
+- **客户端版本对齐**:chromadb 客户端为 `1.5.9`,与 Docker 镜像 `chromadb/chroma:latest`(1.x)匹配,
+  心跳端点为 `/api/v2/heartbeat`。
+- **运行期功能需实测**:上述已验证服务可正常启动、所有模块可加载。但 RAG / embedding / agent
+  链路涉及 langchain 1.x、chromadb 1.x 的运行时行为,建议接好 LLM Key 与 MinIO/ChromaDB 容器后,
+  实测「上传文档 → 向量化 → RAG 问答」全链路;如遇 1.x API 差异,可能需要少量适配。
 
 ## 📝 开发进度表 (Roadmap)
 
