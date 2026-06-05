@@ -7,9 +7,14 @@ AI Workspace 是一个集成了聊天、知识库、RAG（检索增强生成）�
 - **AI Chat**: 支持多模型对话，提供流式输出体验。
 - **知识库 (Knowledge Base) & RAG**: 基于私有数据的检索增强生成引擎，支持上传文档并进行智能问答。
 - **文件中心 (File Center)**: 基于 MinIO 的文件集中管理系统。
-- **工作流 & Agent**: 强大的基于 LangGraph/LangChain 的 AI 代理和工作流编排能力。
-- **提示词中心 & MCP**: 提供系统化的高级提示词管理，及多端工具整合。
-- **仪表盘 (Dashboard)**: 可视化统计 Token 消耗、会话状态和系统运行情况。
+- **Agent (智能体)**: 可配置系统提示词与模型；运行时真实调用工具中心的 HTTP 工具，并通过 SSE 加载 MCP 服务器工具，返回完整执行轨迹。
+- **工作流 (Workflow)**: 基于 LangGraph/LangChain 的工作流编排与运行。
+- **工具中心 (Tool Center)**: HTTP / 内置工具注册表，供 Agent 运行时按需调用。
+- **MCP 服务器**: MCP（Model Context Protocol）服务器注册表，支持 SSE 连通性检测与运行时工具加载。
+- **提示词中心 (Prompt Center)**: 系统化的提示词模板管理，支持分类检索与一键复制。
+- **定时任务 (Scheduled Jobs)**: 管理员可视化的动态 Cron 调度器，支持可插拔任务处理器与执行日志（管理员）。
+- **系统监控 (Monitor)**: 服务器运行时指标（CPU/内存/磁盘/JVM）与依赖服务（Redis/FastAPI/MinIO）健康检查（管理员）。
+- **仪表盘 (Dashboard)**: 可视化统计会话、知识库、文档与文件等概览。
 
 ## 🛠️ 技术栈
 
@@ -37,8 +42,10 @@ AI Workspace 是一个集成了聊天、知识库、RAG（检索增强生成）�
 │ Spring Boot (Port: 8080) │
 ├──────────────────────────┤
 │ Auth & RBAC              │
-│ Chat Management          │
-│ Knowledge Base & File    │
+│ Chat / KB / File         │
+│ Agent / Workflow         │
+│ Prompt / Tool / MCP      │
+│ Job & Monitor (admin)    │
 └────────────┬─────────────┘
              │ HTTP Proxy
              ▼
@@ -47,7 +54,8 @@ AI Workspace 是一个集成了聊天、知识库、RAG（检索增强生成）�
 ├──────────────────────────┤
 │ Chat / Streaming Engine  │
 │ Embedding & RAG Engine   │
-│ Agent / Workflow Engine  │
+│ Agent (Tools + MCP)      │
+│ Workflow Engine          │
 └────────────┬─────────────┘
              │
  ┌───────────┼───────────┐
@@ -70,11 +78,20 @@ ai-workspace/
 │   ├── workspace-system     # RBAC 系统
 │   ├── workspace-chat       # 会话管理
 │   ├── workspace-kb         # 知识库
-│   └── workspace-file       # 文件中心
+│   ├── workspace-file       # 文件中心
+│   ├── workspace-agent      # Agent (CRUD + 运行时工具/MCP 调用)
+│   ├── workspace-workflow   # 工作流
+│   ├── workspace-prompt     # 提示词中心
+│   ├── workspace-tool       # 工具中心
+│   ├── workspace-mcp        # MCP 服务器注册表
+│   ├── workspace-job        # 定时任务调度 (管理员)
+│   └── workspace-monitor    # 仪表盘统计 + 系统监控
 └── ai-service/           # FastAPI AI 服务
     ├── app/chat             # 聊天核心逻辑
     ├── app/rag              # RAG 检索生成
-    └── app/embedding        # 向量化处理
+    ├── app/embedding        # 向量化处理
+    ├── app/agent            # 工具调用 Agent (HTTP 工具 + MCP)
+    └── app/workflow         # 工作流引擎
 ```
 
 ## 💻 环境要求 (Prerequisites)
@@ -274,6 +291,9 @@ langchain 1.x 拆分了文本分割模块,已相应修改:
 - **运行期功能需实测**:上述已验证服务可正常启动、所有模块可加载。但 RAG / embedding / agent
   链路涉及 langchain 1.x、chromadb 1.x 的运行时行为,建议接好 LLM Key 与 MinIO/ChromaDB 容器后,
   实测「上传文档 → 向量化 → RAG 问答」全链路;如遇 1.x API 差异,可能需要少量适配。
+- **MCP 依赖**:Agent 运行时通过 `langchain-mcp-adapters` + `mcp` 加载 SSE MCP 服务器工具,二者已加入
+  `requirements.txt`。该能力仅在 AI 服务运行环境(WSL/Linux/Docker)生效,且首次实跑建议复核
+  `MultiServerMCPClient` 的 API 与锁定版本;Agent 的 HTTP 工具调用基于已内置的 `httpx`,无额外依赖。
 
 ## 📝 开发进度表 (Roadmap)
 
@@ -282,6 +302,9 @@ langchain 1.x 拆分了文本分割模块,已相应修改:
 - [x] **Sprint 3**: 文件中心 (MinIO) 对接，知识库基础 CRUD 开发。
 - [x] **Sprint 4**: RAG 引擎上线，支持文档解析、Chunk 切片、Embedding 向量化与问答。
 - [x] **Sprint 5**: 数据看板 (Dashboard) 完成统计与概览开发。
+- [x] **Sprint 6**: 系统监控 (Monitor) 上线；Agent 与工作流模块（CRUD + 运行代理至 FastAPI）；动态 Cron 定时任务调度器 (Job)。
+- [x] **Sprint 7**: 提示词中心 (Prompt)、工具中心 (Tool)、MCP 服务器注册表上线（用户级 CRUD，含 MCP 连通性检测）。
+- [x] **Sprint 8**: Agent 运行时工具联动——真实 HTTP 工具执行 + SSE MCP 工具加载，贯通 Spring → FastAPI 工具调用循环；前端可选择工具/MCP 并展示执行轨迹。
 
 ## 📄 许可证
 
