@@ -5,7 +5,7 @@ AI Workspace 是一个集成了聊天、知识库、RAG（检索增强生成）�
 ## 🌟 核心特性
 
 - **AI Chat**: 支持多模型对话，提供流式输出体验。
-- **知识库 (Knowledge Base) & RAG**: 基于私有数据的检索增强生成引擎，支持上传文档并进行智能问答。
+- **知识库 (Knowledge Base) & RAG**: 基于私有数据的检索增强生成引擎，支持上传文档并进行智能问答；内置独立的**流式问答页**，回答逐字输出并以可折叠面板展示引用来源与相关度。
 - **文件中心 (File Center)**: 基于 MinIO 的文件集中管理系统。
 - **Agent (智能体)**: 可配置系统提示词与模型；运行时真实调用工具中心的 HTTP 工具，并通过 SSE 加载 MCP 服务器工具，返回完整执行轨迹。
 - **工作流 (Workflow)**: 基于 LangGraph/LangChain 的工作流编排与运行。
@@ -22,7 +22,7 @@ AI Workspace 是一个集成了聊天、知识库、RAG（检索增强生成）�
 
 | 层级 | 技术与框架 | 
 | --- | --- |
-| **前端 (Frontend)** | Vue3, TypeScript, Element Plus, Pinia, Vite |
+| **前端 (Frontend)** | Vue3, TypeScript, Element Plus（按需引入）, Pinia, Vite |
 | **后端 (Backend)** | Spring Boot 3.5.x, JDK 25, MyBatis Plus, JJWT, Spring Security |
 | **AI 服务 (AI Service)** | FastAPI 0.115, LangGraph, LangChain, OpenAI API |
 | **关系型数据库** | MySQL 8 |
@@ -65,6 +65,13 @@ Redis      ChromaDB     MinIO
              ▼
             LLM
 ```
+
+**稳定性与性能要点**：
+
+- **统一 AI 服务客户端**：Spring Boot 调用 FastAPI 的所有请求（Chat/RAG/Agent/Workflow/Embedding）收敛到单一 `FastApiClient`（基于 JDK `HttpClient`、连接池复用、集中超时），不再各处裸用 `HttpURLConnection`。
+- **线程池隔离**：SSE 流式代理使用独立 `streamExecutor`，与嵌入管道的 `taskExecutor` 分离，避免长连接占满线程池互相饥饿；两者均配 `CallerRunsPolicy` 与优雅关闭。
+- **上下文有界 & 断连保存**：聊天仅回放最近 N 条消息给 LLM；客户端中途断开时已生成的部分回复仍会落库。
+- **前端按需与拆包**：Element Plus 按需引入（组件/指令/样式/图标自动导入），`manualChunks` 按路由拆分，首屏仅加载所需组件。
 
 ## 📁 目录结构
 
@@ -305,6 +312,7 @@ langchain 1.x 拆分了文本分割模块,已相应修改:
 - [x] **Sprint 6**: 系统监控 (Monitor) 上线；Agent 与工作流模块（CRUD + 运行代理至 FastAPI）；动态 Cron 定时任务调度器 (Job)。
 - [x] **Sprint 7**: 提示词中心 (Prompt)、工具中心 (Tool)、MCP 服务器注册表上线（用户级 CRUD，含 MCP 连通性检测）。
 - [x] **Sprint 8**: Agent 运行时工具联动——真实 HTTP 工具执行 + SSE MCP 工具加载，贯通 Spring → FastAPI 工具调用循环；前端可选择工具/MCP 并展示执行轨迹。
+- [x] **Sprint 9**: 架构优化——统一 `FastApiClient`（连接池 + 集中超时）、SSE/嵌入线程池隔离、聊天上下文有界化与断连保存、CORS/LLM 超时重试修复；前端统一 `streamSSE` 流式工具、新增 RAG 流式问答页、Element Plus 按需引入 + 路由级拆包（消除 >500KB 单体包）。
 
 ## 📄 许可证
 
