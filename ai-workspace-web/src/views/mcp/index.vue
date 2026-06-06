@@ -11,7 +11,7 @@
         <el-table-column label="名称" prop="name" width="150" />
         <el-table-column label="传输" prop="transport" width="90" align="center">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.transport === 'sse' ? '' : 'warning'">{{ row.transport }}</el-tag>
+            <el-tag size="small" :type="row.transport === 'sse' ? 'info' : 'warning'">{{ row.transport }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="地址 / 命令" min-width="240" show-overflow-tooltip>
@@ -28,7 +28,7 @@
           <template #default="{ row }">
             <el-button link type="primary" :icon="Connection" :loading="testingId === row.id"
               @click="handleTest(row.id)">测试</el-button>
-            <el-button link :icon="Edit" @click="openDialog(row)">编辑</el-button>
+            <el-button link :icon="Edit" @click="openDialog(row as McpServer)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -78,7 +78,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete, Connection } from '@element-plus/icons-vue'
 import {

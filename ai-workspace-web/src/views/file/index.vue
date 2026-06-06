@@ -53,7 +53,7 @@
         </el-table-column>
         <el-table-column label="操作" width="120" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link :icon="Download" @click="handleDownload(row)">下载</el-button>
+            <el-button link :icon="Download" @click="handleDownload(row as FileInfo)">下载</el-button>
             <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -75,7 +75,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Search, Refresh, Delete, Download } from '@element-plus/icons-vue'
 import type { FileInfo } from '@/types'
 import { listFiles, deleteFile, getFileUrl } from '@/api/file'

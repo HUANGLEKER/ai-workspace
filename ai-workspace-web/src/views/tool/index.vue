@@ -11,7 +11,7 @@
         <el-table-column label="名称" prop="name" width="160" />
         <el-table-column label="类型" prop="toolType" width="100" align="center">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.toolType === 'http' ? '' : 'success'">{{ row.toolType }}</el-tag>
+            <el-tag size="small" :type="row.toolType === 'http' ? 'info' : 'success'">{{ row.toolType }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="描述" prop="description" min-width="180" show-overflow-tooltip />
@@ -25,7 +25,7 @@
         </el-table-column>
         <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link :icon="Edit" @click="openDialog(row)">编辑</el-button>
+            <el-button link :icon="Edit" @click="openDialog(row as Tool)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -72,7 +72,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { listTools, addTool, updateTool, deleteTool, type Tool } from '@/api/tool'

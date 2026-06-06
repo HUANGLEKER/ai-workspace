@@ -119,10 +119,19 @@
               @keydown.ctrl.enter.prevent="handleSend"
             />
             <el-button
+              v-if="streaming"
+              type="danger"
+              :icon="CircleClose"
+              class="send-btn"
+              @click="handleStop"
+            >
+              停止
+            </el-button>
+            <el-button
+              v-else
               type="primary"
               :icon="Promotion"
-              :disabled="!inputText.trim() || streaming"
-              :loading="streaming"
+              :disabled="!inputText.trim()"
               class="send-btn"
               @click="handleSend"
             >
@@ -137,8 +146,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Cpu, UserFilled, Promotion } from '@element-plus/icons-vue'
+import { Plus, Delete, Cpu, UserFilled, Promotion, CircleClose } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
 import type { ChatSession, ChatMessage, ChatModel } from '@/types'
 import { listModels, listSessions, createSession, deleteSession, listMessages, sendMessageStream } from '@/api/chat'
@@ -156,6 +164,7 @@ const streamingContent = ref('')
 const models = ref<ChatModel[]>([])
 const selectedModel = ref('')
 const messagesRef = ref<HTMLElement>()
+let streamController: AbortController | null = null
 
 async function loadModels() {
   try {
@@ -252,6 +261,7 @@ async function handleSend() {
 
   streaming.value = true
   streamingContent.value = ''
+  streamController = new AbortController()
 
   sendMessageStream(
     currentSession.value.id,
@@ -261,17 +271,26 @@ async function handleSend() {
       scrollToBottom()
     },
     () => {
-      messages.value.push({ role: 'assistant', content: streamingContent.value })
+      if (streamingContent.value) {
+        messages.value.push({ role: 'assistant', content: streamingContent.value })
+      }
       streaming.value = false
       streamingContent.value = ''
+      streamController = null
       scrollToBottom()
     },
     (err) => {
       streaming.value = false
       streamingContent.value = ''
+      streamController = null
       ElMessage.error('发送失败：' + err)
-    }
+    },
+    streamController.signal
   )
+}
+
+function handleStop() {
+  streamController?.abort()
 }
 </script>
 

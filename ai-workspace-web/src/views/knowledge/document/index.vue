@@ -71,7 +71,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Upload, Refresh, Delete } from '@element-plus/icons-vue'
 import type { KbDocument } from '@/types'
 import { listDocuments, deleteDocument, rebuildRag } from '@/api/kb'

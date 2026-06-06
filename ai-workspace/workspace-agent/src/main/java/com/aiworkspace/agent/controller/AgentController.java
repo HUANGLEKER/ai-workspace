@@ -5,6 +5,7 @@ import com.aiworkspace.agent.entity.Agent;
 import com.aiworkspace.agent.service.AgentService;
 import com.aiworkspace.common.exception.BusinessException;
 import com.aiworkspace.common.response.Result;
+import com.aiworkspace.framework.client.FastApiClient;
 import com.aiworkspace.mcp.entity.McpServer;
 import com.aiworkspace.mcp.service.McpServerService;
 import com.aiworkspace.system.security.LoginUser;
@@ -15,15 +16,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -40,18 +36,18 @@ public class AgentController {
     private final ToolService toolService;
     private final McpServerService mcpServerService;
     private final ObjectMapper objectMapper;
-
-    @Value("${fastapi.base-url}")
-    private String fastapiBaseUrl;
+    private final FastApiClient fastApiClient;
 
     public AgentController(AgentService agentService,
                           ToolService toolService,
                           McpServerService mcpServerService,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          FastApiClient fastApiClient) {
         this.agentService = agentService;
         this.toolService = toolService;
         this.mcpServerService = mcpServerService;
         this.objectMapper = objectMapper;
+        this.fastApiClient = fastApiClient;
     }
 
     @Operation(summary = "我的Agent列表")
@@ -112,7 +108,7 @@ public class AgentController {
             body.put("model", agent.getModel());
         }
 
-        JsonNode data = postFastapi("/agent/run", body);
+        JsonNode data = fastApiClient.postForData("/agent/run", body);
         Map<String, Object> result = new HashMap<>();
         result.put("output", data.path("output").asText(""));
         result.put("steps", objectMapper.convertValue(data.path("steps"), List.class));
@@ -186,37 +182,6 @@ public class AgentController {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
             return new HashMap<>();
-        }
-    }
-
-    /** POST a JSON body to the FastAPI service and return the unwrapped {@code data} node. */
-    private JsonNode postFastapi(String path, Map<String, Object> body) {
-        HttpURLConnection conn = null;
-        try {
-            URI uri = URI.create(fastapiBaseUrl + path);
-            conn = (HttpURLConnection) uri.toURL().openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(180_000);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(objectMapper.writeValueAsBytes(body));
-            }
-            int code = conn.getResponseCode();
-            try (InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream()) {
-                JsonNode root = objectMapper.readTree(is);
-                if (code >= 400 || (root.has("code") && root.get("code").asInt() != 200)) {
-                    throw new BusinessException("AI服务调用失败: " + root.path("message").asText("HTTP " + code));
-                }
-                return root.path("data");
-            }
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BusinessException("AI服务不可用: " + e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
         }
     }
 

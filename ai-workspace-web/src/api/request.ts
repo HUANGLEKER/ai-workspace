@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
 
 const request = axios.create({
   baseURL: '/api',
@@ -26,7 +25,10 @@ request.interceptors.response.use(
   error => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
-      window.location.href = '/login'
+      // Avoid redirect loops if a request on the login page itself 401s.
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
       return Promise.reject(error)
     }
     const msg = error.response?.data?.message || error.message || '网络连接失败'

@@ -42,6 +42,12 @@ const router = createRouter({
           meta: { title: '文档管理', icon: 'Document' }
         },
         {
+          path: 'knowledge/rag',
+          name: 'KnowledgeRag',
+          component: () => import('@/views/knowledge/rag/index.vue'),
+          meta: { title: '知识库问答', icon: 'Search' }
+        },
+        {
           path: 'file',
           name: 'File',
           component: () => import('@/views/file/index.vue'),

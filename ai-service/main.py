@@ -1,8 +1,12 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.config.settings import settings
+
+logger = logging.getLogger("ai-service")
 
 app = FastAPI(
     title="AI Workspace Service",
@@ -12,8 +16,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=settings.cors_origin_list,
+    # Credentials cannot be combined with a wildcard origin (browsers reject it),
+    # and this service authenticates via headers, not cookies — so keep it off.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -23,6 +29,7 @@ app.include_router(api_router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
         content={"code": 500, "message": str(exc), "data": None},

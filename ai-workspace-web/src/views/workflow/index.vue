@@ -22,8 +22,8 @@
         </el-table-column>
         <el-table-column label="操作" width="220" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" :icon="VideoPlay" @click="openRun(row)">运行</el-button>
-            <el-button link :icon="Edit" @click="openDialog(row)">编辑</el-button>
+            <el-button link type="primary" :icon="VideoPlay" @click="openRun(row as Workflow)">运行</el-button>
+            <el-button link :icon="Edit" @click="openDialog(row as Workflow)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -45,7 +45,7 @@
         </el-form-item>
         <el-form-item label="模型">
           <el-select v-model="form.model" placeholder="留空使用默认模型" clearable style="width:100%">
-            <el-option v-for="m in models" :key="m.modelName" :label="m.modelName" :value="m.modelName" />
+            <el-option v-for="m in models" :key="m.modelName" :label="m.modelName" :value="m.modelName || ''" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -84,7 +84,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete, VideoPlay } from '@element-plus/icons-vue'
 import {

@@ -4,6 +4,13 @@ server:
     encoding:
       charset: UTF-8
       force: true
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 20
+    accept-count: 100
+    max-connections: 10000
+    connection-timeout: 20000
 
 spring:
   profiles:
@@ -18,7 +25,9 @@ spring:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # Route SQL logging through SLF4J (was StdOutImpl, which printed every statement
+    # to stdout — noisy and slow). Control verbosity via the logging level below.
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       logic-delete-field: deleted
@@ -38,6 +47,14 @@ jwt:
 
 fastapi:
   base-url: http://localhost:8001
+  connect-timeout: 10000
+  read-timeout: 180000
+  stream-timeout: 180000
+
+logging:
+  level:
+    # Set to DEBUG to see SQL again during local debugging.
+    com.aiworkspace: INFO
 
 minio:
   endpoint: http://localhost:9000

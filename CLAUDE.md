@@ -37,6 +37,8 @@ npm run dev      # dev server on port 3000 with proxy to localhost:8080
 npm run build    # production build (runs vue-tsc then vite build)
 ```
 
+Element Plus is **auto-imported on demand** (no global `app.use(ElementPlus)`): `vite.config.ts` wires `unplugin-auto-import` (for `ElMessage`/`ElMessageBox` etc.) and `unplugin-vue-components` with `ElementPlusResolver` plus a small resolver that maps template-used icons (`<Search/>`) to `@element-plus/icons-vue`. Do **not** add `import { ElMessage } from 'element-plus'` or globally register icons — just use them; the plugins inject the import and its styles. `:icon="X"` script bindings still import `X` explicitly. Locale lives in `App.vue`'s `<el-config-provider>`. The generated `src/auto-imports.d.ts` and `src/components.d.ts` are committed (not generated artifacts to ignore) because `npm run build` runs `vue-tsc` before Vite regenerates them — deleting them breaks a clean type-check. `build.rollupOptions.output.manualChunks` force-chunks only the framework core (`vue-vendor`) and the heavy markdown stack (`markdown`, lazy with chat/RAG); Element Plus is left to per-route splitting so first paint pulls only the components a page uses.
+
 ### Spring Boot backend
 
 ```bash
@@ -121,11 +123,11 @@ No test suite exists yet. There are no `src/test/` directories in any Spring Boo
 
 ## SSE Streaming
 
-Chat streaming (`POST /api/chat/send`) is implemented with raw `fetch()`, not Axios — Axios does not support SSE. The frontend (`api/chat.ts:sendMessageStream`) reads the response body as a `ReadableStream`, splits on `\n`, and parses `data: <json>` lines. The stream ends with `data: [DONE]`. The Spring Boot controller proxies this SSE from FastAPI through to the browser.
+Chat streaming (`POST /api/chat/send`) is implemented with raw `fetch()`, not Axios — Axios does not support SSE. All SSE consumers share one helper, `api/sse.ts:streamSSE`, which owns the transport concerns: auth header, incremental UTF-8 decode, `\n` line buffering, `data: <json>` parsing, the `data: [DONE]` sentinel, and `AbortSignal` cancellation. Callers supply only URL/body, an `extract` mapper (payload → display text), and `onChunk/onDone/onError`. `api/chat.ts:sendMessageStream` is a thin wrapper over it; new streaming endpoints (e.g. RAG) should reuse `streamSSE` with a custom `extract` rather than re-implementing the reader loop. The Spring Boot controller proxies this SSE from FastAPI through to the browser.
 
 ## Async Embedding Pipeline
 
-When a document is uploaded, `EmbeddingService.buildAsync()` (annotated `@Async("taskExecutor")`) runs on the thread pool defined in `workspace-framework/async/AsyncConfig.java` (10 core / 50 max / 200 queue). It:
+When a document is uploaded, `EmbeddingService.buildAsync()` (annotated `@Async("taskExecutor")`) runs on the embedding thread pool defined in `workspace-framework/async/AsyncConfig.java` (`taskExecutor`: 5 core / 10 max / 100 queue, `CallerRunsPolicy`). SSE proxy tasks (Chat/RAG streaming) run on a **separate** `streamExecutor` (20 core / 200 max / 0 queue) so long-lived streams can't starve the embedding pipeline. It:
 1. Inserts a `KbChunkTask` record with `task_status=RUNNING`
 2. Sets `kb_document.status=PROCESSING`
 3. POSTs to FastAPI `POST /embedding/build` (blocking HTTP call on async thread)
@@ -159,7 +161,7 @@ All Spring Boot REST endpoints are prefixed `/api/`. Standard response wrapper (
 Auth: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/info` (returns roles)  
 User management: `/api/user/` (page/add/update/delete/status) in `workspace-system` `SysUserController` — locked with `@PreAuthorize("hasRole('ADMIN')")`. Passwords BCrypt-encoded; username immutable on update; password re-hashed only when a new one is sent; hashes stripped from list responses.  
 Chat: `POST /api/chat/send` (SSE), session CRUD under `/api/chat/session/`  
-KB/RAG: `/api/kb/`, `/api/document/`, `/api/rag/chat`, `/api/rag/rebuild`  
+KB/RAG: `/api/kb/`, `/api/document/`, `/api/rag/chat` (SSE), `/api/rag/rebuild`. The frontend RAG Q&A page (`views/knowledge/rag`, route `/knowledge/rag`) streams answers via `api/kb.ts:ragChatStream`, which reuses the shared `streamSSE` with a custom `extract` that splits the `{type:'sources'}` metadata frame (rendered as collapsible source citations) from the `{content}` token frames.  
 Files: `/api/file/` (MinIO-backed)  
 Monitor: `GET /api/dashboard/stats` (per-user counts); `GET /api/monitor/server` + `GET /api/monitor/health` in `workspace-monitor` `MonitorController` — admin-only (`@PreAuthorize("hasRole('ADMIN')")`), no DB tables; server metrics come from JDK MXBeans, health probes Redis (via `RedisConnectionFactory.ping`), FastAPI (`/health`), and MinIO (`/minio/health/live`).  
 Agent: `/api/agent/` (list/get/add/update/delete + `POST /api/agent/{id}/run`) — user-owned (`createBy`)
@@ -168,7 +170,7 @@ Job: `/api/job/` (page/handlers/add/update/delete/status + `POST /api/job/run/{i
 Prompt: `/api/prompt/` (list/get/add/update/delete) — user-owned (`createBy`)
 Tool: `/api/tool/` (list/get/add/update/delete) — user-owned (`createBy`)
 MCP: `/api/mcp/` (list/get/add/update/delete + `POST /api/mcp/test/{id}`) — user-owned (`createBy`)
-FastAPI internal (called by Spring Boot, not exposed to clients): `POST /chat`, `POST /rag/chat`, `POST /embedding/build`, `POST /agent/run`, `POST /workflow/run`
+FastAPI internal (called by Spring Boot, not exposed to clients): `POST /chat`, `POST /rag/chat`, `POST /embedding/build`, `POST /agent/run`, `POST /workflow/run`. All of these go through the single shared `FastApiClient` (`workspace-framework/client`, JDK `HttpClient` with pooled connections + centralized timeouts) — `postForData` for unary JSON (agent/workflow), `send` for build/delete (embedding), `stream` for SSE proxy (chat/rag). Base URL and timeouts come from `FastApiProperties` (`fastapi.*` in `application.yml`); do not re-introduce per-call `HttpURLConnection`.
 
 Swagger UI: `http://localhost:8080/swagger-ui.html`  
 FastAPI health check: `GET http://localhost:8001/health`

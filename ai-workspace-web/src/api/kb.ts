@@ -1,5 +1,6 @@
 import request from './request'
-import type { KnowledgeBase, KbDocument, PageResult } from '@/types'
+import { streamSSE } from './sse'
+import type { KnowledgeBase, KbDocument, PageResult, RagSource } from '@/types'
 
 export const listKnowledgeBases = () =>
   request.get<unknown, KnowledgeBase[]>('/kb/list')
@@ -21,3 +22,39 @@ export const deleteDocument = (id: number) =>
 
 export const rebuildRag = (kbId: number) =>
   request.post<unknown, void>('/rag/rebuild', { kbId })
+
+/**
+ * Stream a RAG answer for a question against a knowledge base.
+ *
+ * Reuses the shared {@link streamSSE} transport. The backend proxies two frame
+ * shapes: a one-off `{type:'sources', sources:[...]}` metadata frame (surfaced
+ * via {@link onSources}) and repeated `{content:'<token>'}` token frames
+ * (surfaced via {@link onChunk}). Returns the promise from `streamSSE`.
+ */
+export const ragChatStream = (
+  params: { kbId: number; question: string; sessionId?: string; topK?: number },
+  onChunk: (text: string) => void,
+  onSources: (sources: RagSource[]) => void,
+  onDone: () => void,
+  onError: (err: string) => void,
+  signal?: AbortSignal
+) =>
+  streamSSE('/api/rag/chat', params, {
+    onChunk,
+    onDone,
+    onError,
+    signal,
+    extract: (data) => {
+      try {
+        const frame = JSON.parse(data)
+        // metadata frame — capture sources, emit nothing as text
+        if (frame.type === 'sources') {
+          onSources(frame.sources ?? [])
+          return undefined
+        }
+        return frame.content ?? frame.token ?? undefined
+      } catch {
+        return undefined
+      }
+    }
+  })

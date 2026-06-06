@@ -79,6 +79,14 @@ export interface KbDocument {
   createTime: string
 }
 
+// RAG 检索来源（流式问答时由 sources 帧携带）
+export interface RagSource {
+  document_id: string
+  file_name: string
+  content: string
+  score: number
+}
+
 // 文件相关
 export interface FileInfo {
   id: number

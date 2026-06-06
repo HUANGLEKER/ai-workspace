@@ -4,6 +4,7 @@ import com.aiworkspace.chat.dto.SendMessageRequest;
 import com.aiworkspace.chat.entity.ChatMessage;
 import com.aiworkspace.chat.service.ChatMessageService;
 import com.aiworkspace.chat.service.ChatSessionService;
+import com.aiworkspace.framework.client.FastApiClient;
 import com.aiworkspace.system.security.LoginUser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,18 +12,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,22 +27,25 @@ import java.util.concurrent.Executor;
 @RequestMapping("/api/chat")
 public class ChatController {
 
+    /** Upper bound on how many recent messages are replayed to the LLM as context. */
+    private static final int MAX_CONTEXT_MESSAGES = 20;
+
     private final ChatMessageService chatMessageService;
     private final ChatSessionService chatSessionService;
     private final ObjectMapper objectMapper;
-    private final Executor taskExecutor;
-
-    @Value("${fastapi.base-url}")
-    private String fastapiBaseUrl;
+    private final FastApiClient fastApiClient;
+    private final Executor streamExecutor;
 
     public ChatController(ChatMessageService chatMessageService,
                           ChatSessionService chatSessionService,
                           ObjectMapper objectMapper,
-                          @Qualifier("taskExecutor") Executor taskExecutor) {
+                          FastApiClient fastApiClient,
+                          @Qualifier("streamExecutor") Executor streamExecutor) {
         this.chatMessageService = chatMessageService;
         this.chatSessionService = chatSessionService;
         this.objectMapper = objectMapper;
-        this.taskExecutor = taskExecutor;
+        this.fastApiClient = fastApiClient;
+        this.streamExecutor = streamExecutor;
     }
 
     @Operation(summary = "发送消息（SSE流式）")
@@ -62,45 +59,30 @@ public class ChatController {
         // save user message
         chatMessageService.saveMessage(request.getSessionId(), "user", request.getContent());
 
-        // load full history for context
-        List<ChatMessage> history = chatMessageService.listBySessionId(request.getSessionId());
+        // load a bounded slice of recent history for context (keeps LLM token cost
+        // and latency from growing unbounded with conversation length)
+        List<ChatMessage> history =
+                chatMessageService.listRecentBySessionId(request.getSessionId(), MAX_CONTEXT_MESSAGES);
 
-        taskExecutor.execute(() -> {
+        // build FastAPI request body
+        List<Map<String, String>> messages = history.stream()
+                .map(m -> Map.of("role", m.getRole(), "content", m.getContent()))
+                .toList();
+        Map<String, Object> body = new HashMap<>();
+        body.put("session_id", String.valueOf(request.getSessionId()));
+        body.put("messages", messages);
+        body.put("stream", true);
+
+        streamExecutor.execute(() -> {
             StringBuilder assistantReply = new StringBuilder();
             try {
-                // build FastAPI request body
-                List<Map<String, String>> messages = history.stream()
-                        .map(m -> Map.of("role", m.getRole(), "content", m.getContent()))
-                        .toList();
-
-                Map<String, Object> body = new HashMap<>();
-                body.put("session_id", String.valueOf(request.getSessionId()));
-                body.put("messages", messages);
-                body.put("stream", true);
-
-                String requestJson = objectMapper.writeValueAsString(body);
-
-                URL url = java.net.URI.create(fastapiBaseUrl + "/chat").toURL();
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
-                conn.setConnectTimeout(10_000);
-                conn.setReadTimeout(180_000);
-
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(requestJson.getBytes(StandardCharsets.UTF_8));
-                }
-
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        if (!line.startsWith("data: ")) continue;
-                        String data = line.substring(6).trim();
+                fastApiClient.stream("/chat", body, line -> {
+                    if (!line.startsWith("data: ")) return;
+                    String data = line.substring(6).trim();
+                    try {
                         if ("[DONE]".equals(data)) {
                             emitter.send(SseEmitter.event().data("[DONE]"));
-                            break;
+                            return;
                         }
                         JsonNode node = objectMapper.readTree(data);
                         if (node.hasNonNull("token")) {
@@ -109,19 +91,25 @@ public class ChatController {
                             emitter.send(SseEmitter.event().data(
                                     objectMapper.writeValueAsString(Map.of("content", token))));
                         }
+                    } catch (Exception e) {
+                        // client disconnected or serialization failed — stop streaming
+                        throw new RuntimeException(e);
                     }
-                }
-
-                // persist complete assistant response
-                if (!assistantReply.isEmpty()) {
-                    chatMessageService.saveMessage(request.getSessionId(), "assistant", assistantReply.toString());
-                }
-
+                });
                 emitter.complete();
             } catch (Exception e) {
                 try {
                     emitter.completeWithError(e);
                 } catch (Exception ignored) {
+                }
+            } finally {
+                // persist whatever was generated, even if the client disconnected mid-stream
+                if (!assistantReply.isEmpty()) {
+                    try {
+                        chatMessageService.saveMessage(request.getSessionId(), "assistant", assistantReply.toString());
+                    } catch (Exception ex) {
+                        // best-effort persistence; do not surface to the (already-closed) stream
+                    }
                 }
             }
         });

@@ -12,6 +12,8 @@ def get_chat_llm(model: str | None = None, temperature: float = 0.7) -> ChatOpen
         api_key=SecretStr(settings.llm_api_key),
         base_url=settings.llm_api_base,
         streaming=True,
+        timeout=settings.llm_timeout,
+        max_retries=settings.llm_max_retries,
     )
 
 
@@ -21,4 +23,6 @@ def get_embeddings() -> OpenAIEmbeddings:
         model=settings.llm_embedding_model,
         api_key=SecretStr(settings.llm_api_key),
         base_url=settings.llm_api_base,
+        timeout=settings.llm_timeout,
+        max_retries=settings.llm_max_retries,
     )

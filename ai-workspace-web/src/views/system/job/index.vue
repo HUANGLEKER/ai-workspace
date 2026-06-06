@@ -24,13 +24,13 @@
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-switch :model-value="row.status === 0" active-text="运行" inactive-text="暂停" inline-prompt
-                  @change="(v: boolean) => toggleStatus(row, v)" />
+                  @change="(v: string | number | boolean) => toggleStatus(row as SysJob, v as boolean)" />
               </template>
             </el-table-column>
             <el-table-column label="操作" width="220" align="center" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" :icon="VideoPlay" @click="handleRun(row.id)">执行</el-button>
-                <el-button link :icon="Edit" @click="openDialog(row)">编辑</el-button>
+                <el-button link :icon="Edit" @click="openDialog(row as SysJob)">编辑</el-button>
                 <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
               </template>
             </el-table-column>
@@ -105,7 +105,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Search, Edit, Delete, VideoPlay } from '@element-plus/icons-vue'
 import {

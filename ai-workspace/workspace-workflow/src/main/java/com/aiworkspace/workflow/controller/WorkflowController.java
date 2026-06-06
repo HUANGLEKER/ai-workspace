@@ -2,6 +2,7 @@ package com.aiworkspace.workflow.controller;
 
 import com.aiworkspace.common.exception.BusinessException;
 import com.aiworkspace.common.response.Result;
+import com.aiworkspace.framework.client.FastApiClient;
 import com.aiworkspace.system.security.LoginUser;
 import com.aiworkspace.workflow.dto.WorkflowRunRequest;
 import com.aiworkspace.workflow.entity.Workflow;
@@ -10,15 +11,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,13 +26,13 @@ public class WorkflowController {
 
     private final WorkflowService workflowService;
     private final ObjectMapper objectMapper;
+    private final FastApiClient fastApiClient;
 
-    @Value("${fastapi.base-url}")
-    private String fastapiBaseUrl;
-
-    public WorkflowController(WorkflowService workflowService, ObjectMapper objectMapper) {
+    public WorkflowController(WorkflowService workflowService, ObjectMapper objectMapper,
+                             FastApiClient fastApiClient) {
         this.workflowService = workflowService;
         this.objectMapper = objectMapper;
+        this.fastApiClient = fastApiClient;
     }
 
     @Operation(summary = "我的工作流列表")
@@ -89,42 +85,11 @@ public class WorkflowController {
             body.put("model", workflow.getModel());
         }
 
-        JsonNode data = postFastapi("/workflow/run", body);
+        JsonNode data = fastApiClient.postForData("/workflow/run", body);
         Map<String, Object> result = new HashMap<>();
         result.put("status", data.path("status").asText("failed"));
         result.put("outputs", objectMapper.convertValue(data.path("outputs"), Map.class));
         return Result.ok(result);
-    }
-
-    /** POST a JSON body to the FastAPI service and return the unwrapped {@code data} node. */
-    private JsonNode postFastapi(String path, Map<String, Object> body) {
-        HttpURLConnection conn = null;
-        try {
-            URI uri = URI.create(fastapiBaseUrl + path);
-            conn = (HttpURLConnection) uri.toURL().openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(180_000);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(objectMapper.writeValueAsBytes(body));
-            }
-            int code = conn.getResponseCode();
-            try (InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream()) {
-                JsonNode root = objectMapper.readTree(is);
-                if (code >= 400 || (root.has("code") && root.get("code").asInt() != 200)) {
-                    throw new BusinessException("AI服务调用失败: " + root.path("message").asText("HTTP " + code));
-                }
-                return root.path("data");
-            }
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BusinessException("AI服务不可用: " + e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
     }
 
     private Long currentUserId() {

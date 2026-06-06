@@ -40,6 +40,10 @@
           <el-icon><Document /></el-icon>
           <template #title>文档管理</template>
         </el-menu-item>
+        <el-menu-item index="/knowledge/rag">
+          <el-icon><Search /></el-icon>
+          <template #title>知识库问答</template>
+        </el-menu-item>
       </el-sub-menu>
 
       <el-menu-item index="/file">

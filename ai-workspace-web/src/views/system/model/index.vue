@@ -34,7 +34,7 @@
               active-text="启用"
               inactive-text="禁用"
               inline-prompt
-              @change="(v: boolean) => handleToggleStatus(row, v)"
+              @change="(v: string | number | boolean) => handleToggleStatus(row as ChatModel, v as boolean)"
             />
           </template>
         </el-table-column>
@@ -43,7 +43,7 @@
         </el-table-column>
         <el-table-column label="操作" width="140" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link :icon="Edit" @click="openDialog(row)">编辑</el-button>
+            <el-button link :icon="Edit" @click="openDialog(row as ChatModel)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -106,7 +106,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Search, Edit, Delete } from '@element-plus/icons-vue'
 import type { ChatModel } from '@/types'

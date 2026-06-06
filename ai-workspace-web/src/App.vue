@@ -1,6 +1,10 @@
 <template>
-  <router-view />
+  <el-config-provider :locale="zhCn">
+    <router-view />
+  </el-config-provider>
 </template>
 
 <script setup lang="ts">
+// Locale is applied here (was previously passed to the global app.use(ElementPlus)).
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 </script>

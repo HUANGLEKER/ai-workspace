@@ -4,6 +4,15 @@ spring:
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: AiWorkspaceHikari
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1700000
+      keepalive-time: 120000
+      connection-test-query: SELECT 1
   data:
     redis:
       host: localhost
