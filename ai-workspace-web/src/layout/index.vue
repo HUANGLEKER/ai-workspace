@@ -51,8 +51,9 @@ onMounted(async () => {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
-  background: #f0f2f5;
+  padding: var(--space-6);
+  background: var(--bg-body);
+  scroll-behavior: smooth;
 }
 
 .fade-enter-active,

@@ -64,39 +64,51 @@ const handleCommand = async (cmd: string) => {
 
 <style scoped>
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 60px;
-  padding: 0 24px;
-  background: #fff;
-  border-bottom: 1px solid #ebeef5;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  padding: 0 var(--space-6);
+  background: var(--bg-container);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm);
   transition: background 0.2s;
 }
 
 .user-info:hover {
-  background: #f5f7fa;
+  background: var(--bg-subtle);
+}
+
+.user-avatar {
+  background: var(--brand-primary);
 }
 
 .username {
   font-size: 14px;
-  color: #303133;
+  color: var(--text-primary);
   max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;

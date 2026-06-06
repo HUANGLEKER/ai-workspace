@@ -152,7 +152,7 @@ const activeMenu = computed(() => route.path)
 
 .logo-icon {
   flex-shrink: 0;
-  color: #409eff;
+  color: var(--brand-primary);
 }
 
 .sidebar-menu {
@@ -160,10 +160,30 @@ const activeMenu = computed(() => route.path)
   border-right: none;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 8px 0;
+}
+
+.sidebar-menu :deep(.el-menu-item),
+.sidebar-menu :deep(.el-sub-menu__title) {
+  height: 48px;
+  line-height: 48px;
+  position: relative;
 }
 
 .sidebar-menu :deep(.el-menu-item.is-active) {
-  background-color: #409eff !important;
+  background-color: rgba(64, 158, 255, 0.18) !important;
+  color: #fff !important;
+}
+
+/* active 项左侧高亮条 */
+.sidebar-menu :deep(.el-menu-item.is-active)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--brand-primary);
 }
 
 .sidebar-menu :deep(.el-menu-item:hover),
@@ -173,6 +193,11 @@ const activeMenu = computed(() => route.path)
 
 .sidebar-menu :deep(.el-sub-menu__title) {
   color: #bfcbd9;
+}
+
+/* 子菜单内项缩进时高亮条对齐左边缘 */
+.sidebar-menu :deep(.el-menu .el-menu-item) {
+  min-width: auto;
 }
 
 .sidebar-collapse {
