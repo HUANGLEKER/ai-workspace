@@ -1,9 +1,3 @@
-export interface ApiResponse<T = unknown> {
-  code: number
-  message: string
-  data: T
-}
-
 export interface PageResult<T> {
   records: T[]
   total: number
@@ -64,12 +58,6 @@ export interface ChatMessage {
   createTime?: string
 }
 
-export interface SendMessageRequest {
-  sessionId: number
-  content: string
-  modelName?: string
-}
-
 // 知识库相关
 export interface KnowledgeBase {
   id: number
@@ -113,11 +101,4 @@ export interface SysUser {
   phone: string
   status: number
   createTime?: string
-}
-
-export interface SysRole {
-  id: number
-  roleName: string
-  roleCode: string
-  remark: string
 }

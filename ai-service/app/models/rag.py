@@ -17,9 +17,3 @@ class SourceDocument(BaseModel):
     file_name: str
     content: str
     score: float
-
-
-class RagChatResponse(BaseModel):
-    session_id: str
-    answer: str
-    sources: list[SourceDocument] = []

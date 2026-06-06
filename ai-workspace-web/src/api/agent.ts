@@ -20,7 +20,6 @@ export interface AgentRunResult {
 }
 
 export const listAgents = () => request.get<unknown, Agent[]>('/agent/list')
-export const getAgent = (id: number) => request.get<unknown, Agent>(`/agent/${id}`)
 export const addAgent = (data: Agent) => request.post('/agent/add', data)
 export const updateAgent = (data: Agent) => request.put('/agent/update', data)
 export const deleteAgent = (id: number) => request.delete(`/agent/delete/${id}`)

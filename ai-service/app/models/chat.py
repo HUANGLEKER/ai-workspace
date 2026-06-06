@@ -14,11 +14,3 @@ class ChatRequest(BaseModel):
     stream: bool = True
     temperature: float = 0.7
     max_tokens: Optional[int] = None
-
-
-class ChatResponse(BaseModel):
-    session_id: str
-    content: str
-    model: str
-    prompt_tokens: int = 0
-    completion_tokens: int = 0

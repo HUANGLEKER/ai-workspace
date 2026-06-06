@@ -13,7 +13,6 @@ export interface McpServer {
 }
 
 export const listMcpServers = () => request.get<unknown, McpServer[]>('/mcp/list')
-export const getMcpServer = (id: number) => request.get<unknown, McpServer>(`/mcp/${id}`)
 export const addMcpServer = (data: McpServer) => request.post('/mcp/add', data)
 export const updateMcpServer = (data: McpServer) => request.put('/mcp/update', data)
 export const deleteMcpServer = (id: number) => request.delete(`/mcp/delete/${id}`)

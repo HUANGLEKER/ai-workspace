@@ -2,8 +2,6 @@ package com.aiworkspace.kb.service;
 
 import com.aiworkspace.kb.entity.KbDocument;
 
-import java.util.List;
-
 public interface EmbeddingService {
 
     /** 异步为单个文档构建向量索引 */
