@@ -20,9 +20,9 @@ def get_chat_llm(model: str | None = None, temperature: float = 0.7) -> ChatOpen
 @lru_cache(maxsize=2)
 def get_embeddings() -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
-        model=settings.llm_embedding_model,
-        api_key=SecretStr(settings.llm_api_key),
-        base_url=settings.llm_api_base,
+        model=settings.embedding_model,
+        api_key=SecretStr(settings.resolved_embedding_api_key),
+        base_url=settings.resolved_embedding_api_base,
         timeout=settings.llm_timeout,
         max_retries=settings.llm_max_retries,
     )

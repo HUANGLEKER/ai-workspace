@@ -108,25 +108,42 @@ ai-workspace/
 - **Node.js**: v18 及以上版本 (前端运行环境)
 - **JDK**: Java 25 (后端运行环境，需配置环境变量)
 - **Python**: 3.10 及以上版本 (AI 服务运行环境，含 `pip`)
-- **MySQL**: 8.x 版本 (核心业务数据库)
-- **Redis**: 5.x 及以上版本 (缓存与会话管理)
-- **ChromaDB**: 本地运行的向量数据库 (可通过 Python 或 Docker 启动)
-- **MinIO**: 本地运行的对象存储服务
+- **Docker Desktop**: 所有基础设施（MySQL、Redis、ChromaDB、MinIO）均通过 Docker 统一管理
 - **Git**: (可选) 用于代码版本控制
 
-*💡 强烈推荐使用 [Docker Desktop](https://www.docker.com/products/docker-desktop/) 容器化一键部署 MySQL、Redis、ChromaDB 和 MinIO，以省去繁琐的本地配置过程。*
+*💡 所有基础设施通过项目根目录的 `docker-compose.infra.yml` 一键启动，无需本地安装 MySQL 或 Redis。*
 
 ## 🚀 快速启动
 
-### 1. 数据库准备
-系统需要 MySQL, Redis, ChromaDB 和 MinIO 的支持。
-```bash
-# 导入初始化 SQL 脚本
-mysql -u root -p < ai-workspace/sql/init.sql
+### 1. 启动基础设施（Docker）
+
+所有基础设施通过 `docker-compose.infra.yml` 一键启动：
+
+```powershell
+docker compose -f docker-compose.infra.yml up -d
+docker compose -f docker-compose.infra.yml ps
 ```
+
+包含服务：
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| MySQL 8.0 | 3306 | 首次启动自动执行 `init.sql` 初始化表结构 |
+| Redis 7 | 6379 | AOF 持久化 |
+| MinIO | 9000 / 9011 控制台 | 对象存储 |
+| ChromaDB | 8000 | 向量数据库 |
+
 *默认凭证*：
-- MySQL 默认：`root / 123456`
+- MySQL：`root / 123456`
 - 平台管理员：`admin / admin123`
+- MinIO：`minioadmin / minioadmin`
+
+文件中心需要名为 `ai-workspace` 的存储桶，首次启动后创建：
+
+```powershell
+docker run --rm --network host minio/mc sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/ai-workspace"
+```
+
+或打开 http://localhost:9011 用 `minioadmin / minioadmin` 登录后手动新建桶 `ai-workspace`。
 
 ### 2. 启动前端项目 (Vue3)
 ```bash
@@ -153,90 +170,47 @@ cd ai-workspace
 ```bash
 cd ai-service
 cp .env.example .env
-# 请在 .env 中填写您的 LLM_API_KEY 及其他配置信息
+# 填写 LLM_API_KEY（Chat）及 EMBEDDING_API_KEY（嵌入，见下方说明）
 pip install -r requirements.txt
 python main.py
 # 默认运行在 http://localhost:8001
 ```
 
-## 🐳 部署 MinIO 与 ChromaDB（缺失组件补齐）
+> **Chat 与 Embedding 分离配置**  
+> DeepSeek API 不提供嵌入端点，因此 Chat 与 Embedding 使用独立的 API 配置：
+> - `LLM_API_*` / `LLM_MODEL`：Chat 模型（如 DeepSeek `deepseek-chat`）  
+> - `EMBEDDING_API_KEY` / `EMBEDDING_API_BASE` / `EMBEDDING_MODEL`：嵌入模型（推荐 [硅基流动](https://siliconflow.cn) `BAAI/bge-m3`，兼容 OpenAI 格式，支持中英文）  
+>
+> 若 `EMBEDDING_API_KEY` / `EMBEDDING_API_BASE` 留空，自动回退使用 `LLM_*` 配置（适合 OpenAI 一套走通的场景）。  
+> **切换嵌入模型后必须重建知识库索引**——旧向量与新模型不兼容。
 
-当前机器仅有 **MySQL** 和 **Redis**，尚缺文件中心依赖的 **MinIO** 与 RAG 依赖的 **ChromaDB**。
-缺少这两者不影响纯 Chat 与 RBAC，但文件上传/下载、知识库向量检索将不可用。
+## 🐳 基础设施说明
 
-**推荐方案：用 Docker 单独部署这两个缺失组件**——零编译、隔离干净、随删随起。
-MySQL 和 Redis 已在本机原生运行，**不要**再用容器重复启动，以免端口冲突。
+所有基础设施（MySQL、Redis、MinIO、ChromaDB）均通过 `docker-compose.infra.yml` 统一管理，数据持久化到 Docker named volume，`docker compose down` 不加 `-v` 不会丢数据。
 
-### 1. 安装 Docker Desktop
-
-安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)（Windows 自带 WSL2 后端），确认：
-
-```powershell
-docker version
-```
-
-### 2. 在项目根目录创建 `docker-compose.infra.yml`
-
-```yaml
-services:
-  minio:
-    image: minio/minio:latest
-    container_name: ai-workspace-minio
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"   # S3 API（后端 / FastAPI 连接）
-      - "9011:9001"   # Web 控制台（宿主机 9011，因本机 9001 被系统进程占用）
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio-data:/data
-    restart: unless-stopped
-
-  chroma:
-    image: chromadb/chroma:latest
-    container_name: ai-workspace-chroma
-    ports:
-      - "8000:8000"
-    volumes:
-      - chroma-data:/chroma/chroma
-    restart: unless-stopped
-
-volumes:
-  minio-data:
-  chroma-data:
-```
-
-### 3. 启动并初始化
+### 健康检查
 
 ```powershell
-docker compose -f docker-compose.infra.yml up -d
-docker compose -f docker-compose.infra.yml ps
+docker compose -f docker-compose.infra.yml ps        # 查看容器状态
+curl http://localhost:9000/minio/health/live          # MinIO
+curl http://localhost:8000/api/v2/heartbeat           # ChromaDB
 ```
 
-文件中心需要名为 `ai-workspace` 的存储桶，两种方式任选其一创建：
+### 配置 `ai-service/.env`
 
-- **控制台**：打开 http://localhost:9011 （本机 9001 被系统进程占用，故控制台映射到宿主机 9011；S3 API 仍为 9000，不受影响），用 `minioadmin / minioadmin` 登录后新建桶 `ai-workspace`。
-- **命令行**：
-
-```powershell
-docker run --rm --network host minio/mc sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/ai-workspace"
-```
-
-ChromaDB 无需手动建集合，FastAPI 首次写入时会按 `CHROMA_COLLECTION_PREFIX` 自动创建。
-
-### 4. 健康检查
-
-```powershell
-curl http://localhost:9000/minio/health/live      # MinIO
-curl http://localhost:8000/api/v2/heartbeat        # ChromaDB
-```
-
-### 5. 配置 `ai-service/.env`
-
-由 `.env.example` 复制后保持以下默认值即可对接上面的容器：
+由 `.env.example` 复制后保持以下默认值即可对接容器：
 
 ```dotenv
+# Chat LLM（以 DeepSeek 为例）
+LLM_API_KEY=sk-xxx
+LLM_API_BASE=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-chat
+
+# Embedding（以硅基流动 bge-m3 为例）
+EMBEDDING_API_KEY=sk-xxx
+EMBEDDING_API_BASE=https://api.siliconflow.cn/v1
+EMBEDDING_MODEL=BAAI/bge-m3
+
 CHROMA_HOST=localhost
 CHROMA_PORT=8000
 CHROMA_COLLECTION_PREFIX=ai_workspace
@@ -248,11 +222,7 @@ MINIO_BUCKET=ai-workspace
 MINIO_SECURE=false
 ```
 
-> **备选（不使用 Docker）**：MinIO 可从 https://min.io/download 下载 `minio.exe` 运行
-> `.\minio.exe server D:\minio-data --console-address ":9011"`（本机 9001 被系统进程占用）；ChromaDB 可 `pip install chromadb`
-> 后运行 `chroma run --host 0.0.0.0 --port 8000 --path D:\chroma-data`（建议放独立虚拟环境避免依赖冲突）。
-
-> **数据持久化**：容器数据保存在 Docker 卷 `minio-data` / `chroma-data`，`docker compose down` 不加 `-v` 不会丢数据。
+ChromaDB 无需手动建集合，FastAPI 首次写入时会按 `CHROMA_COLLECTION_PREFIX` 自动创建。
 
 ## 🐍 Python 依赖安装（已适配 Python 3.14）
 

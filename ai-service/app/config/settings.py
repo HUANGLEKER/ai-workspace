@@ -8,16 +8,29 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # LLM
+    # LLM (chat)
     llm_provider: str = "openai"
     llm_api_key: str = "sk-xxx"
     llm_api_base: str = "https://api.openai.com/v1"
     llm_model: str = "gpt-4o-mini"
-    llm_embedding_model: str = "text-embedding-3-small"
     # Per-request timeout (seconds) and automatic retry count for LLM/embedding
     # calls — bounds how long a hung upstream can stall a chat/RAG stream.
     llm_timeout: float = 60.0
     llm_max_retries: int = 2
+
+    # Embedding — can point to a different provider (e.g. SiliconFlow + bge-m3)
+    # while chat stays on DeepSeek. Defaults to the LLM settings when not set.
+    embedding_api_key: str = ""
+    embedding_api_base: str = ""
+    embedding_model: str = "text-embedding-3-small"
+
+    @property
+    def resolved_embedding_api_key(self) -> str:
+        return self.embedding_api_key or self.llm_api_key
+
+    @property
+    def resolved_embedding_api_base(self) -> str:
+        return self.embedding_api_base or self.llm_api_base
 
     # Redis
     redis_host: str = "localhost"

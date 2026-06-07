@@ -14,7 +14,7 @@
 | 后端 | Spring Boot 3.5.0 + JDK 25、MyBatis Plus、JJWT |
 | AI 服务 | FastAPI 0.115 + LangGraph + LangChain + OpenAI |
 | 数据库 | MySQL 8 |
-| 缓存 | Redis 5（localhost:6379） |
+| 缓存 | Redis 7（localhost:6379） |
 | 向量库 | ChromaDB（localhost:8000） |
 | 对象存储 | MinIO（localhost:9000） |
 
@@ -61,7 +61,13 @@ pip install -r requirements.txt
 python main.py                # 以 uvicorn 运行于 8001 端口，开启自动重载
 ```
 
-关键 `.env` 变量（大写，与 Pydantic 字段名对应）：`LLM_API_KEY`、`LLM_API_BASE`、`LLM_MODEL`、`LLM_EMBEDDING_MODEL`、`REDIS_HOST`、`CHROMA_HOST`、`CHROMA_COLLECTION_PREFIX`、`MINIO_ENDPOINT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET`。FastAPI 使用 Redis DB 1；Spring Boot 使用 DB 0。
+关键 `.env` 变量（大写，与 Pydantic 字段名对应）：
+
+- **Chat LLM**：`LLM_API_KEY`、`LLM_API_BASE`、`LLM_MODEL`、`LLM_TIMEOUT`、`LLM_MAX_RETRIES`
+- **Embedding（独立）**：`EMBEDDING_API_KEY`、`EMBEDDING_API_BASE`、`EMBEDDING_MODEL`。DeepSeek 不提供嵌入端点，需单独配置其他 OpenAI 兼容提供商（推荐硅基流动 `BAAI/bge-m3`）。`EMBEDDING_API_KEY` / `EMBEDDING_API_BASE` 为空时自动回退使用 `LLM_*` 配置。
+- **基础设施**：`REDIS_HOST`、`CHROMA_HOST`、`CHROMA_COLLECTION_PREFIX`、`MINIO_ENDPOINT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET`
+
+FastAPI 使用 Redis DB 1；Spring Boot 使用 DB 0。切换嵌入模型后必须重建知识库索引（旧向量与新模型不兼容）。
 
 嵌入管道会把下载的文档写入硬编码的 `/tmp/` 路径（`ai-service/app/embedding/service.py` 的 `_load_document`），这仅适用于 POSIX。RAG/嵌入相关工作请在 WSL/Linux/Docker 下运行 AI 服务——Windows 原生 `python main.py` 会在这些路径上失败。
 
@@ -72,9 +78,20 @@ python main.py                # 以 uvicorn 运行于 8001 端口，开启自动
 mysql -u root -p < ai-workspace/sql/init.sql
 ```
 
-### 本地基础设施（MinIO + ChromaDB）
+### 本地基础设施（全部 Docker 化）
 
-本机原生运行了 MySQL 与 Redis；MinIO 与 ChromaDB 没有。缺少它们时 Chat 与 RBAC 仍可用，但文件上传/下载、RAG 向量检索不可用。README 记录了仅通过 `docker-compose.infra.yml` 启动这两个缺失组件（MinIO 在 9000/9001，ChromaDB 在 8000）——不要把 MySQL/Redis 也容器化，以免端口冲突。
+所有基础设施（MySQL、Redis、MinIO、ChromaDB）均通过 `docker-compose.infra.yml` 统一管理：
+
+```bash
+docker-compose -f docker-compose.infra.yml up -d
+```
+
+- MySQL 8.0（3306）：首次启动自动执行 `ai-workspace/sql/init.sql` 初始化表结构，数据持久化到 `mysql-data` volume
+- Redis 7（6379）：开启 AOF 持久化，数据持久化到 `redis-data` volume
+- MinIO（9000 S3 API / 9011 控制台）：数据持久化到 `minio-data` volume
+- ChromaDB（8000）：数据持久化到 `chroma-data` volume
+
+Spring Boot 配置（`application-dev.yml`）无需修改，端口映射后连接地址不变（localhost:3306 / localhost:6379）。
 
 ## 测试
 
