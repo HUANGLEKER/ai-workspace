@@ -57,9 +57,11 @@ Element Plus 采用**按需自动引入**（不再全局 `app.use(ElementPlus)`�
 ```bash
 # 在 ai-service/ 下
 cp .env.example .env          # 填入 LLM key 与服务配置
-pip install -r requirements.txt
-python main.py                # 以 uvicorn 运行于 8001 端口，开启自动重载
+uv sync                       # 按 uv.lock 安装依赖（首次或依赖变更后）
+uv run python main.py         # 以 uvicorn 运行于 8001 端口，开启自动重载
 ```
+
+依赖通过 `pyproject.toml` + `uv.lock` 管理。新增包用 `uv add <pkg>`，会自动更新两个文件。
 
 关键 `.env` 变量（大写，与 Pydantic 字段名对应）：
 
