@@ -1,3 +1,8 @@
+"""文档嵌入管道。
+
+从 MinIO 下载文档原文 → 切片 → 调用嵌入模型生成向量 → 写入 ChromaDB。
+注意：临时文件写入系统临时目录，依赖 POSIX 路径行为（Windows 原生运行可能失败）。
+"""
 import os
 import tempfile
 import uuid
@@ -13,6 +18,7 @@ from app.vectorstore.chroma_client import get_or_create_collection, delete_by_do
 
 
 def _get_minio_client() -> Minio:
+    """创建 MinIO 客户端。"""
     return Minio(
         settings.minio_endpoint,
         access_key=settings.minio_access_key,
@@ -22,22 +28,29 @@ def _get_minio_client() -> Minio:
 
 
 def _load_document(file_path: str, file_name: str) -> list[str]:
+    """从 MinIO 下载文档并按扩展名选择加载器解析为纯文本段落列表。
+
+    流程：拉取对象 → 写入临时文件 → 按 pdf/docx/纯文本选择 Loader 解析 → 清理临时文件。
+    """
     client = _get_minio_client()
     response = client.get_object(settings.minio_bucket, file_path)
     try:
         raw = response.read()
     finally:
+        # 务必释放底层连接，避免连接泄漏
         response.close()
         response.release_conn()
 
+    # 用随机文件名落临时盘，避免并发冲突
     suffix = file_name.rsplit(".", 1)[-1].lower()
     tmp_dir = tempfile.gettempdir()
     tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4()}.{suffix}")
-    
+
     with open(tmp_path, "wb") as f:
         f.write(raw)
 
     try:
+        # 按文件类型选择对应的 LangChain 文档加载器
         loader: BaseLoader
         if suffix == "pdf":
             loader = PyPDFLoader(tmp_path)
@@ -49,13 +62,17 @@ def _load_document(file_path: str, file_name: str) -> list[str]:
         docs = loader.load()
         return [d.page_content for d in docs]
     finally:
+        # 无论解析成败都删除临时文件
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
 
 async def build_embedding(req: EmbeddingBuildRequest) -> EmbeddingBuildResponse:
+    """为单个文档构建嵌入索引并写入对应知识库集合。"""
+    # 先删除该文档的旧向量，保证重建幂等
     delete_by_document(req.kb_id, req.document_id)
 
+    # 加载原文并按指定切片大小/重叠切分
     texts = _load_document(req.file_path, req.file_name)
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=req.chunk_size,
@@ -66,16 +83,18 @@ async def build_embedding(req: EmbeddingBuildRequest) -> EmbeddingBuildResponse:
     embeddings = get_embeddings()
     collection = get_or_create_collection(req.kb_id)
 
+    # 逐切片生成向量，并组装 ChromaDB upsert 所需的并行数组
     ids, docs, embeds = [], [], []
     metas: list[dict[str, Any]] = []
     for i, chunk in enumerate(chunks):
-        chunk_id = f"{req.document_id}_{i}"
+        chunk_id = f"{req.document_id}_{i}"  # 切片 ID = 文档ID_序号
         vector = await embeddings.aembed_query(chunk.page_content)
         ids.append(chunk_id)
         docs.append(chunk.page_content)
         embeds.append(vector)
         metas.append({"document_id": req.document_id, "file_name": req.file_name, "chunk_index": i})
 
+    # 批量写入（仅在有切片时）
     if ids:
         collection.upsert(ids=ids, documents=docs, embeddings=embeds, metadatas=metas)  # type: ignore
 
