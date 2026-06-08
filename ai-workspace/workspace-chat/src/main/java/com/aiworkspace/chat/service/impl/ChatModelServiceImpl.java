@@ -12,6 +12,15 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+/**
+ * 聊天模型配置服务实现
+ *
+ * 主要职责：
+ * 1. 模型配置的增删改查与启停
+ * 2. apiKey 敏感字段的脱敏与"留空即保留原值"语义处理
+ *
+ * @since 2026
+ */
 @Service
 public class ChatModelServiceImpl extends ServiceImpl<ChatModelMapper, ChatModel>
         implements ChatModelService {
@@ -21,7 +30,7 @@ public class ChatModelServiceImpl extends ServiceImpl<ChatModelMapper, ChatModel
         List<ChatModel> models = list(new LambdaQueryWrapper<ChatModel>()
                 .eq(ChatModel::getEnabled, 1)
                 .orderByAsc(ChatModel::getId));
-        // Never expose API keys to the browser.
+        // 安全：apiKey 绝不下发到浏览器，返回前统一脱敏
         models.forEach(m -> m.setApiKey(null));
         return models;
     }
@@ -32,6 +41,7 @@ public class ChatModelServiceImpl extends ServiceImpl<ChatModelMapper, ChatModel
                 new LambdaQueryWrapper<ChatModel>()
                         .like(StringUtils.hasText(modelName), ChatModel::getModelName, modelName)
                         .orderByDesc(ChatModel::getId));
+        // 安全：分页结果同样脱敏 apiKey
         p.getRecords().forEach(m -> m.setApiKey(null));
         return p;
     }
@@ -54,8 +64,7 @@ public class ChatModelServiceImpl extends ServiceImpl<ChatModelMapper, ChatModel
         if (existing == null) {
             throw new BusinessException("模型不存在");
         }
-        // The browser never receives the apiKey, so a blank value on update means
-        // "keep the existing key" rather than "clear it".
+        // 因 apiKey 从不下发到浏览器，更新时传入空值表示"保留原密钥"，而非"清空"
         if (!StringUtils.hasText(model.getApiKey())) {
             model.setApiKey(existing.getApiKey());
         }

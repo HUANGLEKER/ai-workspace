@@ -15,6 +15,17 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 系统监控服务
+ *
+ * 采集服务器运行时指标并探测依赖服务健康状态，无任何 DB 表依赖。
+ *
+ * 主要职责：
+ * 1. 通过 JDK MXBean 采集 CPU / 内存 / JVM / 磁盘 / OS 运行时指标
+ * 2. 探测 Redis、FastAPI、MinIO 的连通性与延迟
+ *
+ * @since 2026
+ */
 @Service
 public class MonitorService {
 
@@ -30,9 +41,16 @@ public class MonitorService {
         this.redisConnectionFactory = redisConnectionFactory;
     }
 
-    /** Sample server runtime metrics. */
+    /**
+     * 采集服务器运行时指标
+     *
+     * <p>所有指标均取自 JDK MXBean / Runtime，按请求实时采样，不做持久化。
+     *
+     * @return CPU、系统内存、JVM、OS、磁盘等运行时指标快照
+     */
     public ServerInfoVO getServerInfo() {
         ServerInfoVO vo = new ServerInfoVO();
+        // 取自 JDK OperatingSystemMXBean：提供 CPU 负载与物理内存等系统级指标
         com.sun.management.OperatingSystemMXBean osBean =
                 (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
         RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
@@ -93,7 +111,11 @@ public class MonitorService {
         return vo;
     }
 
-    /** Probe each dependency the platform relies on. */
+    /**
+     * 探测平台依赖服务的健康状态
+     *
+     * @return Redis、FastAPI、MinIO 各自的健康检查结果（含连通性与延迟）
+     */
     public List<ServiceHealthVO> getServiceHealth() {
         List<ServiceHealthVO> list = new ArrayList<>();
         list.add(checkRedis());
@@ -102,9 +124,11 @@ public class MonitorService {
         return list;
     }
 
+    /** Redis 健康探针：用 PING 命令验证连通性并测量往返延迟 */
     private ServiceHealthVO checkRedis() {
         String target = "Redis";
         long start = System.currentTimeMillis();
+        // try-with-resources 确保连接归还连接池，避免探活泄漏连接
         try (RedisConnection conn = redisConnectionFactory.getConnection()) {
             conn.ping();
             return ServiceHealthVO.up(target, target, System.currentTimeMillis() - start);
@@ -113,12 +137,14 @@ public class MonitorService {
         }
     }
 
+    /** HTTP 健康探针：GET 健康端点，2xx/3xx 视为 UP；设置短超时避免探活阻塞 */
     private ServiceHealthVO checkHttp(String name, String url) {
         long start = System.currentTimeMillis();
         HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
             conn.setRequestMethod("GET");
+            // 限定 2s 连接/读取超时，防止依赖不可用时拖垮监控接口响应
             conn.setConnectTimeout(2000);
             conn.setReadTimeout(2000);
             int code = conn.getResponseCode();
@@ -136,6 +162,7 @@ public class MonitorService {
         }
     }
 
+    /** 将 MXBean 返回的 0~1 负载折算为百分比；MXBean 不可用时会返回负值，此处透传 -1 表示无数据 */
     private static double toPercent(double load) {
         if (load < 0) {
             return -1;
@@ -143,6 +170,7 @@ public class MonitorService {
         return round2(load * 100);
     }
 
+    /** 计算占用百分比；total 非正时按 0 处理，避免除零 */
     private static double ratio(long used, long total) {
         if (total <= 0) {
             return 0;

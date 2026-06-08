@@ -12,6 +12,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+/**
+ * 系统用户服务实现
+ *
+ * 实现用户的查询、分页、增删改与状态管理。
+ *
+ * 安全要点：
+ * 1. 密码统一经 {@link PasswordEncoder}（BCrypt）编码，明文绝不入库
+ * 2. 列表/分页响应剥离密码哈希，避免泄露
+ * 3. 更新时用户名不可变，防止越权改名
+ *
+ * @since 2026
+ */
 @Service
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
@@ -34,7 +46,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             wrapper.like(SysUser::getUsername, username);
         }
         Page<SysUser> result = page(new Page<>(page, size), wrapper);
-        // never expose password hashes to the client
+        // 安全：列表响应必须剥离密码哈希，绝不暴露给客户端
         result.getRecords().forEach(u -> u.setPassword(null));
         return result;
     }
@@ -51,6 +63,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException("用户名已存在");
         }
         user.setId(null);
+        // 安全：密码经 BCrypt 编码后入库，明文绝不持久化
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         if (user.getStatus() == null) {
             user.setStatus(1);
@@ -67,9 +80,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         if (existing == null) {
             throw new BusinessException("用户不存在");
         }
-        // username is immutable; ignore any change from the request body
+        // 安全：用户名不可变，强制覆盖为库中原值，忽略请求体中的任何篡改
         user.setUsername(existing.getUsername());
-        // only re-hash when a new password is supplied, otherwise keep the existing one
+        // 安全：仅当传入新密码时才重新 BCrypt 哈希；否则置 null，避免把空值写回覆盖原哈希
         if (StringUtils.hasText(user.getPassword())) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         } else {

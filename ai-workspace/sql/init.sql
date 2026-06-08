@@ -1,5 +1,15 @@
 -- AI Workspace v1.0 数据库初始化脚本
 -- MySQL 8.x
+--
+-- 全库通用约定（各表不再重复说明）：
+--   - 主键统一 BIGINT AUTO_INCREMENT
+--   - 逻辑删除：deleted TINYINT（0 正常 / 1 已删），不做物理删除（sys_job_log 例外，仅追加+物理清理）
+--   - 时间戳 create_time/update_time 由后端 MetaObjectHandler 自动填充，无需应用显式赋值
+--   - 字符集统一 utf8mb4，兼容 emoji 与多语言文本
+--   - 表间不建外键约束，归属与关联由应用层（Service 层 createBy/userId 校验）保证，换取写入性能与分库灵活性
+--   - 用户私有资源的归属列名不统一：KB/文档用 create_by，chat 用 user_id，文件用 upload_by
+
+SET NAMES utf8mb4;
 
 CREATE DATABASE IF NOT EXISTS ai_workspace DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -93,6 +103,7 @@ CREATE TABLE IF NOT EXISTS chat_model (
     model_name  VARCHAR(100) NOT NULL COMMENT '模型名称',
     provider    VARCHAR(50)  NOT NULL COMMENT '提供商（OpenAI/Ollama等）',
     api_url     VARCHAR(500) COMMENT 'API地址',
+    -- 安全：API Key 属敏感凭证，须加密存储，且列表响应须脱敏后再返回前端
     api_key     VARCHAR(500) COMMENT 'API Key（加密存储）',
     enabled     TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用',
     deleted     TINYINT      NOT NULL DEFAULT 0,
@@ -220,6 +231,7 @@ CREATE TABLE IF NOT EXISTS sys_job (
     update_time     DATETIME     COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务表';
 
+-- 执行日志为只追加表：无 deleted 列与 update_time，"清理日志"走物理删除
 CREATE TABLE IF NOT EXISTS sys_job_log (
     id             BIGINT PRIMARY KEY AUTO_INCREMENT,
     job_id         BIGINT       COMMENT '任务ID',
@@ -298,13 +310,14 @@ CREATE TABLE IF NOT EXISTS mcp_server (
 -- 初始数据
 -- =====================================================
 
--- 默认管理员（密码：admin123，BCrypt加密）
+-- 安全：默认管理员（密码 admin123 经 BCrypt 加密存储；id 固定为 1，供下方角色绑定引用）
+-- 生产部署后须立即修改默认密码
 INSERT INTO sys_user (username, password, nickname, status, deleted, create_time, update_time)
 VALUES ('admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '管理员', 1, 0, NOW(), NOW());
 
--- 管理员角色
+-- 管理员角色：role_code 须带 ROLE_ 前缀，以便 Spring Security 的 hasRole('ADMIN') 直接匹配
 INSERT INTO sys_role (role_name, role_code, remark, deleted, create_time, update_time)
 VALUES ('超级管理员', 'ROLE_ADMIN', '系统管理员', 0, NOW(), NOW());
 
--- 绑定用户角色
+-- 绑定用户角色：admin(id=1) ↔ 超级管理员(id=1)
 INSERT INTO sys_user_role (user_id, role_id) VALUES (1, 1);

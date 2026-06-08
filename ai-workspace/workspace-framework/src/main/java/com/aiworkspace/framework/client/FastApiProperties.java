@@ -4,24 +4,31 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Centralized configuration for the FastAPI AI service connection.
- * Replaces the {@code @Value("${fastapi.base-url}")} field injection that was
- * duplicated across every controller/service talking to the AI service.
+ * FastAPI AI 服务连接配置
+ *
+ * 集中管理 Spring Boot 调用 FastAPI 的连接参数（基址与各类超时），
+ * 取代此前散落在各 controller/service 中重复的 {@code @Value("${fastapi.base-url}")} 注入，
+ * 由统一的 FastApiClient 复用，便于集中维护连接池与超时策略。
+ *
+ * 配置前缀：{@code fastapi.*}（见 application.yml）
+ *
+ * @author
+ * @since 2026
  */
 @Component
 @ConfigurationProperties(prefix = "fastapi")
 public class FastApiProperties {
 
-    /** Base URL of the FastAPI service, e.g. {@code http://localhost:8001}. */
+    /** FastAPI 服务基址，例如 {@code http://localhost:8001} */
     private String baseUrl = "http://localhost:8001";
 
-    /** TCP connect timeout in milliseconds. */
+    /** TCP 连接建立超时（毫秒） */
     private int connectTimeout = 10_000;
 
-    /** Default request/read timeout in milliseconds for unary JSON calls. */
+    /** 一元 JSON 调用（agent/workflow 等）的请求/读取超时（毫秒），因 LLM 推理较慢故设置较长 */
     private int readTimeout = 180_000;
 
-    /** Request timeout in milliseconds for streaming (SSE) calls. */
+    /** 流式（SSE）调用（chat/rag）的请求超时（毫秒），需覆盖整条流的生命周期 */
     private int streamTimeout = 180_000;
 
     public String getBaseUrl() {
