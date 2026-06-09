@@ -82,6 +82,13 @@
   </div>
 </template>
 
+/**
+ * 工作流管理页
+ *
+ * 功能：
+ * 1. 工作流 CRUD（definition 字段为 LangGraph 节点/连线 JSON）
+ * 2. 运行工作流：传入 prompt，展示执行状态和 outputs JSON
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'

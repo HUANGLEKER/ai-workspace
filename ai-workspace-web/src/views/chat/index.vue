@@ -144,6 +144,17 @@
   </div>
 </template>
 
+/**
+ * AI 对话页
+ *
+ * 功能：
+ * 1. 左侧会话列表：创建/切换/删除对话
+ * 2. 右侧消息区：历史消息加载、流式输出（SSE）、Markdown 渲染
+ * 3. 输入区：模型选择、Ctrl+Enter 发送、流式输出中途停止
+ *
+ * 流式消息通过 streamController（AbortController）支持用户主动中止。
+ * 流结束后将 streamingContent 写入 messages，保持消息列表与流式态分离。
+ */
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
 import { Plus, Delete, Cpu, UserFilled, Promotion, CircleClose } from '@element-plus/icons-vue'
@@ -164,6 +175,7 @@ const streamingContent = ref('')
 const models = ref<ChatModel[]>([])
 const selectedModel = ref('')
 const messagesRef = ref<HTMLElement>()
+// 持有当前流的 AbortController，用于"停止生成"按钮主动中止请求
 let streamController: AbortController | null = null
 
 async function loadModels() {
@@ -271,6 +283,7 @@ async function handleSend() {
       scrollToBottom()
     },
     () => {
+      // 流结束后将累积内容写入消息列表，流式态与历史态分离，避免双重渲染
       if (streamingContent.value) {
         messages.value.push({ role: 'assistant', content: streamingContent.value })
       }

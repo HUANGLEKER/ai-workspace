@@ -9,7 +9,12 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 @router.post("")
 async def chat(req: ChatRequest):
-    # 返回 SSE 流；X-Accel-Buffering=no 关闭反向代理缓冲以保证实时推送
+    """
+    POST /chat — 流式对话。
+
+    返回 SSE 流，每帧格式为 ``{"session_id":"...","token":"..."}``，以 ``[DONE]`` 结束。
+    X-Accel-Buffering=no 关闭反向代理缓冲，确保 token 实时推送到客户端。
+    """
     return StreamingResponse(
         stream_chat(req),
         media_type="text/event-stream",

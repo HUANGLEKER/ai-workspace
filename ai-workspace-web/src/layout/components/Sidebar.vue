@@ -36,11 +36,7 @@
           <el-icon><Collection /></el-icon>
           <template #title>知识库管理</template>
         </el-menu-item>
-        <el-menu-item index="/knowledge/document">
-          <el-icon><Document /></el-icon>
-          <template #title>文档管理</template>
-        </el-menu-item>
-        <el-menu-item index="/knowledge/rag">
+<el-menu-item index="/knowledge/rag">
           <el-icon><Search /></el-icon>
           <template #title>知识库问答</template>
         </el-menu-item>
@@ -111,6 +107,14 @@
   </div>
 </template>
 
+/**
+ * 侧边导航栏组件
+ *
+ * 功能：
+ * 1. 展示全局导航菜单，支持折叠/展开
+ * 2. 根据当前路由高亮激活菜单项
+ * 3. 管理员专属菜单（监控、系统管理）通过 isAdmin 守卫隐藏，防止普通用户看到入口
+ */
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
@@ -121,6 +125,7 @@ defineEmits<{ toggle: [] }>()
 
 const route = useRoute()
 const authStore = useAuthStore()
+// el-menu 的 router 模式下，index 值需与路由 path 完全匹配
 const activeMenu = computed(() => route.path)
 </script>
 

@@ -1,3 +1,11 @@
+/**
+ * 全局 TypeScript 类型定义
+ *
+ * 与后端 DTO / 数据库表字段保持对应，按业务模块分组。
+ * 所有列表接口均使用 PageResult<T> 包装（无分页时后端返回 total=records.length）。
+ */
+
+/** MyBatis Plus 分页返回结构，与后端 PageResult 对应 */
 export interface PageResult<T> {
   records: T[]
   total: number
@@ -38,11 +46,18 @@ export interface ChatSession {
   updateTime: string
 }
 
+/**
+ * 聊天模型配置，完全由 Spring Boot 的 ChatModelController 管理。
+ * FastAPI 不读此表，选定的模型名通过请求载荷透传。
+ * apiKey 在列表响应中由后端脱敏，编辑时留空则不修改原有值。
+ */
 export interface ChatModel {
   id?: number
   modelName: string
   provider: string
+  /** 留空则使用 AI 服务 .env 中的 LLM_API_BASE */
   apiUrl?: string
+  /** 前端编辑时留空表示不修改，后端永远不返回明文 */
   apiKey?: string
   enabled: number
   createTime?: string
@@ -75,6 +90,7 @@ export interface KbDocument {
   filePath: string
   fileSize: number
   fileType: string
+  /** 异步嵌入管道状态：PENDING → PROCESSING → DONE / FAILED */
   status: 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
   createTime: string
 }

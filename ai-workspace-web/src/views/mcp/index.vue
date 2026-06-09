@@ -76,6 +76,16 @@
   </div>
 </template>
 
+/**
+ * MCP 服务器注册表页
+ *
+ * 功能：
+ * 1. MCP 服务器 CRUD（支持 sse/stdio 两种传输方式）
+ * 2. 连通性测试（仅 sse 类型，探测 HTTP 可达性）
+ *
+ * sse 服务器在 Agent 运行时通过 langchain-mcp-adapters 动态加载工具列表，
+ * 因此只有 sse 类型才能与 Agent 集成使用。
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'

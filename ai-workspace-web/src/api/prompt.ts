@@ -1,3 +1,8 @@
+/**
+ * 提示词中心 API
+ *
+ * 提示词按 createBy 用户私有，支持按标题关键词和分类筛选。
+ */
 import request from './request'
 
 export interface Prompt {

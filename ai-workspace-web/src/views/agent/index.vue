@@ -99,6 +99,16 @@
   </div>
 </template>
 
+/**
+ * Agent 管理页
+ *
+ * 功能：
+ * 1. Agent CRUD（含工具/MCP 服务器多选关联）
+ * 2. 运行 Agent：发送 input，展示 output 及 steps 执行轨迹
+ *
+ * tools/mcpServers 在 DB 中以 JSON 字符串存储，编辑时解析为 string[] 绑定到 el-select。
+ * 提交前重新序列化，运行时由后端 AgentService 解析为完整工具规格传给 FastAPI。
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -121,7 +131,7 @@ const editing = ref<Agent | null>(null)
 const formRef = ref<FormInstance>()
 
 const form = reactive<Agent>({ name: '', description: '', systemPrompt: '', model: '', enabled: 1 })
-// tools / mcpServers are stored as JSON-array strings on the backend; edited as arrays here
+// tools/mcpServers 在后端以 JSON 字符串存储，前端编辑时转为 string[] 绑定多选
 const selectedTools = ref<string[]>([])
 const selectedMcp = ref<string[]>([])
 const rules: FormRules = { name: [{ required: true, message: '请输入名称', trigger: 'blur' }] }

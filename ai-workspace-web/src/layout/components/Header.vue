@@ -30,6 +30,14 @@
   </div>
 </template>
 
+/**
+ * 顶部 Header 组件
+ *
+ * 功能：
+ * 1. 根据当前路由 meta.title 显示面包屑
+ * 2. 展示登录用户昵称/用户名
+ * 3. 提供退出登录入口（先调接口使服务端 token 失效，再清除本地 Store）
+ */
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -41,6 +49,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
+// 从路由 meta 读取页面标题，用于面包屑展示
 const currentTitle = computed(() => route.meta.title as string || '')
 
 const handleCommand = async (cmd: string) => {

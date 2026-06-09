@@ -1,4 +1,61 @@
+# ===================================================================
+# AI Workspace 本地基础设施编排
+# 包含：MySQL、Redis、MinIO、ChromaDB
+# 启动：docker-compose -f docker-compose.infra.yml up -d
+# 所有服务均配置了 restart: unless-stopped，宿主机重启后自动拉起
+# ===================================================================
+
 services:
+  # ─────────────────────────────────────────────────────────────────
+  # MySQL 8.0 — 主业务数据库（用户/RBAC/Chat/KB/文件/Agent 等所有表）
+  # 首次启动时自动执行 init.sql 初始化表结构并创建默认管理员账号
+  # ─────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: ai-workspace-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: ai_workspace
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # init.sql 挂载为只读，容器首次初始化时自动执行（后续启动不再重复执行）
+      - ./ai-workspace/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # 强制使用 utf8mb4 编码以支持中文与 Emoji 存储
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────
+  # Redis 7 — 缓存与会话存储
+  # Spring Boot 使用 DB 0（Token/会话缓存）；FastAPI 使用 DB 1（对话上下文）
+  # ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ai-workspace-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    # AOF 持久化：每次写操作追加到文件，保证宿主机重启后数据不丢失
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # MinIO — 对象存储，用于文件中心的上传/下载及 RAG 嵌入管道的文档读取
+  # 9000：S3 API（Spring Boot / FastAPI 连接）
+  # 9011：Web 控制台（宿主机端口 9011，因 9001 被系统进程占用故重映射）
+  # ─────────────────────────────────────────────────────────────────
   minio:
     image: minio/minio:latest
     container_name: ai-workspace-minio
@@ -13,6 +70,10 @@ services:
       - minio-data:/data
     restart: unless-stopped
 
+  # ─────────────────────────────────────────────────────────────────
+  # ChromaDB — 向量数据库，存储知识库文档的嵌入向量
+  # FastAPI 以 HTTP 客户端模式连接；切换嵌入模型后需清空 chroma-data volume 重建索引
+  # ─────────────────────────────────────────────────────────────────
   chroma:
     image: chromadb/chroma:latest
     container_name: ai-workspace-chroma
@@ -22,6 +83,9 @@ services:
       - chroma-data:/chroma/chroma
     restart: unless-stopped
 
+# 所有数据 volume 均持久化到 Docker 本地卷，避免容器销毁导致数据丢失
 volumes:
+  mysql-data:
+  redis-data:
   minio-data:
   chroma-data:

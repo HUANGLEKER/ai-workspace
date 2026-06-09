@@ -104,6 +104,15 @@
   </div>
 </template>
 
+/**
+ * 系统监控页（仅管理员）
+ *
+ * 功能：
+ * 1. 展示依赖服务（Redis/FastAPI/MinIO）健康状态
+ * 2. 展示 CPU/内存/JVM 堆使用率仪表盘
+ * 3. 磁盘使用情况与运行环境信息
+ * 4. 支持手动刷新和 5s 自动刷新（离开页面时需清除定时器防内存泄漏）
+ */
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import {
@@ -147,7 +156,7 @@ onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
 
-// a load of -1 means the metric was unavailable on this JVM/OS
+// JVM/OS 指标不可用时后端返回 -1，前端统一转为 0 避免 el-progress 异常
 const pct = (v: number) => (v < 0 ? 0 : Math.round(v))
 const fmtPct = (v: number) => (v < 0 ? 'N/A' : v.toFixed(1) + '%')
 const gaugeColor = (p: number) => (p < 70 ? '#67C23A' : p < 90 ? '#E6A23C' : '#F56C6C')

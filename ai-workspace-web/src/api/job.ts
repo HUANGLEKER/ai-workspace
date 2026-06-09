@@ -1,13 +1,23 @@
+/**
+ * 定时任务管理 API（仅管理员）
+ *
+ * invokeTarget 对应后端注册的 JobHandler bean 名称，通过 /job/handlers 枚举可用列表。
+ * Cron 表达式为 Spring 6 段式（秒 分 时 日 月 周），由后端 CronExpression.isValidExpression 校验。
+ * cleanJobLogs 为物理删除，sys_job_log 表不含 deleted 字段。
+ */
 import request from './request'
 
 export interface SysJob {
   id?: number
   jobName: string
   jobGroup?: string
+  /** 对应 JobHandler bean 名称，运行时由 JobHandlerRegistry 按名解析 */
   invokeTarget: string
+  /** Spring 6 段 Cron 表达式：秒 分 时 日 月 周 */
   cronExpression: string
   jobParams?: string
-  status?: number // 0 running, 1 paused
+  /** 0=运行/已调度，1=暂停 */
+  status?: number
   remark?: string
   createTime?: string
 }
@@ -18,7 +28,8 @@ export interface SysJobLog {
   jobName: string
   invokeTarget: string
   jobParams?: string
-  status: number // 0 success, 1 fail
+  /** 0=成功，1=失败 */
+  status: number
   jobMessage?: string
   exceptionInfo?: string
   costMs?: number

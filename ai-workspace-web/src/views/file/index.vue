@@ -73,6 +73,15 @@
   </div>
 </template>
 
+/**
+ * 文件中心页
+ *
+ * 功能：
+ * 1. 文件列表展示（分页、按文件名搜索），按 uploadBy 隔离
+ * 2. 上传文件（el-upload 直传 /api/file/upload）
+ * 3. 下载文件（后端返回 MinIO 预签名 URL，浏览器直接访问）
+ * 4. 删除文件（软删除）
+ */
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Upload, Search, Refresh, Delete, Download } from '@element-plus/icons-vue'
@@ -87,6 +96,7 @@ const total = ref(0)
 const searchName = ref('')
 let searchTimer: ReturnType<typeof setTimeout>
 
+// el-upload 不走 Axios 拦截器，需手动注入 Authorization 头
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${localStorage.getItem('token') || ''}`
 }))
@@ -107,6 +117,7 @@ async function loadFiles() {
 }
 
 function handleSearch() {
+  // 防抖 400ms，避免每次击键都触发接口请求
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     page.value = 1
@@ -138,7 +149,7 @@ async function handleDelete(id: number) {
 
 async function handleDownload(file: FileInfo) {
   try {
-    // backend exposes MinIO presigned URLs; there is no authenticated /download route
+    // 后端返回 MinIO 预签名 URL，无专用下载路由，直接在新标签页打开
     const url = await getFileUrl(file.filePath)
     window.open(url, '_blank')
   } catch {

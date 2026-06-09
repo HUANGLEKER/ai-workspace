@@ -1,3 +1,9 @@
+/**
+ * 用户管理 API（仅管理员）
+ *
+ * 对应后端 SysUserController，全部接口以 @PreAuthorize("hasRole('ADMIN')") 保护。
+ * 密码由后端 BCrypt 编码，更新时若不传 password 则保持不变。
+ */
 import request from './request'
 import type { SysUser, PageResult } from '@/types'
 

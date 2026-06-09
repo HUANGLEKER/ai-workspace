@@ -9,7 +9,14 @@ router = APIRouter(prefix="/rag", tags=["RAG"])
 
 @router.post("/chat")
 async def rag_chat(req: RagChatRequest):
-    # 返回 SSE 流：首帧为来源元数据，后续为答案 token
+    """
+    POST /rag/chat — RAG 流式问答。
+
+    返回 SSE 流，包含两种帧：
+    - 首帧：``{"type":"sources", "sources":[...]}`` 来源元数据
+    - 后续帧：``{"type":"token", "token":"..."}`` 答案 token，以 [DONE] 结束
+    """
+    # X-Accel-Buffering=no 关闭 Nginx 等反向代理缓冲，保证 token 实时推送
     return StreamingResponse(
         stream_rag_chat(req),
         media_type="text/event-stream",

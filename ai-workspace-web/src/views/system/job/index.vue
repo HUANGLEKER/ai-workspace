@@ -103,6 +103,16 @@
   </div>
 </template>
 
+/**
+ * 定时任务管理页（仅管理员）
+ *
+ * 功能：
+ * 1. 任务列表（分页、搜索）、启用/暂停、立即执行、CRUD
+ * 2. 执行日志列表（分页），支持全量清空（物理删除）
+ *
+ * Cron 为 Spring 6 段式（含秒字段）。
+ * 切换 Tab 时按需加载对应数据，避免无谓请求。
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -114,16 +124,17 @@ import {
 
 const activeTab = ref('jobs')
 
-// jobs
+// 任务相关状态
 const jobs = ref<SysJob[]>([])
 const jobLoading = ref(false)
 const jobPage = ref(1)
 const jobSize = ref(10)
 const jobTotal = ref(0)
 const jobSearch = ref('')
+/** 可用的 JobHandler bean 名称列表，由后端 JobHandlerRegistry 枚举 */
 const handlers = ref<string[]>([])
 
-// logs
+// 执行日志相关状态
 const logs = ref<SysJobLog[]>([])
 const logLoading = ref(false)
 const logPage = ref(1)
@@ -199,6 +210,7 @@ async function handleDelete(id: number) {
 }
 
 async function toggleStatus(row: SysJob, running: boolean) {
+  // status: 0=运行/调度中，1=暂停；el-switch 的 model-value 绑定 status===0
   const status = running ? 0 : 1
   try {
     await changeJobStatus(row.id!, status)

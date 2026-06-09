@@ -1,3 +1,11 @@
+/**
+ * Agent 管理 API
+ *
+ * Agent 定义按 createBy 用户私有。
+ * tools 与 mcpServers 字段在数据库中以 JSON 数组字符串存储，
+ * 前端编辑时转为 string[] 操作，提交前再序列化回字符串。
+ * runAgent 会将工具规格解析后发送给 FastAPI /agent/run 执行真实的工具调用循环。
+ */
 import request from './request'
 
 export interface Agent {
@@ -6,9 +14,9 @@ export interface Agent {
   description?: string
   systemPrompt?: string
   model?: string
-  /** JSON array string of Tool Center tool names */
+  /** 工具中心工具名称列表，JSON 数组字符串，如 '["search","calc"]' */
   tools?: string
-  /** JSON array string of MCP server names */
+  /** MCP 服务器名称列表，JSON 数组字符串 */
   mcpServers?: string
   enabled?: number
   createTime?: string

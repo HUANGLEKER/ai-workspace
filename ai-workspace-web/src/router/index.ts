@@ -1,3 +1,12 @@
+/**
+ * Vue Router 配置
+ *
+ * 路由守卫逻辑：
+ * 1. 公开页（requiresAuth: false）：已登录则重定向首页，否则放行
+ * 2. 未登录访问受保护页：跳转 /login 并附带 redirect 参数
+ * 3. 已登录但 userInfo 为空（刷新后 Store 丢失）：异步拉取用户信息以确保 isAdmin 正确
+ * 4. 管理员专属页（requiresAdmin: true）：非管理员重定向仪表盘
+ */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getUserInfo } from '@/api/auth'
@@ -130,14 +139,14 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  // ensure user info (incl. roles) is loaded before entering a protected page,
-  // so admin-only guards work on direct navigation / refresh
+  // 直接导航或刷新时 userInfo 可能为空，需先拉取以确保 isAdmin 等计算属性正确
+  // token 失效时 getUserInfo 会 401，由响应拦截器统一处理跳转
   if (!authStore.userInfo) {
     try {
       const info = await getUserInfo()
       authStore.setUserInfo(info)
     } catch {
-      // token invalid/expired — the response interceptor handles the redirect
+      // 拦截器已处理 401 跳转，此处静默忽略
     }
   }
 

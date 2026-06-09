@@ -70,6 +70,14 @@
   </div>
 </template>
 
+/**
+ * 工具中心页
+ *
+ * 功能：
+ * 1. 工具 CRUD（http/builtin 两种类型）
+ * 2. http 工具：Agent 运行时通过 httpx 按 config 中的参数 Schema 调用
+ * 3. config 字段为 JSON，格式：{method, params:[{name,type,description,required}], headers}
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'

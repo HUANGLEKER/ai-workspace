@@ -113,6 +113,17 @@
   </div>
 </template>
 
+/**
+ * 知识库问答页（RAG）
+ *
+ * 功能：
+ * 1. 顶部选择知识库，切换时重置会话
+ * 2. 以 QaTurn（问题 + 答案 + 来源）为单位展示问答历史
+ * 3. 流式接收 LLM 回答，同步渲染 sources 引用来源折叠面板
+ *
+ * 每轮问答独立持有一个 QaTurn 引用，流式 token 直接追加到该对象，
+ * 无需像 Chat 页那样维护分离的 streamingContent。
+ */
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { Search, Reading, Document, Delete, Cpu, UserFilled, Promotion, CircleClose } from '@element-plus/icons-vue'
@@ -120,6 +131,7 @@ import MarkdownIt from 'markdown-it'
 import type { KnowledgeBase, RagSource } from '@/types'
 import { listKnowledgeBases, ragChatStream } from '@/api/kb'
 
+/** 单轮问答数据结构，流式输出期间 answer 逐步填充 */
 interface QaTurn {
   question: string
   answer: string
@@ -197,6 +209,7 @@ function handleAsk() {
     (err) => {
       streaming.value = false
       streamController = null
+      // 若连一个 token 都未收到则移除占位轮次，避免展示空气泡
       if (!turn.answer) turns.value.pop()
       ElMessage.error('问答失败：' + err)
     },

@@ -68,6 +68,16 @@
   </div>
 </template>
 
+/**
+ * 文档管理页
+ *
+ * 功能：
+ * 1. 展示指定知识库下的文档列表（分页）
+ * 2. 上传新文档（触发后端异步嵌入管道，status 流转 PENDING→PROCESSING→DONE/FAILED）
+ * 3. 删除文档 / 重建整个知识库的 RAG 索引
+ *
+ * 路由参数：通过 query.kbId + query.kbName 从知识库管理页跳转传入
+ */
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -87,11 +97,19 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
+// el-upload 直接发 XMLHttpRequest，不经过 Axios 拦截器，需手动注入 Authorization 头
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${localStorage.getItem('token') || ''}`
 }))
 
-onMounted(loadDocuments)
+onMounted(() => {
+  if (!kbId) {
+    ElMessage.warning('未指定知识库，已跳转回知识库管理')
+    router.replace('/knowledge/base')
+    return
+  }
+  loadDocuments()
+})
 
 async function loadDocuments() {
   if (!kbId) return
@@ -112,6 +130,7 @@ function beforeUpload(file: File) {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/plain', 'text/markdown']
   const maxSize = 50 * 1024 * 1024
+  // 部分浏览器对 .md 文件上报 MIME 为 text/plain 或空字符串，额外检查扩展名兜底
   if (!allowed.includes(file.type) && !file.name.endsWith('.md')) {
     ElMessage.warning('仅支持 PDF、Word、TXT、Markdown 格式')
     return false
@@ -146,10 +165,15 @@ async function handleDelete(id: number) {
 }
 
 async function handleRebuild() {
+  if (!kbId) {
+    ElMessage.error('知识库 ID 无效，请重新进入文档管理页')
+    return
+  }
   await ElMessageBox.confirm('重建索引会重新处理所有文档，可能耗时较长，确认继续？', '重建索引', {
     confirmButtonText: '确认重建', cancelButtonText: '取消', type: 'warning'
   }).catch(() => { throw new Error('cancel') })
   try {
+    // 后端为异步嵌入管道，接口仅提交任务即返回，实际进度需轮询文档状态
     await rebuildRag(kbId)
     ElMessage.success('已提交重建任务，请稍后刷新查看状态')
   } catch (e) {

@@ -1,29 +1,29 @@
 /**
- * Shared Server-Sent-Events (SSE) streaming helper.
+ * 共享 SSE 流式工具
  *
- * Axios cannot read a streaming body, so all SSE endpoints use raw `fetch()`.
- * This centralizes the transport concerns every SSE caller needs — auth header,
- * incremental UTF-8 decoding, line buffering, `data: ` parsing, the `[DONE]`
- * sentinel, and AbortController support — so individual API modules only supply
- * the URL, body and how to turn a payload into display text.
+ * Axios 不支持流式读取响应体，所有 SSE 端点改用原生 fetch()。
+ * 本模块统一处理各调用方共有的传输层关注点：鉴权头注入、
+ * 增量 UTF-8 解码、行缓冲、data: 解析、[DONE] 哨兵识别
+ * 以及 AbortController 取消支持。
+ * 各 API 模块只需提供 URL、请求体以及如何将载荷映射为展示文本。
  */
 
 export interface StreamSSEOptions {
-  /** Called for each decoded text chunk. */
+  /** 每收到一个解码后的文本片段时触发 */
   onChunk: (text: string) => void
-  /** Called exactly once when the stream finishes: DONE sentinel, natural close, or user abort. */
+  /** 流结束时恰好触发一次：[DONE] 哨兵、自然关闭或用户中止均会调用 */
   onDone: () => void
-  /** Called on a non-abort transport/HTTP error. */
+  /** 非中止类传输错误或 HTTP 错误时触发 */
   onError: (err: string) => void
-  /** Optional signal to cancel the stream (e.g. a "stop generating" button). */
+  /** 可选的取消信号，例如"停止生成"按钮绑定的 AbortController.signal */
   signal?: AbortSignal
   /**
-   * Map a raw `data:` payload to display text. Return a string to emit via
-   * {@link onChunk}, or `undefined` to ignore the event (e.g. metadata frames).
+   * 将原始 data: 载荷映射为展示文本。
+   * 返回字符串则通过 onChunk 输出，返回 undefined 则忽略该帧（如元数据帧）。
    *
-   * Defaults to extracting `content` / `text` / `delta` from a JSON payload and
-   * falling back to the raw string. For the RAG stream, pass a custom extractor:
-   * `(d) => { const j = JSON.parse(d); return j.type === 'token' ? j.token : undefined }`.
+   * 默认从 JSON 载荷中依次取 content / text / delta 字段，均不存在时回退为原始字符串。
+   * RAG 流式场景可传入自定义提取器，例如：
+   * `(d) => { const j = JSON.parse(d); return j.type === 'token' ? j.token : undefined }`
    */
   extract?: (data: string) => string | undefined
 }
@@ -38,8 +38,8 @@ const defaultExtract = (data: string): string | undefined => {
 }
 
 /**
- * POST {@code body} as JSON to {@code url} and stream the SSE response.
- * Resolves when the stream ends; never rejects (errors are delivered via callbacks).
+ * 以 JSON 格式 POST body 到 url，并以 SSE 方式消费响应流。
+ * 流结束时 Promise resolve；不会 reject，错误通过 onError 回调传递。
  */
 export async function streamSSE(url: string, body: unknown, opts: StreamSSEOptions): Promise<void> {
   const { onChunk, onDone, onError, signal, extract = defaultExtract } = opts
@@ -72,10 +72,12 @@ export async function streamSSE(url: string, body: unknown, opts: StreamSSEOptio
     const decoder = new TextDecoder()
     let buffer = ''
 
-    // Returns true when the [DONE] sentinel was seen and streaming should stop.
+    // 返回 true 表示收到 [DONE] 哨兵，外层循环应停止读取
     const handleLine = (line: string): boolean => {
-      if (!line.startsWith('data: ')) return false
-      const data = line.slice(6).trim()
+      if (!line.startsWith('data:')) return false
+      // SSE 规范允许 "data:" 后跟一个可选空格，兼容两种格式
+      const raw = line.slice(5)
+      const data = raw.startsWith(' ') ? raw.slice(1) : raw
       if (data === '[DONE]') return true
       const text = extract(data)
       if (text) onChunk(text)
@@ -86,7 +88,7 @@ export async function streamSSE(url: string, body: unknown, opts: StreamSSEOptio
       const { done, value } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
-      // Keep the last (possibly incomplete) line buffered until the next read.
+      // 末尾可能是不完整的行，暂存到 buffer 等待下一次 read 补全
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
       for (const line of lines) {
@@ -96,11 +98,11 @@ export async function streamSSE(url: string, body: unknown, opts: StreamSSEOptio
         }
       }
     }
-    // Flush any remaining buffered line after the stream closes.
+    // 流关闭后冲刷 buffer 中残留的最后一行
     if (buffer) handleLine(buffer)
     finish()
   } catch (e) {
-    // A user-initiated abort is not an error — finalize whatever was streamed.
+    // 用户主动中止不视为错误，正常完结已接收到的内容
     if ((e as Error).name === 'AbortError') {
       finish()
       return

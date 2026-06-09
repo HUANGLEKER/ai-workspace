@@ -46,7 +46,7 @@ async def run_workflow(req: WorkflowRunRequest) -> WorkflowRunResponse:
             outputs=result.get("outputs", {}),
             status="completed",
         )
-    except Exception as e:  # 任意环节失败都不抛出，统一转为 failed 响应
+    except Exception as e:  # 任意环节失败均不向上抛出，统一转为 failed 状态响应，由调用方决策重试策略
         return WorkflowRunResponse(
             session_id=req.session_id,
             workflow_id=req.workflow_id,

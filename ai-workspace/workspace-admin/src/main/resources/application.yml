@@ -1,3 +1,8 @@
+# ===================================================================
+# AI Workspace — Spring Boot 基础配置（各环境通用）
+# 环境相关配置（数据库、Redis 连接等）见 application-dev.yml
+# ===================================================================
+
 server:
   port: 8080
   servlet:
@@ -6,10 +11,13 @@ server:
       force: true
   tomcat:
     threads:
+      # Tomcat 工作线程池：max 应高于 SSE 并发长连接数（每个流式会话占用一个线程）
       max: 200
       min-spare: 20
+    # accept-count：Tomcat 队列满后继续接受的额外连接数，超出后拒绝新连接
     accept-count: 100
     max-connections: 10000
+    # connection-timeout：前端与 Tomcat 建立 HTTP 连接的超时时间（毫秒）
     connection-timeout: 20000
 
 spring:
@@ -18,22 +26,26 @@ spring:
   application:
     name: ai-workspace
   jackson:
+    # 统一时间格式，与前端展示保持一致
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
+    # 响应中排除 null 字段，减少无效数据传输
     default-property-inclusion: non_null
 
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    # Route SQL logging through SLF4J (was StdOutImpl, which printed every statement
-    # to stdout — noisy and slow). Control verbosity via the logging level below.
+    # 通过 SLF4J 输出 SQL，避免旧版 StdOutImpl 直接打 stdout 导致日志混乱；
+    # 调试时将 com.aiworkspace 日志级别调为 DEBUG 即可看到完整 SQL
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
+      # 逻辑删除：deleted=1 表示已删除，deleted=0 表示正常；所有实体表均依赖此约定
       logic-delete-field: deleted
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+# Swagger UI 访问地址：http://localhost:8080/swagger-ui.html
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -41,19 +53,20 @@ springdoc:
     path: /v3/api-docs
 
 jwt:
-  # Base64 encoded secret, minimum 256 bits for HS256 — replace in production
+  # HS256 签名密钥（Base64 编码），最少 256 bit；生产环境必须替换为强随机密钥
   secret: YUlXb3Jrc3BhY2VTZWNyZXRLZXlGb3JKV1RUb2tlbkdlbmVyYXRpb24xMjM0NTY=
-  expiration: 86400000  # 24h
+  expiration: 86400000  # Token 有效期 24 小时（毫秒）
 
 fastapi:
+  # FastAPI AI 服务地址；所有 LLM 调用均通过 FastApiClient 路由到此处
   base-url: http://localhost:8001
-  connect-timeout: 10000
-  read-timeout: 180000
-  stream-timeout: 180000
+  connect-timeout: 10000    # 建立连接超时（毫秒）
+  read-timeout: 180000      # 一元 JSON 响应读取超时（毫秒）；Agent/Workflow 推理耗时较长
+  stream-timeout: 180000    # SSE 流式读取超时（毫秒）；Chat/RAG 长回复依赖此值
 
 logging:
   level:
-    # Set to DEBUG to see SQL again during local debugging.
+    # 调试 SQL 时调为 DEBUG；生产保持 INFO 避免敏感数据泄露到日志
     com.aiworkspace: INFO
 
 minio:
@@ -61,4 +74,5 @@ minio:
   access-key: minioadmin
   secret-key: minioadmin
   bucket: ai-workspace
+  # secure=false 表示使用 HTTP 而非 HTTPS；本地开发 MinIO 无证书故关闭
   secure: false

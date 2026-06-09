@@ -1,3 +1,9 @@
+/**
+ * 工具中心 API
+ *
+ * 工具按 createBy 用户私有。toolType 区分 http（Agent 运行时通过 httpx 调用）
+ * 与 builtin（内置逻辑）。config 字段存储 JSON 格式的参数 Schema。
+ */
 import request from './request'
 
 export interface Tool {

@@ -100,6 +100,16 @@
   </div>
 </template>
 
+/**
+ * 用户管理页（仅管理员）
+ *
+ * 功能：
+ * 1. 用户分页查询（支持按用户名搜索）
+ * 2. 新增/编辑/删除用户
+ * 3. 启用/禁用用户（el-switch 直接切换，乐观更新本地状态）
+ *
+ * 编辑时用户名不可修改（后端不可变约定），密码字段留空则不更新。
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'

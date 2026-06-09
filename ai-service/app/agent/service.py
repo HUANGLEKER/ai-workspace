@@ -94,7 +94,7 @@ async def _load_mcp_tools(servers: list[McpServerSpec], steps: list[dict]) -> li
         tools = await client.get_tools()
         steps.append({"type": "mcp", "content": f"已从 {len(connections)} 个MCP服务器加载 {len(tools)} 个工具"})
         return tools
-    except Exception as e:  # noqa: BLE001 — a bad MCP server must not abort the run
+    except Exception as e:  # noqa: BLE001 — MCP 服务器异常不应中止整次 Agent 运行，降级跳过即可
         steps.append({"type": "warning", "content": f"MCP工具加载失败: {e}"})
         return []
 
@@ -143,7 +143,7 @@ async def run_agent(req: AgentRunRequest) -> AgentRunResponse:
             else:
                 try:
                     result = await tool.ainvoke(args)
-                except Exception as e:  # noqa: BLE001 —— 将工具错误回传给模型而非中断
+                except Exception as e:  # noqa: BLE001 — 工具执行失败不应中断 Agent 循环，将错误文本回传给模型让其自行处理
                     result = f"工具执行出错: {e}"
             result_str = str(result)
             steps.append({"type": "tool_result", "tool": name, "content": result_str[:2000]})

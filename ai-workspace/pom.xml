@@ -65,7 +65,7 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- Internal modules -->
+            <!-- 内部子模块 —— 统一在此声明版本，各子模块 pom 引用时无需重复指定版本号 -->
             <dependency>
                 <groupId>com.aiworkspace</groupId>
                 <artifactId>workspace-common</artifactId>
@@ -132,14 +132,14 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- MyBatis Plus -->
+            <!-- MyBatis Plus —— ORM 框架，提供通用 CRUD、逻辑删除、自动填充等能力 -->
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
-            <!-- JWT -->
+            <!-- JWT (JJWT) —— HS256 签名的 Token 生成与校验；impl/jackson 为运行时依赖 -->
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-api</artifactId>
@@ -158,21 +158,21 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- SpringDoc OpenAPI -->
+            <!-- SpringDoc OpenAPI —— 自动生成 Swagger UI，访问 /swagger-ui.html -->
             <dependency>
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
             </dependency>
 
-            <!-- Hutool -->
+            <!-- Hutool —— 工具库，提供字符串/时间/加密等通用能力 -->
             <dependency>
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
             </dependency>
 
-            <!-- MinIO -->
+            <!-- MinIO —— 对象存储客户端，文件中心上传/下载及 RAG 嵌入管道依赖 -->
             <dependency>
                 <groupId>io.minio</groupId>
                 <artifactId>minio</artifactId>

@@ -57,6 +57,14 @@
   </div>
 </template>
 
+/**
+ * 提示词中心页
+ *
+ * 功能：
+ * 1. 提示词列表（支持标题关键词和分类筛选）
+ * 2. 新建/编辑/删除提示词
+ * 3. 一键复制提示词内容到剪贴板
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'

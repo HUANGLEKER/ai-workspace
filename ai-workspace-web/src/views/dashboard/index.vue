@@ -62,6 +62,14 @@
   </div>
 </template>
 
+/**
+ * 仪表盘页
+ *
+ * 功能：
+ * 1. 展示当前用户的统计概览（今日对话、知识库、文档、文件数量）
+ * 2. 提供常用功能的快速入口
+ * 3. 展示系统技术栈信息
+ */
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'

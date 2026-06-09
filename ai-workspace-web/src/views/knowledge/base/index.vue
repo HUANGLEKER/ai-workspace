@@ -33,7 +33,10 @@
         </div>
       </el-card>
 
-      <el-empty v-if="!loading && knowledgeBases.length === 0" description="暂无知识库，点击右上角新建" />
+      <div v-if="!loading && knowledgeBases.length === 0" class="kb-empty">
+        <el-icon class="kb-empty-icon"><Reading /></el-icon>
+        <p class="kb-empty-text">暂无知识库，点击右上角新建</p>
+      </div>
     </div>
 
     <!-- 新建/编辑弹窗 -->
@@ -66,6 +69,14 @@
   </div>
 </template>
 
+/**
+ * 知识库管理页
+ *
+ * 功能：
+ * 1. 展示当前用户所有知识库（按 createBy 隔离，后端仅返回本人数据）
+ * 2. 新建 / 编辑 / 删除知识库
+ * 3. 跳转到文档管理页（携带 kbId、kbName 查询参数）
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -142,6 +153,8 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id: number) {
+  // 用户点取消时 confirm 会 reject，重新抛出特殊 cancel 标记
+  // 以便在 catch 中区分"用户主动取消"与"接口请求失败"两种情况
   await ElMessageBox.confirm('确定删除该知识库吗？删除后相关文档也将一并删除。', '删除确认', {
     confirmButtonText: '确定删除',
     cancelButtonText: '取消',
@@ -227,5 +240,26 @@ function goDocuments(kb: KnowledgeBase) {
   gap: 8px;
   border-top: 1px solid #f0f2f5;
   padding-top: 12px;
+}
+
+.kb-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  gap: 16px;
+}
+
+.kb-empty-icon {
+  font-size: 64px;
+  color: #c0c4cc;
+}
+
+.kb-empty-text {
+  font-size: 14px;
+  color: #909399;
+  margin: 0;
 }
 </style>

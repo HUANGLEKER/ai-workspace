@@ -1,3 +1,9 @@
+/**
+ * 工作流管理 API
+ *
+ * 工作流定义按 createBy 用户私有，definition 字段为 LangGraph 节点/连线的 JSON 字符串。
+ * runWorkflow 将 inputs 透传给 FastAPI /workflow/run 执行。
+ */
 import request from './request'
 
 export interface Workflow {

@@ -1,3 +1,13 @@
+/**
+ * Chat 相关 API
+ *
+ * 包含两类：
+ * 1. 模型管理（管理员专属）：增删查改、分页、启用/禁用
+ * 2. 会话与消息：创建/列出/删除会话，加载历史消息，发送流式消息
+ *
+ * sendMessageStream 使用原生 fetch SSE（非 Axios），
+ * 通过共享的 streamSSE 工具处理传输层细节。
+ */
 import request from './request'
 import { streamSSE } from './sse'
 import type { ChatSession, ChatMessage, ChatModel, PageResult } from '@/types'

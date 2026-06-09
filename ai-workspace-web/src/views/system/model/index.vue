@@ -104,6 +104,17 @@
   </div>
 </template>
 
+/**
+ * 模型管理页（仅管理员）
+ *
+ * 功能：
+ * 1. 模型分页查询（支持按模型名搜索）
+ * 2. 新增/编辑/删除模型配置
+ * 3. 启用/禁用模型（el-switch 直接切换）
+ *
+ * apiKey 在列表中由后端脱敏不返回，编辑弹窗中留空则不修改原有值。
+ * 模型选择按请求透传给 FastAPI，FastAPI 不直接读此表。
+ */
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -153,6 +164,7 @@ function resetSearch() {
 
 function openDialog(model?: ChatModel) {
   editing.value = model || null
+  // 编辑时清空 apiKey 字段，留空提交则后端保持原值不变
   Object.assign(form, model ? { ...model, apiKey: '' } : emptyForm())
   dialogVisible.value = true
 }
