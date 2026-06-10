@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/aiworkspace/backend/internal/common"
@@ -102,7 +104,7 @@ func ListJobLogs(c *gin.Context) {
 	pg := common.ParsePage(c)
 	var jobID int64
 	if v := c.Query("jobId"); v != "" {
-		parseID64(v, &jobID)
+		jobID, _ = strconv.ParseInt(v, 10, 64)
 	}
 	result, err := service.JobSvc.PageJobLogs(pg.PageNum, pg.PageSize, jobID)
 	if err != nil {
@@ -119,15 +121,4 @@ func CleanJobLogs(c *gin.Context) {
 		return
 	}
 	common.OKMsg(c, "日志已清空")
-}
-
-func parseID64(s string, dst *int64) {
-	var v int64
-	for _, ch := range s {
-		if ch < '0' || ch > '9' {
-			return
-		}
-		v = v*10 + int64(ch-'0')
-	}
-	*dst = v
 }

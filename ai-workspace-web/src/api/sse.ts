@@ -31,7 +31,8 @@ export interface StreamSSEOptions {
 const defaultExtract = (data: string): string | undefined => {
   try {
     const parsed = JSON.parse(data)
-    return parsed.content ?? parsed.text ?? parsed.delta ?? undefined
+    // token 是 FastAPI chat 流的载荷字段（{"session_id","token"}）
+    return parsed.token ?? parsed.content ?? parsed.text ?? parsed.delta ?? undefined
   } catch {
     return data || undefined
   }

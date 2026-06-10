@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -72,16 +73,13 @@ func DeleteKB(c *gin.Context) {
 
 // ListDocuments GET /api/document/list?kbId=&pageNum=&pageSize=
 func ListDocuments(c *gin.Context) {
-	var req struct {
-		KbID     int64 `form:"kbId" binding:"required"`
-		PageNum  int   `form:"pageNum"`
-		PageSize int   `form:"pageSize"`
-	}
-	if err := c.ShouldBindQuery(&req); err != nil {
-		common.BadRequest(c, err.Error())
+	kbID, err := strconv.ParseInt(c.Query("kbId"), 10, 64)
+	if err != nil || kbID <= 0 {
+		common.BadRequest(c, "kbId 无效")
 		return
 	}
-	result, err := service.KBSvc.PageDocuments(req.KbID, middleware.CurrentUserID(c), req.PageNum, req.PageSize)
+	pg := common.ParsePage(c)
+	result, err := service.KBSvc.PageDocuments(kbID, middleware.CurrentUserID(c), pg.PageNum, pg.PageSize)
 	if err != nil {
 		handleBizError(c, err)
 		return
@@ -91,13 +89,11 @@ func ListDocuments(c *gin.Context) {
 
 // UploadDocument POST /api/document/upload — multipart/form-data，含 kbId 字段
 func UploadDocument(c *gin.Context) {
-	kbIDStr := c.PostForm("kbId")
-	if kbIDStr == "" {
-		common.BadRequest(c, "kbId 不能为空")
+	kbID, err := strconv.ParseInt(c.PostForm("kbId"), 10, 64)
+	if err != nil || kbID <= 0 {
+		common.BadRequest(c, "kbId 无效")
 		return
 	}
-	var kbID int64
-	fmt.Sscanf(kbIDStr, "%d", &kbID)
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -107,8 +103,8 @@ func UploadDocument(c *gin.Context) {
 	defer file.Close()
 
 	// 读取文件内容（文档通常不超过数十 MB，内存读取可接受）
-	data := make([]byte, header.Size)
-	if _, err = file.Read(data); err != nil {
+	data, err := io.ReadAll(file)
+	if err != nil {
 		common.ServerError(c, "读取文件失败")
 		return
 	}
@@ -163,8 +159,9 @@ func RAGChat(c *gin.Context) {
 		req.SessionID = "default"
 	}
 
+	// FastAPI 的 Pydantic 模型要求 kb_id 为字符串，传整数会触发 422 校验错误
 	body := map[string]any{
-		"kb_id":      req.KbID,
+		"kb_id":      strconv.FormatInt(req.KbID, 10),
 		"question":   req.Question,
 		"session_id": req.SessionID,
 		"top_k":      req.TopK,
@@ -183,17 +180,7 @@ func RAGChat(c *gin.Context) {
 		if strings.TrimSpace(line) == "" {
 			return nil
 		}
-		// 透传 sources 元数据帧与 content token 帧，前端分别处理
-		if strings.HasPrefix(line, "data: ") {
-			data := strings.TrimPrefix(line, "data: ")
-			var payload map[string]any
-			if err := json.Unmarshal([]byte(data), &payload); err == nil {
-				// sources 帧：文档引用信息（可折叠展示）
-				// content 帧：LLM token
-				// 统一透传，由前端的 streamSSE.extract 分拣
-				_ = payload
-			}
-		}
+		// sources 元数据帧与 content token 帧统一透传，由前端 streamSSE.extract 分拣
 		fmt.Fprintf(w, "%s\n\n", line)
 		if canFlush {
 			flusher.Flush()

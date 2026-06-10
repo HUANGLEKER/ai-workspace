@@ -97,9 +97,14 @@ func ChatSend(c *gin.Context) {
 
 	userID := middleware.CurrentUserID(c)
 	// 会话归属校验，越权直接 400/403
-	if _, err := service.ChatSvc.GetOwnedSession(req.SessionID, userID); err != nil {
+	sess, err := service.ChatSvc.GetOwnedSession(req.SessionID, userID)
+	if err != nil {
 		handleBizError(c, err)
 		return
+	}
+	// 请求未指定模型时回退到会话创建时绑定的模型
+	if req.Model == "" {
+		req.Model = sess.ModelName
 	}
 
 	// 持久化用户消息，确保即使后续流失败也有记录
@@ -169,7 +174,9 @@ func ChatSend(c *gin.Context) {
 	if streamErr != nil {
 		// 客户端断连属于正常情况，仅在非 context canceled 时记录错误
 		if ctx.Err() == nil {
-			fmt.Fprintf(w, "data: {\"error\":\"%s\"}\n\n", streamErr.Error())
+			// 用 json.Marshal 序列化，避免错误信息中的引号破坏 JSON 帧
+			errFrame, _ := json.Marshal(map[string]string{"error": streamErr.Error()})
+			fmt.Fprintf(w, "data: %s\n\n", errFrame)
 			if canFlush {
 				flusher.Flush()
 			}
@@ -184,6 +191,29 @@ func ChatSend(c *gin.Context) {
 
 // ─── 模型管理 ────────────────────────────────────────────────────────
 
+// chatModelReq 模型增改请求体。
+// model.ChatModel 的 ApiKey json tag 为 "-"（响应中脱敏），无法直接绑定请求，
+// 故用独立 DTO 接收 apiKey 后映射到模型。
+type chatModelReq struct {
+	ID        int64  `json:"id"`
+	ModelName string `json:"modelName"`
+	Provider  string `json:"provider"`
+	ApiUrl    string `json:"apiUrl"`
+	ApiKey    string `json:"apiKey"`
+	Enabled   int8   `json:"enabled"`
+}
+
+func (r *chatModelReq) toModel() *model.ChatModel {
+	return &model.ChatModel{
+		BaseModel: model.BaseModel{ID: r.ID},
+		ModelName: r.ModelName,
+		Provider:  r.Provider,
+		ApiUrl:    r.ApiUrl,
+		ApiKey:    r.ApiKey,
+		Enabled:   r.Enabled,
+	}
+}
+
 // ListChatModels GET /api/chat/model/list
 func ListChatModels(c *gin.Context) {
 	models, err := service.ChatSvc.ListModels()
@@ -194,32 +224,61 @@ func ListChatModels(c *gin.Context) {
 	common.OK(c, models)
 }
 
+// PageChatModels GET /api/chat/model/page — 仅管理员，分页查询全部模型（含禁用）
+func PageChatModels(c *gin.Context) {
+	pg := common.ParsePage(c)
+	result, err := service.ChatSvc.PageModels(pg.PageNum, pg.PageSize, c.Query("modelName"))
+	if err != nil {
+		common.ServerError(c, err.Error())
+		return
+	}
+	common.OK(c, result)
+}
+
 // AddChatModel POST /api/chat/model/add — 仅管理员
 func AddChatModel(c *gin.Context) {
-	var m model.ChatModel
-	if err := c.ShouldBindJSON(&m); err != nil {
+	var req chatModelReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		common.BadRequest(c, err.Error())
 		return
 	}
-	if err := service.ChatSvc.AddModel(&m); err != nil {
+	m := req.toModel()
+	if err := service.ChatSvc.AddModel(m); err != nil {
 		handleBizError(c, err)
 		return
 	}
 	common.OK(c, m)
 }
 
-// UpdateChatModel PUT /api/chat/model/update — 仅管理员
+// UpdateChatModel PUT /api/chat/model/update — 仅管理员；apiKey 留空表示保持原值
 func UpdateChatModel(c *gin.Context) {
-	var m model.ChatModel
-	if err := c.ShouldBindJSON(&m); err != nil {
+	var req chatModelReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		common.BadRequest(c, err.Error())
 		return
 	}
-	if err := service.ChatSvc.UpdateModel(&m); err != nil {
+	if err := service.ChatSvc.UpdateModel(req.toModel()); err != nil {
 		handleBizError(c, err)
 		return
 	}
 	common.OKMsg(c, "更新成功")
+}
+
+// UpdateChatModelStatus PUT /api/chat/model/status — 仅管理员，启用/禁用模型
+func UpdateChatModelStatus(c *gin.Context) {
+	var req struct {
+		ID      int64 `json:"id" binding:"required"`
+		Enabled int8  `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.BadRequest(c, err.Error())
+		return
+	}
+	if err := service.ChatSvc.UpdateModelStatus(req.ID, req.Enabled); err != nil {
+		handleBizError(c, err)
+		return
+	}
+	common.OKMsg(c, "状态更新成功")
 }
 
 // DeleteChatModel DELETE /api/chat/model/:id — 仅管理员

@@ -40,8 +40,13 @@ func (s *chatService) DeleteSession(id, userID int64) error {
 	if err := s.getOwned(id, userID); err != nil {
 		return err
 	}
-	database.DB.Where("session_id = ?", id).Delete(&model.ChatMessage{})
-	return database.DB.Delete(&model.ChatSession{}, id).Error
+	// 事务保证会话与其消息的删除原子性
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("session_id = ?", id).Delete(&model.ChatMessage{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.ChatSession{}, id).Error
+	})
 }
 
 // GetOwnedSession 校验会话归属，用于消息读写前的权限检查（防 IDOR）
@@ -68,7 +73,8 @@ func (s *chatService) getOwned(id, userID int64) error {
 // ListMessages 查询会话下所有消息，按时间升序（对话历史展示用）
 func (s *chatService) ListMessages(sessionID int64) ([]model.ChatMessage, error) {
 	var messages []model.ChatMessage
-	err := database.DB.Where("session_id = ?", sessionID).Order("create_time ASC").Find(&messages).Error
+	// 按 id 排序：create_time 秒级精度下同秒消息会乱序
+	err := database.DB.Where("session_id = ?", sessionID).Order("id ASC").Find(&messages).Error
 	return messages, err
 }
 
@@ -77,7 +83,7 @@ func (s *chatService) ListMessages(sessionID int64) ([]model.ChatMessage, error)
 func (s *chatService) ListRecentMessages(sessionID int64) ([]model.ChatMessage, error) {
 	var messages []model.ChatMessage
 	err := database.DB.Where("session_id = ?", sessionID).
-		Order("create_time DESC").
+		Order("id DESC").
 		Limit(maxContextMessages).
 		Find(&messages).Error
 	if err != nil {
@@ -106,6 +112,30 @@ func (s *chatService) ListModels() ([]model.ChatModel, error) {
 	return models, err
 }
 
+// PageModels 分页查询全部模型配置（含禁用），供管理员模型管理页使用
+func (s *chatService) PageModels(pageNum, pageSize int, modelName string) (common.PageResult[model.ChatModel], error) {
+	var models []model.ChatModel
+	var total int64
+	q := database.DB.Model(&model.ChatModel{})
+	if modelName != "" {
+		q = q.Where("model_name LIKE ?", "%"+modelName+"%")
+	}
+	if err := q.Count(&total).Error; err != nil {
+		return common.PageResult[model.ChatModel]{}, err
+	}
+	pg := common.PageQuery{PageNum: pageNum, PageSize: pageSize}
+	pg.Normalize()
+	if err := q.Offset(pg.Offset()).Limit(pg.PageSize).Order("id DESC").Find(&models).Error; err != nil {
+		return common.PageResult[model.ChatModel]{}, err
+	}
+	return common.PageResult[model.ChatModel]{Total: total, PageNum: pg.PageNum, PageSize: pg.PageSize, List: models}, nil
+}
+
+// UpdateModelStatus 启用/禁用模型
+func (s *chatService) UpdateModelStatus(id int64, enabled int8) error {
+	return database.DB.Model(&model.ChatModel{}).Where("id = ?", id).Update("enabled", enabled).Error
+}
+
 // AddModel 新增 LLM 模型配置，仅管理员可操作
 func (s *chatService) AddModel(m *model.ChatModel) error {
 	m.ID = 0
@@ -114,6 +144,21 @@ func (s *chatService) AddModel(m *model.ChatModel) error {
 
 // UpdateModel 更新 LLM 模型配置
 func (s *chatService) UpdateModel(m *model.ChatModel) error {
+	if m.ID == 0 {
+		return common.NewBizError(common.CodeBadRequest, "模型ID不能为空")
+	}
+	var existing model.ChatModel
+	if err := database.DB.First(&existing, m.ID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return common.ErrNotFound("模型")
+		}
+		return err
+	}
+	// ApiKey 的 json tag 为 "-"，请求体不会带入；Save 全字段覆盖前必须回填，否则密钥被清空
+	if m.ApiKey == "" {
+		m.ApiKey = existing.ApiKey
+	}
+	m.CreatedAt = existing.CreatedAt
 	return database.DB.Save(m).Error
 }
 

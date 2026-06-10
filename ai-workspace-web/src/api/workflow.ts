@@ -2,7 +2,7 @@
  * 工作流管理 API
  *
  * 工作流定义按 createBy 用户私有，definition 字段为 LangGraph 节点/连线的 JSON 字符串。
- * runWorkflow 将 inputs 透传给 FastAPI /workflow/run 执行。
+ * runWorkflow 传入提示词字符串，后端包装为 inputs.prompt 转发 FastAPI /workflow/run 执行。
  */
 import request from './request'
 
@@ -25,5 +25,5 @@ export const listWorkflows = () => request.get<unknown, Workflow[]>('/workflow/l
 export const addWorkflow = (data: Workflow) => request.post('/workflow/add', data)
 export const updateWorkflow = (data: Workflow) => request.put('/workflow/update', data)
 export const deleteWorkflow = (id: number) => request.delete(`/workflow/delete/${id}`)
-export const runWorkflow = (id: number, inputs: Record<string, unknown>) =>
-  request.post<unknown, WorkflowRunResult>(`/workflow/${id}/run`, { inputs })
+export const runWorkflow = (id: number, input: string) =>
+  request.post<unknown, WorkflowRunResult>(`/workflow/${id}/run`, { input })

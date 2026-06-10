@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -42,10 +43,15 @@ func ParseToken(tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
 		return []byte(config.Global.JWT.Secret), nil
 	})
-	if err != nil || !token.Valid {
+	if err != nil {
 		return nil, err
 	}
-	return token.Claims.(*Claims), nil
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		// err 为 nil 但 token 无效时必须返回非 nil 错误，否则调用方会解引用 nil claims
+		return nil, errors.New("invalid token")
+	}
+	return claims, nil
 }
 
 // JWTAuth 认证中间件，对应 JwtAuthFilter
@@ -72,8 +78,8 @@ func JWTAuth() gin.HandlerFunc {
 // AdminRequired 对应 @PreAuthorize("hasRole('ADMIN')")
 func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		roles, _ := c.Get(CtxRoles)
-		for _, r := range roles.([]string) {
+		// 安全断言：路由误配（未先挂 JWTAuth）时返回 403 而不是 panic
+		for _, r := range c.GetStringSlice(CtxRoles) {
 			if r == "ROLE_ADMIN" {
 				c.Next()
 				return

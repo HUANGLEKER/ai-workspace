@@ -37,8 +37,10 @@ func registerChatRoutes(rg *gin.RouterGroup) {
 	// LLM 模型配置：读取所有人可用，增删改仅管理员
 	g.GET("/model/list", handler.ListChatModels)
 	admin := g.Group("/model", middleware.AdminRequired())
+	admin.GET("/page", handler.PageChatModels)
 	admin.POST("/add", handler.AddChatModel)
 	admin.PUT("/update", handler.UpdateChatModel)
+	admin.PUT("/status", handler.UpdateChatModelStatus)
 	admin.DELETE("/:id", handler.DeleteChatModel)
 }
 

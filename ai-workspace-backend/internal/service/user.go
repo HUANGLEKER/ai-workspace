@@ -73,6 +73,12 @@ func (s *userService) UpdateUser(user *model.SysUser) error {
 		return err
 	}
 	user.Username = existing.Username
+	// Save 会覆盖全部字段：必须回填创建时间，否则 create_time 会被写成零值
+	user.CreatedAt = existing.CreatedAt
+	// 状态变更走专用 /user/status 接口；请求未带 status（零值）时保留原状态，防止误禁用
+	if user.Status == 0 {
+		user.Status = existing.Status
+	}
 	if user.Password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 		if err != nil {

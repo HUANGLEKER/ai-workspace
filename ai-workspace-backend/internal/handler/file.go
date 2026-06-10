@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"io"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/aiworkspace/backend/internal/common"
@@ -29,8 +31,8 @@ func UploadFile(c *gin.Context) {
 	}
 	defer file.Close()
 
-	data := make([]byte, header.Size)
-	if _, err = file.Read(data); err != nil {
+	data, err := io.ReadAll(file)
+	if err != nil {
 		common.ServerError(c, "读取文件失败")
 		return
 	}

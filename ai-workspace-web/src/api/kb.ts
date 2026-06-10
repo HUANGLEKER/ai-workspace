@@ -14,7 +14,7 @@ export const listKnowledgeBases = () =>
   request.get<unknown, KnowledgeBase[]>('/kb/list')
 
 export const createKnowledgeBase = (data: { kbName: string; description: string }) =>
-  request.post<unknown, KnowledgeBase>('/kb/create', data)
+  request.post<unknown, KnowledgeBase>('/kb/add', data)
 
 export const updateKnowledgeBase = (data: Partial<KnowledgeBase>) =>
   request.put<unknown, void>('/kb/update', data)

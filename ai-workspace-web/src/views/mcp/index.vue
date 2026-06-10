@@ -144,7 +144,11 @@ async function handleTest(id: number) {
   testingId.value = id
   try {
     const res = await testMcpServer(id)
-    ElMessage.success(`连通性：${res}`)
+    if (res.reachable) {
+      ElMessage.success(`连通正常（${res.latency}ms）：${res.message}`)
+    } else {
+      ElMessage.warning(`连通失败：${res.message}`)
+    }
   } catch { } finally { testingId.value = null }
 }
 </script>

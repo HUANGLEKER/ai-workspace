@@ -56,6 +56,8 @@ func (s *agentService) Update(a *model.Agent, userID int64) error {
 		return err
 	}
 	a.CreateBy = existing.CreateBy
+	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
+	a.CreatedAt = existing.CreatedAt
 	return database.DB.Save(a).Error
 }
 
@@ -98,6 +100,11 @@ func (s *agentService) Run(ctx context.Context, agentID, userID int64, input, se
 	mcpServers, err := MCPSvc.ResolveForAgent(userID, agent.McpServers)
 	if err != nil {
 		return nil, err
+	}
+
+	// FastAPI AgentRunRequest 的 session_id 为必填字符串
+	if sessionID == "" {
+		sessionID = "default"
 	}
 
 	body := map[string]any{

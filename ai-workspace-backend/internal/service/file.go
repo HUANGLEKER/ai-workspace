@@ -68,11 +68,10 @@ func (s *fileService) Delete(ctx context.Context, id, userID int64) error {
 // GetPresignedURL 生成临时预签名下载 URL（有效期 1 小时）
 // 校验 upload_by + file_path 双重条件，防止通过构造 filePath 枚举他人文件
 func (s *fileService) GetPresignedURL(ctx context.Context, fileID, userID int64) (string, error) {
-	if _, err := s.getOwned(fileID, userID); err != nil {
+	info, err := s.getOwned(fileID, userID)
+	if err != nil {
 		return "", err
 	}
-	var info model.FileInfo
-	database.DB.First(&info, fileID)
 	return minioPkg.PresignedURL(ctx, info.FilePath, time.Hour)
 }
 

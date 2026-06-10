@@ -149,8 +149,8 @@ async function handleDelete(id: number) {
 
 async function handleDownload(file: FileInfo) {
   try {
-    // 后端返回 MinIO 预签名 URL，无专用下载路由，直接在新标签页打开
-    const url = await getFileUrl(file.filePath)
+    // 后端按文件 ID 校验归属后返回 MinIO 预签名 URL，直接在新标签页打开
+    const url = await getFileUrl(file.id)
     window.open(url, '_blank')
   } catch {
     ElMessage.error('下载失败')

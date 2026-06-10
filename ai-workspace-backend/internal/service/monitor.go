@@ -13,7 +13,6 @@ import (
 
 	"github.com/aiworkspace/backend/internal/config"
 	"github.com/aiworkspace/backend/pkg/fastapi"
-	minioPkg "github.com/aiworkspace/backend/pkg/minio"
 	redisPkg "github.com/aiworkspace/backend/pkg/redis"
 )
 
@@ -150,7 +149,6 @@ func checkHTTP(name, url string) ServiceHealth {
 		return ServiceHealth{Name: name, Target: url, Status: "DOWN", Latency: latency, Message: err.Error()}
 	}
 	defer resp.Body.Close()
-	_ = minioPkg.Client
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		return ServiceHealth{Name: name, Target: url, Status: "UP", Latency: latency, Message: fmt.Sprintf("HTTP %d", resp.StatusCode)}
 	}

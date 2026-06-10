@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
@@ -69,6 +70,9 @@ func (s *jobService) UpdateJob(job *model.SysJob) error {
 		return err
 	}
 	scheduler.Manager.Remove(existing.ID)
+	// Save 全字段覆盖，回填创建时间与创建人防止被写成零值
+	job.CreatedAt = existing.CreatedAt
+	job.CreateBy = existing.CreateBy
 	if err = database.DB.Save(job).Error; err != nil {
 		return err
 	}
@@ -155,7 +159,7 @@ func (s *jobService) LoadAndScheduleRunning() error {
 	}
 	for _, job := range jobs {
 		if err := scheduler.Manager.Add(job.ID, job.JobName, job.InvokeTarget, job.CronExpression, job.JobParams); err != nil {
-			_ = err
+			zap.L().Warn("启动时加载定时任务失败", zap.Int64("jobId", job.ID), zap.Error(err))
 		}
 	}
 	return nil

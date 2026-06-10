@@ -59,6 +59,8 @@ func (s *toolService) Update(t *model.Tool, userID int64) error {
 		return err
 	}
 	t.CreateBy = existing.CreateBy
+	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
+	t.CreatedAt = existing.CreatedAt
 	return database.DB.Save(t).Error
 }
 
@@ -91,12 +93,17 @@ func (s *toolService) ResolveForAgent(userID int64, toolNamesJSON string) ([]map
 
 	result := make([]map[string]any, 0, len(tools))
 	for _, t := range tools {
+		// FastAPI HttpToolSpec.config 是字典；DB 中存的是 JSON 字符串，须先解析
+		config := map[string]any{}
+		if t.Config != "" {
+			_ = json.Unmarshal([]byte(t.Config), &config)
+		}
 		spec := map[string]any{
 			"name":        t.Name,
 			"description": t.Description,
 			"type":        t.ToolType,
 			"endpoint":    t.Endpoint,
-			"config":      t.Config,
+			"config":      config,
 		}
 		result = append(result, spec)
 	}

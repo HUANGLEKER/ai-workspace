@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +49,8 @@ func (s *kbService) Update(kb *model.KbKnowledgeBase, userID int64) error {
 		return err
 	}
 	kb.CreateBy = existing.CreateBy
+	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
+	kb.CreatedAt = existing.CreatedAt
 	return database.DB.Save(kb).Error
 }
 
@@ -141,8 +145,12 @@ func (s *kbService) DeleteDocument(ctx context.Context, docID, userID int64) err
 		zap.L().Warn("删除 MinIO 对象失败", zap.String("path", doc.FilePath), zap.Error(err))
 	}
 
-	body := map[string]any{"document_id": docID, "kb_id": doc.KbID}
-	if err := fastapi.Client.Send(ctx, "/embedding/delete", body, 30*time.Second); err != nil {
+	// FastAPI 侧 Pydantic 模型要求 ID 为字符串，且 /embedding/delete 注册为 DELETE 路由
+	body := map[string]any{
+		"document_id": strconv.FormatInt(docID, 10),
+		"kb_id":       strconv.FormatInt(doc.KbID, 10),
+	}
+	if err := fastapi.Client.SendMethod(ctx, http.MethodDelete, "/embedding/delete", body, 30*time.Second); err != nil {
 		zap.L().Warn("删除向量数据失败", zap.Int64("docId", docID), zap.Error(err))
 	}
 
@@ -176,9 +184,10 @@ func (s *kbService) buildEmbedding(doc *model.KbDocument) {
 
 	database.DB.Model(&model.KbDocument{}).Where("id = ?", doc.ID).Update("status", model.DocStatusProcessing)
 
+	// FastAPI 侧 Pydantic 模型要求 ID 为字符串
 	body := map[string]any{
-		"document_id": doc.ID,
-		"kb_id":       doc.KbID,
+		"document_id": strconv.FormatInt(doc.ID, 10),
+		"kb_id":       strconv.FormatInt(doc.KbID, 10),
 		"file_path":   doc.FilePath,
 		"file_name":   doc.FileName,
 	}

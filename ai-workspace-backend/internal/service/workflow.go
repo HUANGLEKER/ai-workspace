@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"gorm.io/gorm"
 
@@ -56,6 +57,8 @@ func (s *workflowService) Update(w *model.Workflow, userID int64) error {
 		return err
 	}
 	w.CreateBy = existing.CreateBy
+	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
+	w.CreatedAt = existing.CreatedAt
 	return database.DB.Save(w).Error
 }
 
@@ -89,9 +92,12 @@ func (s *workflowService) Run(ctx context.Context, workflowID, userID int64, inp
 	if err != nil {
 		return nil, err
 	}
+	// 契约对齐 FastAPI WorkflowRunRequest：workflow_id 为字符串，
+	// session_id 必填，输入为 inputs 字典（默认图从 inputs.prompt 取提示词）
 	body := map[string]any{
-		"workflow_id": workflowID,
-		"input":       input,
+		"workflow_id": strconv.FormatInt(workflowID, 10),
+		"session_id":  "default",
+		"inputs":      map[string]any{"prompt": input},
 		"model":       wf.Model,
 		"definition":  wf.Definition,
 	}

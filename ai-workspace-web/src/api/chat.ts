@@ -26,7 +26,7 @@ export const updateModel = (data: ChatModel) =>
   request.put<unknown, void>('/chat/model/update', data)
 
 export const deleteModel = (id: number) =>
-  request.delete<unknown, void>(`/chat/model/delete/${id}`)
+  request.delete<unknown, void>(`/chat/model/${id}`)
 
 export const toggleModelStatus = (id: number, enabled: number) =>
   request.put<unknown, void>('/chat/model/status', { id, enabled })
@@ -35,13 +35,13 @@ export const listSessions = () =>
   request.get<unknown, ChatSession[]>('/chat/session/list')
 
 export const createSession = (data: { title?: string; modelName?: string }) =>
-  request.post<unknown, ChatSession>('/chat/session/create', data)
+  request.post<unknown, ChatSession>('/chat/session/add', data)
 
 export const deleteSession = (id: number) =>
-  request.delete<unknown, void>(`/chat/session/delete/${id}`)
+  request.delete<unknown, void>(`/chat/session/${id}`)
 
 export const listMessages = (sessionId: number) =>
-  request.get<unknown, ChatMessage[]>('/chat/message/list', { params: { sessionId } })
+  request.get<unknown, ChatMessage[]>(`/chat/session/${sessionId}/messages`)
 
 export const sendMessageStream = (
   sessionId: number,

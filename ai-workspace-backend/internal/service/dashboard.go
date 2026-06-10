@@ -23,7 +23,9 @@ type DashboardStats struct {
 // GetStats 聚合当前用户的仪表盘统计数据
 // 注意各表归属列不同：chat 用 user_id，KB/文档用 create_by，文件用 upload_by
 func (s *dashboardService) GetStats(userID int64) DashboardStats {
-	startOfToday := time.Now().Truncate(24 * time.Hour)
+	// Truncate(24h) 按 UTC 取整，UTC+8 时区会偏 8 小时；改用本地零点
+	now := time.Now()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	var todaySessions, kbCount, fileCount int64
 	database.DB.Model(&model.ChatSession{}).

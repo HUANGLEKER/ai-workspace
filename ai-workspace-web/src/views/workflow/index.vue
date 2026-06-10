@@ -167,7 +167,7 @@ async function doRun() {
   runOutput.value = ''
   runStatus.value = ''
   try {
-    const res = await runWorkflow(runTarget.value.id, { prompt: runPrompt.value })
+    const res = await runWorkflow(runTarget.value.id, runPrompt.value)
     runStatus.value = res.status
     runOutput.value = JSON.stringify(res.outputs, null, 2)
   } catch { } finally { running.value = false }

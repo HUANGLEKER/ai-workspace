@@ -62,6 +62,8 @@ func (s *mcpService) Update(srv *model.McpServer, userID int64) error {
 		return err
 	}
 	srv.CreateBy = existing.CreateBy
+	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
+	srv.CreatedAt = existing.CreatedAt
 	return database.DB.Save(srv).Error
 }
 
@@ -123,10 +125,22 @@ func (s *mcpService) ResolveForAgent(userID int64, serverNamesJSON string) ([]ma
 
 	result := make([]map[string]any, 0, len(servers))
 	for _, srv := range servers {
+		// FastAPI McpServerSpec 需要 transport 与 headers 字典；
+		// headers 存在扩展配置 JSON（{"headers":{...},...}）中，须解析提取
+		headers := map[string]string{}
+		if srv.Config != "" {
+			var cfg struct {
+				Headers map[string]string `json:"headers"`
+			}
+			if err := json.Unmarshal([]byte(srv.Config), &cfg); err == nil && cfg.Headers != nil {
+				headers = cfg.Headers
+			}
+		}
 		spec := map[string]any{
-			"name":   srv.Name,
-			"url":    srv.URL,
-			"config": srv.Config,
+			"name":      srv.Name,
+			"url":       srv.URL,
+			"transport": srv.Transport,
+			"headers":   headers,
 		}
 		result = append(result, spec)
 	}

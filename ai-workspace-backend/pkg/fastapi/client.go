@@ -78,13 +78,19 @@ func (c *fastapiClient) PostForData(ctx context.Context, path string, body any) 
 }
 
 // Send 发起带自定义超时的 JSON POST，仅关注是否成功，不读取响应体。
-// 适用于嵌入构建/删除等耗时较长但无需回传数据的操作。
+// 适用于嵌入构建等耗时较长但无需回传数据的操作。
 func (c *fastapiClient) Send(ctx context.Context, path string, body any, timeout time.Duration) error {
+	return c.SendMethod(ctx, http.MethodPost, path, body, timeout)
+}
+
+// SendMethod 同 Send，但允许指定 HTTP 方法。
+// FastAPI 的 /embedding/delete 注册为 DELETE 路由，用 POST 调用会返回 405。
+func (c *fastapiClient) SendMethod(ctx context.Context, method, path string, body any, timeout time.Duration) error {
 	client := &http.Client{
 		Transport: c.httpClient.Transport,
 		Timeout:   timeout,
 	}
-	resp, err := c.doPost(ctx, client, path, body)
+	resp, err := c.doJSON(ctx, client, method, path, body)
 	if err != nil {
 		return err
 	}
@@ -133,14 +139,19 @@ func (c *fastapiClient) Stream(ctx context.Context, path string, body any, onLin
 	return scanner.Err()
 }
 
-// doPost 构造并执行 HTTP POST 请求，统一设置 Content-Type 和 Authorization 头。
+// doPost 构造并执行 HTTP POST 请求，统一设置 Content-Type 头。
 func (c *fastapiClient) doPost(ctx context.Context, client *http.Client, path string, body any) (*http.Response, error) {
+	return c.doJSON(ctx, client, http.MethodPost, path, body)
+}
+
+// doJSON 构造并执行携带 JSON 请求体的 HTTP 请求。
+func (c *fastapiClient) doJSON(ctx context.Context, client *http.Client, method, path string, body any) (*http.Response, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("序列化请求体失败: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("构造请求失败: %w", err)
 	}
@@ -150,7 +161,7 @@ func (c *fastapiClient) doPost(ctx context.Context, client *http.Client, path st
 	if err != nil {
 		return nil, fmt.Errorf("请求 FastAPI %s 失败: %w", path, err)
 	}
-	if resp.StatusCode >= 500 {
+	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		return nil, fmt.Errorf("FastAPI %s 返回 HTTP %d: %s", path, resp.StatusCode, string(body))

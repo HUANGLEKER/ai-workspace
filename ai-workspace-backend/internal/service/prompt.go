@@ -62,6 +62,8 @@ func (s *promptService) Update(p *model.Prompt, userID int64) error {
 		return err
 	}
 	p.CreateBy = existing.CreateBy
+	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
+	p.CreatedAt = existing.CreatedAt
 	return database.DB.Save(p).Error
 }
 
