@@ -1,0 +1,37 @@
+server:
+  port: 8080
+  mode: debug  # debug | release
+
+database:
+  dsn: "root:123456@tcp(localhost:3306)/ai_workspace?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 100
+  max_idle_conns: 10
+  conn_max_lifetime: 3600  # seconds
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+jwt:
+  secret: "ai-workspace-jwt-secret-change-in-production"
+  expire: 86400  # seconds (24h)
+
+fastapi:
+  base_url: "http://localhost:8001"
+  timeout: 120  # seconds
+
+minio:
+  endpoint: "localhost:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  bucket: "ai-workspace"
+  use_ssl: false
+
+log:
+  level: "info"    # debug | info | warn | error
+  filename: "logs/app.log"
+  max_size: 100    # MB
+  max_backups: 7
+  max_age: 30      # days
+  compress: true

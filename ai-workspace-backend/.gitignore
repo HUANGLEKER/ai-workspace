@@ -1,0 +1,6 @@
+bin/
+logs/
+*.env
+.env
+*.err
+server.log
