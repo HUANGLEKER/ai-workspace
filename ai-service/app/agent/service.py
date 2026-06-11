@@ -79,7 +79,7 @@ async def _load_mcp_tools(servers: list[McpServerSpec], steps: list[dict]) -> li
         return []
 
     # 仅处理 sse 传输且配置了 url 的服务器
-    connections: dict[str, dict] = {}
+    connections: dict[str, Any] = {}
     for s in servers:
         if s.transport == "sse" and s.url:
             conn: dict[str, Any] = {"url": s.url, "transport": "sse"}

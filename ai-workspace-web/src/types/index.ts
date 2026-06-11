@@ -78,7 +78,7 @@ export interface KnowledgeBase {
   id: number
   kbName: string
   description: string
-  createBy: string
+  createBy: number
   createTime: string
   documentCount?: number
 }
@@ -110,7 +110,7 @@ export interface FileInfo {
   filePath: string
   fileSize: number
   fileType: string
-  uploadBy: string
+  uploadBy: number
   createTime: string
 }
 
