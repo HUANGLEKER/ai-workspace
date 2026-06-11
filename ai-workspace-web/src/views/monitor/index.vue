@@ -1,126 +1,132 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>系统监控</h2>
-      <div class="header-actions">
-        <span v-if="lastUpdated" class="update-text">更新于 {{ lastUpdated }}</span>
-        <el-button :loading="loading" @click="refresh">刷新</el-button>
-        <el-button :type="autoRefresh ? 'primary' : 'default'" @click="toggleAuto">
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">系统监控</h2>
+      <div class="flex items-center gap-3">
+        <span v-if="lastUpdated" class="text-sm text-zinc-500">更新于 {{ lastUpdated }}</span>
+        <AppButton :icon="RefreshCw" :loading="loading" @click="refresh">刷新</AppButton>
+        <AppButton :variant="autoRefresh ? 'primary' : 'secondary'" @click="toggleAuto">
           {{ autoRefresh ? '关闭自动刷新' : '自动刷新 (5s)' }}
-        </el-button>
+        </AppButton>
       </div>
     </div>
 
     <!-- 依赖服务健康 -->
-    <el-card shadow="never" class="section">
-      <template #header><span>依赖服务</span></template>
-      <el-row :gutter="16">
-        <el-col :xs="24" :sm="8" v-for="svc in health" :key="svc.name">
-          <div class="svc-item">
-            <span class="svc-dot" :class="svc.status === 'UP' ? 'up' : 'down'" />
-            <div class="svc-info">
-              <div class="svc-name">{{ svc.name }}</div>
-              <div class="svc-meta">
-                <el-tag :type="svc.status === 'UP' ? 'success' : 'danger'" size="small">
-                  {{ svc.status }}
-                </el-tag>
-                <span v-if="svc.status === 'UP'" class="svc-latency">{{ svc.latencyMs }} ms</span>
-                <span v-else class="svc-error">{{ svc.error }}</span>
-              </div>
-              <div class="svc-target">{{ svc.target }}</div>
+    <AppCard title="依赖服务" class="mb-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div v-for="svc in health" :key="svc.name" class="flex items-start gap-3 rounded-xl border border-zinc-200/80 p-4">
+          <span
+            class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+            :class="svc.status === 'UP' ? 'bg-emerald-500' : 'bg-red-500'"
+          />
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-zinc-800">{{ svc.name }}</div>
+            <div class="mt-1 flex items-center gap-2">
+              <AppTag :variant="svc.status === 'UP' ? 'success' : 'danger'">{{ svc.status }}</AppTag>
+              <span v-if="svc.status === 'UP'" class="text-xs text-emerald-600">{{ svc.latencyMs }} ms</span>
+              <span v-else class="text-xs text-red-500">{{ svc.error }}</span>
             </div>
+            <div class="mt-1 break-all text-xs text-zinc-400">{{ svc.target }}</div>
           </div>
-        </el-col>
-      </el-row>
-    </el-card>
+        </div>
+      </div>
+    </AppCard>
 
     <!-- 资源使用率 -->
-    <el-row :gutter="16" class="section" v-if="server">
-      <el-col :xs="24" :sm="8">
-        <el-card shadow="never">
-          <template #header><span>CPU</span></template>
-          <el-progress type="dashboard" :percentage="pct(server.cpu.sysUsedPercent)" :color="gaugeColor" />
-          <div class="gauge-foot">
-            <div>系统使用率 {{ fmtPct(server.cpu.sysUsedPercent) }}</div>
-            <div>进程使用率 {{ fmtPct(server.cpu.procUsedPercent) }}</div>
-            <div>逻辑核心 {{ server.cpu.cores }}</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="8">
-        <el-card shadow="never">
-          <template #header><span>物理内存</span></template>
-          <el-progress type="dashboard" :percentage="pct(server.memory.usedPercent)" :color="gaugeColor" />
-          <div class="gauge-foot">
-            <div>{{ fmtBytes(server.memory.used) }} / {{ fmtBytes(server.memory.total) }}</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="8">
-        <el-card shadow="never">
-          <template #header><span>JVM 堆内存</span></template>
-          <el-progress type="dashboard" :percentage="pct(server.jvm.usedPercent)" :color="gaugeColor" />
-          <div class="gauge-foot">
-            <div>{{ fmtBytes(server.jvm.used) }} / {{ fmtBytes(server.jvm.max) }}</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div v-if="server" class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <AppCard title="CPU">
+        <UsageBar :percent="pct(server.cpu.sysUsedPercent)" />
+        <div class="mt-3 flex flex-col gap-1 text-sm text-zinc-500">
+          <span>系统使用率 {{ fmtPct(server.cpu.sysUsedPercent) }}</span>
+          <span>进程使用率 {{ fmtPct(server.cpu.procUsedPercent) }}</span>
+          <span>逻辑核心 {{ server.cpu.cores }}</span>
+        </div>
+      </AppCard>
+      <AppCard title="物理内存">
+        <UsageBar :percent="pct(server.memory.usedPercent)" />
+        <div class="mt-3 text-sm text-zinc-500">
+          {{ fmtBytes(server.memory.used) }} / {{ fmtBytes(server.memory.total) }}
+        </div>
+      </AppCard>
+      <AppCard title="进程堆内存">
+        <UsageBar :percent="pct(server.jvm.usedPercent)" />
+        <div class="mt-3 text-sm text-zinc-500">
+          {{ fmtBytes(server.jvm.used) }} / {{ fmtBytes(server.jvm.max) }}
+        </div>
+      </AppCard>
+    </div>
 
     <!-- 磁盘 + 运行环境 -->
-    <el-row :gutter="16" class="section" v-if="server">
-      <el-col :xs="24" :sm="14">
-        <el-card shadow="never">
-          <template #header><span>磁盘</span></template>
-          <el-table :data="server.disks" size="small">
-            <el-table-column prop="path" label="挂载点" />
-            <el-table-column label="已用 / 总量">
-              <template #default="{ row }">
-                {{ fmtBytes(row.used) }} / {{ fmtBytes(row.total) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="使用率" width="200">
-              <template #default="{ row }">
-                <el-progress :percentage="pct(row.usedPercent)" :color="gaugeColor" />
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="10">
-        <el-card shadow="never">
-          <template #header><span>运行环境</span></template>
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="操作系统">
-              {{ server.os.name }} {{ server.os.version }} ({{ server.os.arch }})
-            </el-descriptions-item>
-            <el-descriptions-item label="JVM">{{ server.jvm.vendor }}</el-descriptions-item>
-            <el-descriptions-item label="Java 版本">{{ server.jvm.version }}</el-descriptions-item>
-            <el-descriptions-item label="运行时长">{{ fmtUptime(server.jvm.uptime) }}</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div v-if="server" class="grid grid-cols-1 gap-4 lg:grid-cols-5">
+      <AppCard title="磁盘" class="lg:col-span-3">
+        <div class="flex flex-col gap-4">
+          <div v-for="disk in server.disks" :key="disk.path">
+            <div class="mb-1.5 flex items-center justify-between text-sm">
+              <span class="text-zinc-800">{{ disk.path }}</span>
+              <span class="text-zinc-500">{{ fmtBytes(disk.used) }} / {{ fmtBytes(disk.total) }}</span>
+            </div>
+            <UsageBar :percent="pct(disk.usedPercent)" />
+          </div>
+        </div>
+      </AppCard>
+      <AppCard title="运行环境" class="lg:col-span-2">
+        <dl class="flex flex-col gap-3 text-sm">
+          <div class="flex items-center justify-between gap-4">
+            <dt class="shrink-0 text-zinc-500">操作系统</dt>
+            <dd class="text-right text-zinc-800">{{ server.os.name }} {{ server.os.version }} ({{ server.os.arch }})</dd>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <dt class="shrink-0 text-zinc-500">运行时</dt>
+            <dd class="text-right text-zinc-800">{{ server.jvm.vendor }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <dt class="shrink-0 text-zinc-500">版本</dt>
+            <dd class="text-right text-zinc-800">{{ server.jvm.version }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <dt class="shrink-0 text-zinc-500">运行时长</dt>
+            <dd class="text-right text-zinc-800">{{ fmtUptime(server.jvm.uptime) }}</dd>
+          </div>
+        </dl>
+      </AppCard>
+    </div>
   </div>
 </template>
 
-/**
- * 系统监控页（仅管理员）
- *
- * 功能：
- * 1. 展示依赖服务（Redis/FastAPI/MinIO）健康状态
- * 2. 展示 CPU/内存/JVM 堆使用率仪表盘
- * 3. 磁盘使用情况与运行环境信息
- * 4. 支持手动刷新和 5s 自动刷新（离开页面时需清除定时器防内存泄漏）
- */
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+/**
+ * 系统监控页（仅管理员）：依赖服务（Redis/FastAPI/MinIO）健康状态、
+ * CPU/内存/进程堆使用率、磁盘与运行环境信息；支持手动与 5s 自动刷新。
+ */
+import { ref, h, onMounted, onUnmounted, defineComponent } from 'vue'
+import { RefreshCw } from 'lucide-vue-next'
 import {
   getServerInfo,
   getServiceHealth,
   type ServerInfo,
   type ServiceHealth
 } from '@/api/monitor'
+import { AppButton, AppCard, AppTag } from '@/components/ui'
+
+/** 横向使用率进度条：<70% 黑色、<90% 琥珀、其余红色 */
+const UsageBar = defineComponent({
+  props: { percent: { type: Number, required: true } },
+  setup(props) {
+    return () =>
+      h('div', { class: 'flex items-center gap-3' }, [
+        h('div', { class: 'h-2 flex-1 overflow-hidden rounded-full bg-zinc-100' }, [
+          h('div', {
+            class: [
+              'h-full rounded-full transition-all duration-200 ease-out',
+              props.percent < 70 ? 'bg-zinc-900' : props.percent < 90 ? 'bg-amber-500' : 'bg-red-500'
+            ],
+            style: { width: props.percent + '%' }
+          })
+        ]),
+        h('span', { class: 'w-10 text-right text-sm text-zinc-800' }, props.percent + '%')
+      ])
+  }
+})
 
 const server = ref<ServerInfo | null>(null)
 const health = ref<ServiceHealth[]>([])
@@ -156,10 +162,9 @@ onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
 
-// JVM/OS 指标不可用时后端返回 -1，前端统一转为 0 避免 el-progress 异常
+// 指标不可用时后端返回 -1，前端统一转为 0 避免进度条异常
 const pct = (v: number) => (v < 0 ? 0 : Math.round(v))
 const fmtPct = (v: number) => (v < 0 ? 'N/A' : v.toFixed(1) + '%')
-const gaugeColor = (p: number) => (p < 70 ? '#67C23A' : p < 90 ? '#E6A23C' : '#F56C6C')
 
 const fmtBytes = (bytes: number) => {
   if (!bytes) return '0 B'
@@ -171,26 +176,8 @@ const fmtBytes = (bytes: number) => {
 const fmtUptime = (ms: number) => {
   const s = Math.floor(ms / 1000)
   const d = Math.floor(s / 86400)
-  const h = Math.floor((s % 86400) / 3600)
+  const h2 = Math.floor((s % 86400) / 3600)
   const m = Math.floor((s % 3600) / 60)
-  return `${d}天 ${h}时 ${m}分`
+  return `${d}天 ${h2}时 ${m}分`
 }
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; }
-.header-actions { display: flex; align-items: center; gap: 12px; }
-.update-text { color: #909399; font-size: 13px; }
-.section { margin-top: 16px; }
-.svc-item { display: flex; align-items: flex-start; gap: 12px; padding: 6px 0; }
-.svc-dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-.svc-dot.up { background: #67C23A; box-shadow: 0 0 6px #67C23A; }
-.svc-dot.down { background: #F56C6C; box-shadow: 0 0 6px #F56C6C; }
-.svc-name { font-weight: 600; color: #303133; }
-.svc-meta { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-.svc-latency { color: #67C23A; font-size: 13px; }
-.svc-error { color: #F56C6C; font-size: 12px; }
-.svc-target { color: #909399; font-size: 12px; word-break: break-all; }
-.gauge-foot { text-align: center; margin-top: 8px; color: #606266; font-size: 13px; line-height: 1.6; }
-</style>

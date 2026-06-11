@@ -1,89 +1,77 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>知识库管理</h2>
-      <el-button type="primary" :icon="Plus" @click="openCreateDialog">新建知识库</el-button>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">知识库管理</h2>
+      <AppButton variant="primary" :icon="Plus" @click="openCreateDialog">新建知识库</AppButton>
     </div>
 
-    <!-- 知识库列表 -->
-    <div v-loading="loading" class="kb-grid">
-      <el-card
+    <!-- 知识库卡片网格 -->
+    <div class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div
         v-for="kb in knowledgeBases"
         :key="kb.id"
-        class="kb-card"
-        shadow="hover"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
       >
-        <div class="kb-card-body">
-          <div class="kb-icon">
-            <el-icon size="28" color="#409EFF"><Reading /></el-icon>
+        <div class="mb-3 flex items-start gap-3.5">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100/50">
+            <BookOpen class="h-5 w-5 text-zinc-800" />
           </div>
-          <div class="kb-info">
-            <div class="kb-name">{{ kb.kbName }}</div>
-            <div class="kb-desc">{{ kb.description || '暂无描述' }}</div>
-            <div class="kb-meta">
-              <span>创建人：{{ kb.createBy }}</span>
-              <span>{{ formatDate(kb.createTime) }}</span>
-            </div>
+          <div class="min-w-0">
+            <div class="truncate text-sm font-semibold text-zinc-800">{{ kb.kbName }}</div>
+            <p class="mt-1 line-clamp-2 text-sm text-zinc-500">{{ kb.description || '暂无描述' }}</p>
           </div>
         </div>
-        <div class="kb-actions">
-          <el-button size="small" :icon="Document" @click="goDocuments(kb)">文档管理</el-button>
-          <el-button size="small" :icon="Edit" @click="openEditDialog(kb)">编辑</el-button>
-          <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(kb.id)">删除</el-button>
+        <div class="flex gap-3 text-xs text-zinc-400">
+          <span>创建人：{{ kb.createBy }}</span>
+          <span>{{ formatDate(kb.createTime) }}</span>
         </div>
-      </el-card>
-
-      <div v-if="!loading && knowledgeBases.length === 0" class="kb-empty">
-        <el-icon class="kb-empty-icon"><Reading /></el-icon>
-        <p class="kb-empty-text">暂无知识库，点击右上角新建</p>
+        <div class="mt-4 flex gap-2 border-t border-zinc-200/80 pt-3">
+          <AppButton size="sm" :icon="FileText" @click="goDocuments(kb)">文档管理</AppButton>
+          <AppButton size="sm" :icon="Pencil" @click="openEditDialog(kb)">编辑</AppButton>
+          <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(kb.id)">删除</AppButton>
+        </div>
       </div>
+
+      <AppEmpty
+        v-if="!loading && knowledgeBases.length === 0"
+        class="col-span-full py-20"
+        description="暂无知识库，点击右上角新建"
+        :icon="BookOpen"
+      />
+      <AppLoading v-if="loading" overlay />
     </div>
 
     <!-- 新建/编辑弹窗 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="editingKb ? '编辑知识库' : '新建知识库'"
-      width="480px"
-      @close="resetForm"
-    >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="名称" prop="kbName">
-          <el-input v-model="form.kbName" placeholder="请输入知识库名称" clearable />
-        </el-form-item>
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入知识库描述（可选）"
-          />
-        </el-form-item>
-      </el-form>
+    <AppDialog v-model="dialogVisible" :title="editingKb ? '编辑知识库' : '新建知识库'" width="480px" @close="resetForm">
+      <AppFormItem label="名称" required>
+        <AppInput v-model="form.kbName" placeholder="请输入知识库名称" />
+      </AppFormItem>
+      <AppFormItem label="描述">
+        <AppTextarea v-model="form.description" :rows="3" placeholder="请输入知识库描述（可选）" />
+      </AppFormItem>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+        <AppButton @click="dialogVisible = false">取消</AppButton>
+        <AppButton variant="primary" :loading="submitting" @click="handleSubmit">
           {{ editingKb ? '保存修改' : '确认创建' }}
-        </el-button>
+        </AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
-/**
- * 知识库管理页
- *
- * 功能：
- * 1. 展示当前用户所有知识库（按 createBy 隔离，后端仅返回本人数据）
- * 2. 新建 / 编辑 / 删除知识库
- * 3. 跳转到文档管理页（携带 kbId、kbName 查询参数）
- */
 <script setup lang="ts">
+/**
+ * 知识库管理页：Card Grid 展示当前用户所有知识库，支持新建/编辑/删除，
+ * 跳转文档管理页（携带 kbId、kbName 查询参数）。
+ */
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Document, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, BookOpen, FileText, Pencil, Trash2 } from 'lucide-vue-next'
 import type { KnowledgeBase } from '@/types'
 import { listKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } from '@/api/kb'
+import {
+  AppButton, AppDialog, AppInput, AppTextarea, AppFormItem, AppEmpty, AppLoading, toast, confirm
+} from '@/components/ui'
 
 const router = useRouter()
 const loading = ref(false)
@@ -91,12 +79,8 @@ const submitting = ref(false)
 const dialogVisible = ref(false)
 const editingKb = ref<KnowledgeBase | null>(null)
 const knowledgeBases = ref<KnowledgeBase[]>([])
-const formRef = ref<FormInstance>()
 
 const form = reactive({ kbName: '', description: '' })
-const rules: FormRules = {
-  kbName: [{ required: true, message: '请输入知识库名称', trigger: 'blur' }]
-}
 
 const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('zh-CN') : ''
 
@@ -132,16 +116,18 @@ function resetForm() {
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!form.kbName.trim()) {
+    toast.warning('请输入知识库名称')
+    return
+  }
   submitting.value = true
   try {
     if (editingKb.value) {
       await updateKnowledgeBase({ ...editingKb.value, ...form })
-      ElMessage.success('修改成功')
+      toast.success('修改成功')
     } else {
       await createKnowledgeBase(form)
-      ElMessage.success('创建成功')
+      toast.success('创建成功')
     }
     dialogVisible.value = false
     loadList()
@@ -153,19 +139,19 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id: number) {
-  // 用户点取消时 confirm 会 reject，重新抛出特殊 cancel 标记
-  // 以便在 catch 中区分"用户主动取消"与"接口请求失败"两种情况
-  await ElMessageBox.confirm('确定删除该知识库吗？删除后相关文档也将一并删除。', '删除确认', {
-    confirmButtonText: '确定删除',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).catch(() => { throw new Error('cancel') })
+  const ok = await confirm({
+    title: '删除确认',
+    message: '确定删除该知识库吗？删除后相关文档也将一并删除。',
+    confirmText: '确定删除',
+    danger: true
+  })
+  if (!ok) return
   try {
     await deleteKnowledgeBase(id)
-    ElMessage.success('删除成功')
+    toast.success('删除成功')
     loadList()
-  } catch (e) {
-    if ((e as Error).message !== 'cancel') ElMessage.error('删除失败')
+  } catch {
+    toast.error('删除失败')
   }
 }
 
@@ -173,93 +159,3 @@ function goDocuments(kb: KnowledgeBase) {
   router.push({ path: '/knowledge/document', query: { kbId: kb.id, kbName: kb.kbName } })
 }
 </script>
-
-<style scoped>
-.page-wrapper {
-  padding-bottom: 20px;
-}
-
-.kb-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-}
-
-.kb-card {
-  border-radius: 8px;
-  transition: transform 0.2s;
-}
-
-.kb-card:hover {
-  transform: translateY(-2px);
-}
-
-.kb-card-body {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.kb-icon {
-  width: 48px;
-  height: 48px;
-  background: #ecf5ff;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.kb-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 4px;
-}
-
-.kb-desc {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 8px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.kb-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: #c0c4cc;
-}
-
-.kb-actions {
-  display: flex;
-  gap: 8px;
-  border-top: 1px solid #f0f2f5;
-  padding-top: 12px;
-}
-
-.kb-empty {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 0;
-  gap: 16px;
-}
-
-.kb-empty-icon {
-  font-size: 64px;
-  color: #c0c4cc;
-}
-
-.kb-empty-text {
-  font-size: 14px;
-  color: #909399;
-  margin: 0;
-}
-</style>

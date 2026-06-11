@@ -1,0 +1,32 @@
+/**
+ * 统一组件库出口
+ *
+ * 所有业务模块从这里引入 UI 组件与 toast/confirm 工具，
+ * 复杂交互基于 Radix Vue，样式全部使用 TailwindCSS。
+ */
+export { default as AppButton } from './AppButton.vue'
+export { default as AppInput } from './AppInput.vue'
+export { default as AppTextarea } from './AppTextarea.vue'
+export { default as AppCard } from './AppCard.vue'
+export { default as AppDialog } from './AppDialog.vue'
+export { default as AppDropdown } from './AppDropdown.vue'
+export { default as AppTooltip } from './AppTooltip.vue'
+export { default as AppTable } from './AppTable.vue'
+export { default as AppEmpty } from './AppEmpty.vue'
+export { default as AppLoading } from './AppLoading.vue'
+export { default as AppAvatar } from './AppAvatar.vue'
+export { default as AppTag } from './AppTag.vue'
+export { default as AppSearch } from './AppSearch.vue'
+export { default as AppSelect } from './AppSelect.vue'
+export { default as AppMultiSelect } from './AppMultiSelect.vue'
+export { default as AppSwitch } from './AppSwitch.vue'
+export { default as AppRadioGroup } from './AppRadioGroup.vue'
+export { default as AppPagination } from './AppPagination.vue'
+export { default as AppTabs } from './AppTabs.vue'
+export { default as AppUpload } from './AppUpload.vue'
+export { default as AppFormItem } from './AppFormItem.vue'
+export { toast } from './toast'
+export { confirm, alertBox } from './confirm'
+export type { TableColumn } from './AppTable.vue'
+export type { SelectOption } from './AppSelect.vue'
+export type { DropdownItem } from './AppDropdown.vue'

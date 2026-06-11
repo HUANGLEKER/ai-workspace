@@ -1,116 +1,115 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>工作流</h2>
-      <el-button type="primary" :icon="Plus" @click="openDialog()">新建工作流</el-button>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">工作流</h2>
+      <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建工作流</AppButton>
     </div>
 
-    <el-card shadow="never">
-      <el-table :data="workflows" v-loading="loading" stripe border>
-        <el-table-column label="ID" prop="id" width="70" align="center" />
-        <el-table-column label="名称" prop="name" width="160" />
-        <el-table-column label="描述" prop="description" min-width="200" show-overflow-tooltip />
-        <el-table-column label="模型" prop="model" width="140">
-          <template #default="{ row }">{{ row.model || '默认' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.enabled === 1 ? 'success' : 'info'" size="small">
-              {{ row.enabled === 1 ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="220" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" :icon="VideoPlay" @click="openRun(row as Workflow)">运行</el-button>
-            <el-button link :icon="Edit" @click="openDialog(row as Workflow)">编辑</el-button>
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-if="!loading && workflows.length === 0" description="还没有工作流，点击右上角新建" />
-    </el-card>
+    <!-- 工作流卡片网格 -->
+    <div class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div
+        v-for="w in workflows"
+        :key="w.id"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
+      >
+        <div class="mb-2 flex items-center gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100/50">
+            <Workflow class="h-5 w-5 text-zinc-800" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-semibold text-zinc-800">{{ w.name }}</div>
+            <AppTag :variant="w.enabled === 1 ? 'success' : 'info'">{{ w.enabled === 1 ? '启用' : '禁用' }}</AppTag>
+          </div>
+        </div>
+        <p class="line-clamp-2 flex-1 text-sm text-zinc-500">{{ w.description || '暂无描述' }}</p>
+        <div class="mt-2 text-xs text-zinc-400">模型：{{ w.model || '默认' }}</div>
+        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 pt-3">
+          <AppButton size="sm" variant="ghost" :icon="Play" @click="openRun(w)">运行</AppButton>
+          <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(w)">编辑</AppButton>
+          <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(w.id!)">删除</AppButton>
+        </div>
+      </div>
+
+      <AppEmpty v-if="!loading && workflows.length === 0" class="col-span-full py-16" description="还没有工作流，点击右上角新建" :icon="Workflow" />
+      <AppLoading v-if="loading" overlay />
+    </div>
 
     <!-- 新增/编辑 -->
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑工作流' : '新建工作流'" width="560px" @close="resetForm">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="给工作流起个名字" clearable />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" placeholder="一句话描述用途" clearable />
-        </el-form-item>
-        <el-form-item label="定义(JSON)">
-          <el-input v-model="form.definition" type="textarea" :rows="4" placeholder="可选：节点/连线定义，留空使用默认单节点流程" />
-        </el-form-item>
-        <el-form-item label="模型">
-          <el-select v-model="form.model" placeholder="留空使用默认模型" clearable style="width:100%">
-            <el-option v-for="m in models" :key="m.modelName" :label="m.modelName" :value="m.modelName || ''" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="form.enabled">
-            <el-radio :value="1">启用</el-radio>
-            <el-radio :value="0">禁用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+    <AppDialog v-model="dialogVisible" :title="editing ? '编辑工作流' : '新建工作流'" width="560px" @close="resetForm">
+      <AppFormItem label="名称" required>
+        <AppInput v-model="form.name" placeholder="给工作流起个名字" />
+      </AppFormItem>
+      <AppFormItem label="描述">
+        <AppInput v-model="form.description" placeholder="一句话描述用途" />
+      </AppFormItem>
+      <AppFormItem label="定义(JSON)">
+        <AppTextarea v-model="form.definition" :rows="4" placeholder="可选：节点/连线定义，留空使用默认单节点流程" />
+      </AppFormItem>
+      <AppFormItem label="模型">
+        <AppSelect v-model="form.model" :options="modelOptions" placeholder="留空使用默认模型" />
+      </AppFormItem>
+      <AppFormItem label="状态">
+        <AppRadioGroup v-model="form.enabled" numeric :options="[{ label: '启用', value: 1 }, { label: '禁用', value: 0 }]" />
+      </AppFormItem>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+        <AppButton @click="dialogVisible = false">取消</AppButton>
+        <AppButton variant="primary" :loading="submitting" @click="handleSubmit">
           {{ editing ? '保存修改' : '确认创建' }}
-        </el-button>
+        </AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
 
     <!-- 运行 -->
-    <el-dialog v-model="runVisible" :title="`运行 · ${runTarget?.name}`" width="600px">
-      <el-input v-model="runPrompt" type="textarea" :rows="3" placeholder="输入提示词 (prompt)" />
-      <div class="run-actions">
-        <el-button type="primary" :loading="running" @click="doRun">运行</el-button>
+    <AppDialog v-model="runVisible" :title="`运行 · ${runTarget?.name}`" width="600px">
+      <AppTextarea v-model="runPrompt" :rows="3" placeholder="输入提示词 (prompt)" />
+      <div class="mt-3 text-right">
+        <AppButton variant="primary" :loading="running" @click="doRun">运行</AppButton>
       </div>
-      <div v-if="runStatus" class="run-output">
-        <div class="run-output-label">
-          状态：<el-tag :type="runStatus === 'completed' ? 'success' : 'danger'" size="small">{{ runStatus }}</el-tag>
+      <div v-if="runStatus" class="mt-4">
+        <div class="mb-1.5 flex items-center gap-2 text-sm font-semibold text-zinc-800">
+          状态：
+          <AppTag :variant="runStatus === 'completed' ? 'success' : 'danger'">{{ runStatus }}</AppTag>
         </div>
-        <pre>{{ runOutput }}</pre>
+        <pre class="whitespace-pre-wrap break-words rounded-xl bg-zinc-50 p-3 text-sm text-zinc-800">{{ runOutput }}</pre>
       </div>
       <template #footer>
-        <el-button @click="runVisible = false">关闭</el-button>
+        <AppButton @click="runVisible = false">关闭</AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
-/**
- * 工作流管理页
- *
- * 功能：
- * 1. 工作流 CRUD（definition 字段为 LangGraph 节点/连线 JSON）
- * 2. 运行工作流：传入 prompt，展示执行状态和 outputs JSON
- */
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Edit, Delete, VideoPlay } from '@element-plus/icons-vue'
+/**
+ * 工作流管理页：Card Grid + CRUD（definition 字段为 LangGraph 节点/连线 JSON），
+ * 运行工作流展示执行状态和 outputs JSON。
+ */
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Plus, Workflow, Play, Pencil, Trash2 } from 'lucide-vue-next'
 import {
-  listWorkflows, addWorkflow, updateWorkflow, deleteWorkflow, runWorkflow, type Workflow
+  listWorkflows, addWorkflow, updateWorkflow, deleteWorkflow, runWorkflow, type Workflow as WorkflowType
 } from '@/api/workflow'
 import { listModels } from '@/api/chat'
+import {
+  AppButton, AppDialog, AppFormItem, AppInput, AppTextarea, AppSelect, AppRadioGroup,
+  AppTag, AppEmpty, AppLoading, toast, confirm
+} from '@/components/ui'
 
 const loading = ref(false)
 const submitting = ref(false)
-const workflows = ref<Workflow[]>([])
+const workflows = ref<WorkflowType[]>([])
 const models = ref<{ modelName?: string }[]>([])
 const dialogVisible = ref(false)
-const editing = ref<Workflow | null>(null)
-const formRef = ref<FormInstance>()
+const editing = ref<WorkflowType | null>(null)
 
-const form = reactive<Workflow>({ name: '', description: '', definition: '', model: '', enabled: 1 })
-const rules: FormRules = { name: [{ required: true, message: '请输入名称', trigger: 'blur' }] }
+const form = reactive<WorkflowType>({ name: '', description: '', definition: '', model: '', enabled: 1 })
+
+const modelOptions = computed(() =>
+  models.value.filter((m) => m.modelName).map((m) => ({ label: m.modelName!, value: m.modelName! }))
+)
 
 const runVisible = ref(false)
-const runTarget = ref<Workflow | null>(null)
+const runTarget = ref<WorkflowType | null>(null)
 const runPrompt = ref('')
 const runOutput = ref('')
 const runStatus = ref('')
@@ -126,35 +125,37 @@ async function loadModels() {
   try { models.value = await listModels() } catch { models.value = [] }
 }
 
-function openDialog(row?: Workflow) {
+function openDialog(row?: WorkflowType) {
   editing.value = row || null
   if (row) Object.assign(form, row)
   else Object.assign(form, { name: '', description: '', definition: '', model: '', enabled: 1 })
   dialogVisible.value = true
 }
 function resetForm() {
-  formRef.value?.resetFields()
   editing.value = null
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!form.name.trim()) {
+    toast.warning('请输入名称')
+    return
+  }
   submitting.value = true
   try {
-    if (editing.value) { await updateWorkflow({ ...form, id: editing.value.id }); ElMessage.success('修改成功') }
-    else { await addWorkflow(form); ElMessage.success('创建成功') }
+    if (editing.value) { await updateWorkflow({ ...form, id: editing.value.id }); toast.success('修改成功') }
+    else { await addWorkflow(form); toast.success('创建成功') }
     dialogVisible.value = false
     load()
   } catch { } finally { submitting.value = false }
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定删除该工作流吗？', '删除确认', { type: 'warning' }).catch(() => { throw new Error('cancel') })
-  try { await deleteWorkflow(id); ElMessage.success('删除成功'); load() } catch { }
+  const ok = await confirm({ title: '删除确认', message: '确定删除该工作流吗？', confirmText: '确定删除', danger: true })
+  if (!ok) return
+  try { await deleteWorkflow(id); toast.success('删除成功'); load() } catch { }
 }
 
-function openRun(row: Workflow) {
+function openRun(row: WorkflowType) {
   runTarget.value = row
   runPrompt.value = ''
   runOutput.value = ''
@@ -173,11 +174,3 @@ async function doRun() {
   } catch { } finally { running.value = false }
 }
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-.run-actions { margin-top: 12px; text-align: right; }
-.run-output { margin-top: 16px; }
-.run-output-label { font-weight: 600; margin-bottom: 6px; color: #303133; }
-.run-output pre { white-space: pre-wrap; word-break: break-word; background: #f5f7fa; padding: 12px; border-radius: 6px; margin: 0; }
-</style>

@@ -1,11 +1,17 @@
 <template>
-  <div class="app-layout">
+  <div class="flex h-screen overflow-hidden bg-white text-zinc-800">
     <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
-    <div class="main-container">
+    <div class="flex flex-1 flex-col overflow-hidden">
       <Header />
-      <main class="main-content">
+      <main class="flex-1 overflow-y-auto scroll-smooth bg-zinc-50 p-6">
         <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
+          <transition
+            mode="out-in"
+            enter-active-class="transition-all duration-200 ease-out"
+            enter-from-class="opacity-0 translate-y-2"
+            leave-active-class="transition-all duration-150 ease-out"
+            leave-to-class="opacity-0 -translate-y-1"
+          >
             <component :is="Component" />
           </transition>
         </router-view>
@@ -14,15 +20,11 @@
   </div>
 </template>
 
-/**
- * 应用主布局组件
- *
- * 功能：
- * 1. 组合侧边栏与顶部 Header，构成整体页面框架
- * 2. 管理侧边栏折叠状态
- * 3. 挂载时补全用户信息，避免页面刷新后 Store 为空导致权限菜单丢失
- */
 <script setup lang="ts">
+/**
+ * 应用主布局：Sidebar + Header + 内容区。
+ * 挂载时补全用户信息，避免页面刷新后 Store 为空导致权限菜单丢失。
+ */
 import { ref, onMounted } from 'vue'
 import Sidebar from './components/Sidebar.vue'
 import Header from './components/Header.vue'
@@ -33,8 +35,6 @@ const authStore = useAuthStore()
 const sidebarCollapsed = ref(false)
 
 onMounted(async () => {
-  // 路由守卫已确认 token 有效，但刷新后 Pinia Store 内存状态丢失
-  // 此处按需补全，确保 Header 与侧边栏能正确显示用户名和 isAdmin 标记
   if (authStore.isLoggedIn && !authStore.userInfo) {
     try {
       const info = await getUserInfo()
@@ -43,44 +43,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.app-layout {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.main-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-6);
-  background: var(--bg-body);
-  scroll-behavior: smooth;
-}
-
-.page-enter-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.page-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-</style>

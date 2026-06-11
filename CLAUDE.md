@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 层级 | 技术 |
 |---|---|
-| 前端 | Vue3 + TypeScript + Element Plus（`ai-workspace-web/`） |
+| 前端 | Vue3 + TypeScript + TailwindCSS 4 + Radix Vue + Lucide（`ai-workspace-web/`） |
 | 后端 | Go 1.23 + Gin + GORM（`ai-workspace-backend/`） |
 | AI 服务 | FastAPI 0.115 + LangGraph + LangChain + OpenAI（`ai-service/`） |
 | 数据库 | MySQL 8 |
@@ -35,9 +35,16 @@ Vue3 (3000) → Go/Gin (8080) → FastAPI (8001) → [Redis, ChromaDB, MinIO] �
 npm install
 npm run dev      # 开发服务器运行于 3000 端口，代理到 localhost:8080
 npm run build    # 生产构建（先 vue-tsc 再 vite build）
+npx vue-tsc --noEmit   # 仅类型检查，不输出文件
 ```
 
-Element Plus 采用**按需自动引入**（不再全局 `app.use(ElementPlus)`）：`vite.config.ts` 配置了 `unplugin-auto-import`（用于 `ElMessage`/`ElMessageBox` 等）与 `unplugin-vue-components`（搭配 `ElementPlusResolver`，并额外加了一个把模板中直接使用的图标 `<Search/>` 映射到 `@element-plus/icons-vue` 的小型解析器）。**不要**再写 `import { ElMessage } from 'element-plus'` 或全局注册图标——直接使用即可，插件会自动注入导入及其样式。`:icon="X"` 这类脚本绑定仍需显式 `import X`。语言环境（locale）放在 `App.vue` 的 `<el-config-provider>` 中。生成的 `src/auto-imports.d.ts` 与 `src/components.d.ts` **需提交**（并非可忽略的生成产物），因为 `npm run build` 会在 Vite 重新生成它们之前先运行 `vue-tsc`——删除会导致干净环境下的类型检查失败。`build.rollupOptions.output.manualChunks` 仅强制拆分框架核心（`vue-vendor`）与较重的 markdown 栈（`markdown`，随 chat/RAG 懒加载）；Element Plus 交由按路由自然拆分，因此首屏只加载当前页面用到的组件。
+UI 栈已从 Element Plus 全面迁移为 **TailwindCSS 4（`@tailwindcss/vite` 插件 + `@tailwindcss/typography`）+ Radix Vue（headless 交互组件）+ lucide-vue-next（图标）**。规范：
+
+- 禁止引入 Element Plus / 其他组件库图标集；禁止 `<style scoped>`、`::v-deep`、`!important`，所有样式用 Tailwind utility class。
+- 统一组件库在 `src/components/ui`（AppButton/AppInput/AppDialog/AppTable/AppSelect/AppPagination 等，经 `index.ts` 出口统一引入）；`toast`（替代 ElMessage）与 `confirm`/`alertBox`（替代 ElMessageBox，Promise<boolean> 风格）也从该出口引入，渲染单例 `AppToaster`/`AppConfirm` 挂载在 `App.vue`（同时提供 Radix `TooltipProvider`）。
+- 设计基调：zinc 色阶、`rounded-xl/2xl`、`border-zinc-200/80`、品牌色 `bg-zinc-900 text-white`、动效 `transition-all duration-200 ease-out`。
+- 文件上传用 `AppUpload`（原生 fetch + FormData，手动注入 Authorization 头）。
+- `build.rollupOptions.output.manualChunks` 仅强制拆分框架核心（`vue-vendor`）与较重的 markdown 栈（`markdown`，随 chat/RAG 懒加载）。
 
 ### Go 后端
 
@@ -46,6 +53,9 @@ Element Plus 采用**按需自动引入**（不再全局 `app.use(ElementPlus)`�
 go mod tidy                              # 同步依赖（首次或依赖变更后）
 make run                                 # 等价于 go run ./cmd/server -config config.yaml
 make build                               # 编译为 bin/ai-workspace-backend
+make swag                                # 重新生成 Swagger 文档（需安装 swag CLI）
+go vet ./...                             # 静态检查
+gofmt -l -w .                           # 格式化所有 Go 文件
 ```
 
 配置文件：`ai-workspace-backend/config.yaml`（服务端口、DSN、Redis、JWT、FastAPI、MinIO、日志）。  
@@ -64,10 +74,13 @@ Go 后端结构（`internal/`）：
 
 ```bash
 # 在 ai-service/ 下
-cp .env.example .env          # 填入 LLM key 与服务配置
+cp .env.example .env          # 填入 LLM key 与服务配置（首次必做）
 uv sync                       # 按 uv.lock 安装依赖（首次或依赖变更后）
+uv add <pkg>                  # 新增依赖（会同步更新 uv.lock）
 uv run python main.py         # 以 uvicorn 运行于 8001 端口，开启自动重载
 ```
+
+`ai-service/` 未配置 linter；`pyproject.toml` 中无 `ruff`/`black` 等工具，如需格式化请手动安装后运行 `uv run ruff check .`。
 
 依赖通过 `pyproject.toml` + `uv.lock` 管理。新增包用 `uv add <pkg>`。
 

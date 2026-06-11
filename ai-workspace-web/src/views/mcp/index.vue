@@ -1,98 +1,90 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>MCP 服务器</h2>
-      <el-button type="primary" :icon="Plus" @click="openDialog()">新建 MCP 服务器</el-button>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">MCP 服务器</h2>
+      <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建 MCP 服务器</AppButton>
     </div>
 
-    <el-card shadow="never">
-      <el-table :data="servers" v-loading="loading" stripe border>
-        <el-table-column label="ID" prop="id" width="70" align="center" />
-        <el-table-column label="名称" prop="name" width="150" />
-        <el-table-column label="传输" prop="transport" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" :type="row.transport === 'sse' ? 'info' : 'warning'">{{ row.transport }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="地址 / 命令" min-width="240" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.transport === 'sse' ? row.url : row.command }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.enabled === 1 ? 'success' : 'info'" size="small">
-              {{ row.enabled === 1 ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="240" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" :icon="Connection" :loading="testingId === row.id"
-              @click="handleTest(row.id)">测试</el-button>
-            <el-button link :icon="Edit" @click="openDialog(row as McpServer)">编辑</el-button>
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-if="!loading && servers.length === 0" description="还没有 MCP 服务器，点击右上角新建" />
-    </el-card>
+    <!-- MCP 服务器卡片网格 -->
+    <div class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div
+        v-for="s in servers"
+        :key="s.id"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
+      >
+        <div class="mb-2 flex items-center gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100/50">
+            <Plug class="h-5 w-5 text-zinc-800" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-semibold text-zinc-800">{{ s.name }}</div>
+            <div class="mt-0.5 flex items-center gap-1.5">
+              <AppTag :variant="s.transport === 'sse' ? 'info' : 'warning'">{{ s.transport }}</AppTag>
+              <AppTag :variant="s.enabled === 1 ? 'success' : 'info'">{{ s.enabled === 1 ? '启用' : '禁用' }}</AppTag>
+            </div>
+          </div>
+        </div>
+        <p class="line-clamp-1 text-sm text-zinc-500">{{ s.description || '—' }}</p>
+        <p class="mt-1.5 truncate rounded-xl bg-zinc-50 px-3 py-1.5 text-xs text-zinc-500">
+          {{ s.transport === 'sse' ? s.url : s.command }}
+        </p>
+        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 pt-3">
+          <AppButton size="sm" variant="ghost" :icon="Zap" :loading="testingId === s.id" @click="handleTest(s.id!)">测试</AppButton>
+          <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(s)">编辑</AppButton>
+          <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(s.id!)">删除</AppButton>
+        </div>
+      </div>
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑 MCP 服务器' : '新建 MCP 服务器'" width="560px" @close="resetForm">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="服务器名称" clearable />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" placeholder="用途说明" clearable />
-        </el-form-item>
-        <el-form-item label="传输方式">
-          <el-radio-group v-model="form.transport">
-            <el-radio value="sse">SSE</el-radio>
-            <el-radio value="stdio">stdio</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item v-if="form.transport === 'sse'" label="服务地址">
-          <el-input v-model="form.url" placeholder="https://host/sse" clearable />
-        </el-form-item>
-        <el-form-item v-else label="启动命令">
-          <el-input v-model="form.command" placeholder="如：npx -y @modelcontextprotocol/server-xxx" clearable />
-        </el-form-item>
-        <el-form-item label="配置">
-          <el-input v-model="form.config" type="textarea" :rows="4" placeholder="可选：JSON 配置（headers/env/args）" />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="form.enabled">
-            <el-radio :value="1">启用</el-radio>
-            <el-radio :value="0">禁用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+      <AppEmpty v-if="!loading && servers.length === 0" class="col-span-full py-16" description="还没有 MCP 服务器，点击右上角新建" :icon="Plug" />
+      <AppLoading v-if="loading" overlay />
+    </div>
+
+    <AppDialog v-model="dialogVisible" :title="editing ? '编辑 MCP 服务器' : '新建 MCP 服务器'" width="560px" @close="resetForm">
+      <AppFormItem label="名称" required>
+        <AppInput v-model="form.name" placeholder="服务器名称" />
+      </AppFormItem>
+      <AppFormItem label="描述">
+        <AppInput v-model="form.description" placeholder="用途说明" />
+      </AppFormItem>
+      <AppFormItem label="传输方式">
+        <AppRadioGroup v-model="form.transport" :options="[{ label: 'SSE', value: 'sse' }, { label: 'stdio', value: 'stdio' }]" />
+      </AppFormItem>
+      <AppFormItem v-if="form.transport === 'sse'" label="服务地址">
+        <AppInput v-model="form.url" placeholder="https://host/sse" />
+      </AppFormItem>
+      <AppFormItem v-else label="启动命令">
+        <AppInput v-model="form.command" placeholder="如：npx -y @modelcontextprotocol/server-xxx" />
+      </AppFormItem>
+      <AppFormItem label="配置">
+        <AppTextarea v-model="form.config" :rows="4" placeholder="可选：JSON 配置（headers/env/args）" />
+      </AppFormItem>
+      <AppFormItem label="状态">
+        <AppRadioGroup v-model="form.enabled" numeric :options="[{ label: '启用', value: 1 }, { label: '禁用', value: 0 }]" />
+      </AppFormItem>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+        <AppButton @click="dialogVisible = false">取消</AppButton>
+        <AppButton variant="primary" :loading="submitting" @click="handleSubmit">
           {{ editing ? '保存修改' : '确认创建' }}
-        </el-button>
+        </AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
-/**
- * MCP 服务器注册表页
- *
- * 功能：
- * 1. MCP 服务器 CRUD（支持 sse/stdio 两种传输方式）
- * 2. 连通性测试（仅 sse 类型，探测 HTTP 可达性）
- *
- * sse 服务器在 Agent 运行时通过 langchain-mcp-adapters 动态加载工具列表，
- * 因此只有 sse 类型才能与 Agent 集成使用。
- */
 <script setup lang="ts">
+/**
+ * MCP 服务器注册表页：Card Layout 展示，CRUD（sse/stdio 两种传输方式），
+ * 连通性测试（仅 sse 类型可与 Agent 集成）。
+ */
 import { ref, reactive, onMounted } from 'vue'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Edit, Delete, Connection } from '@element-plus/icons-vue'
+import { Plus, Plug, Zap, Pencil, Trash2 } from 'lucide-vue-next'
 import {
   listMcpServers, addMcpServer, updateMcpServer, deleteMcpServer, testMcpServer, type McpServer
 } from '@/api/mcp'
+import {
+  AppButton, AppDialog, AppFormItem, AppInput, AppTextarea, AppRadioGroup, AppTag,
+  AppEmpty, AppLoading, toast, confirm
+} from '@/components/ui'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -100,10 +92,8 @@ const testingId = ref<number | null>(null)
 const servers = ref<McpServer[]>([])
 const dialogVisible = ref(false)
 const editing = ref<McpServer | null>(null)
-const formRef = ref<FormInstance>()
 
 const form = reactive<McpServer>({ name: '', description: '', transport: 'sse', url: '', command: '', config: '', enabled: 1 })
-const rules: FormRules = { name: [{ required: true, message: '请输入名称', trigger: 'blur' }] }
 
 onMounted(load)
 
@@ -119,25 +109,27 @@ function openDialog(row?: McpServer) {
   dialogVisible.value = true
 }
 function resetForm() {
-  formRef.value?.resetFields()
   editing.value = null
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!form.name.trim()) {
+    toast.warning('请输入名称')
+    return
+  }
   submitting.value = true
   try {
-    if (editing.value) { await updateMcpServer({ ...form, id: editing.value.id }); ElMessage.success('修改成功') }
-    else { await addMcpServer(form); ElMessage.success('创建成功') }
+    if (editing.value) { await updateMcpServer({ ...form, id: editing.value.id }); toast.success('修改成功') }
+    else { await addMcpServer(form); toast.success('创建成功') }
     dialogVisible.value = false
     load()
   } catch { } finally { submitting.value = false }
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定删除该 MCP 服务器吗？', '删除确认', { type: 'warning' }).catch(() => { throw new Error('cancel') })
-  try { await deleteMcpServer(id); ElMessage.success('删除成功'); load() } catch { }
+  const ok = await confirm({ title: '删除确认', message: '确定删除该 MCP 服务器吗？', confirmText: '确定删除', danger: true })
+  if (!ok) return
+  try { await deleteMcpServer(id); toast.success('删除成功'); load() } catch { }
 }
 
 async function handleTest(id: number) {
@@ -145,14 +137,10 @@ async function handleTest(id: number) {
   try {
     const res = await testMcpServer(id)
     if (res.reachable) {
-      ElMessage.success(`连通正常（${res.latency}ms）：${res.message}`)
+      toast.success(`连通正常（${res.latency}ms）：${res.message}`)
     } else {
-      ElMessage.warning(`连通失败：${res.message}`)
+      toast.warning(`连通失败：${res.message}`)
     }
   } catch { } finally { testingId.value = null }
 }
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-</style>

@@ -5,9 +5,10 @@
  * 1. JWT Bearer Token 注入
  * 2. 业务层响应解包（code=200 时透传 data）
  * 3. 401 自动清除 token 并跳转登录页
- * 4. 其他错误统一弹出 ElMessage 提示
+ * 4. 其他错误统一弹出 toast 提示
  */
 import axios from 'axios'
+import { toast } from '@/components/ui/toast'
 
 const request = axios.create({
   baseURL: '/api',
@@ -29,7 +30,7 @@ request.interceptors.response.use(
     if (res.code === 200) {
       return res.data
     }
-    ElMessage.error(res.message || '操作失败')
+    toast.error(res.message || '操作失败')
     return Promise.reject(new Error(res.message || '操作失败'))
   },
   error => {
@@ -42,7 +43,7 @@ request.interceptors.response.use(
       return Promise.reject(error)
     }
     const msg = error.response?.data?.message || error.message || '网络连接失败'
-    ElMessage.error(msg)
+    toast.error(msg)
     return Promise.reject(error)
   }
 )

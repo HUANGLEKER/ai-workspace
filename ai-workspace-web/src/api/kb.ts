@@ -3,7 +3,7 @@
  *
  * 包含：
  * 1. 知识库 CRUD（按 createBy 隔离，后端仅返回本人数据）
- * 2. 文档管理（上传由 el-upload 直传，此处仅负责列表与删除）
+ * 2. 文档管理（上传由 AppUpload 直传，此处仅负责列表与删除）
  * 3. ragChatStream：SSE 流式 RAG 问答，复用 streamSSE 工具
  */
 import request from './request'

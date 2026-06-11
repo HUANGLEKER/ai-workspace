@@ -1,78 +1,70 @@
 <template>
-  <div class="rag-page">
+  <div class="flex h-[calc(100vh-104px)] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)]">
     <!-- 顶部：知识库选择 -->
-    <div class="rag-header">
-      <div class="rag-title">
-        <el-icon size="18" color="#409EFF"><Search /></el-icon>
-        <span>知识库问答</span>
+    <div class="flex h-14 shrink-0 items-center gap-3.5 border-b border-zinc-200/80 px-5">
+      <div class="mr-auto flex items-center gap-2 text-sm font-semibold text-zinc-800">
+        <FileSearch class="h-4.5 w-4.5" />
+        知识库问答
       </div>
-      <el-select
+      <AppSelect
         v-model="selectedKbId"
+        :options="kbOptions"
+        numeric
         placeholder="选择知识库"
-        size="default"
-        style="width: 240px"
-        :loading="kbLoading"
+        class="!w-60 max-w-60"
         @change="resetConversation"
-      >
-        <el-option
-          v-for="kb in knowledgeBases"
-          :key="kb.id"
-          :label="kb.kbName"
-          :value="kb.id"
-        />
-      </el-select>
-      <el-tooltip content="清空问答" placement="bottom">
-        <el-button link :icon="Delete" :disabled="streaming" @click="resetConversation">清空</el-button>
-      </el-tooltip>
+      />
+      <AppButton variant="ghost" size="sm" :icon="Trash2" :disabled="streaming" @click="resetConversation">清空</AppButton>
     </div>
 
     <!-- 问答区 -->
-    <div ref="answersRef" class="answers-area">
-      <div v-if="!selectedKbId" class="rag-empty">
-        <el-icon size="56" color="#c0c4cc"><Reading /></el-icon>
-        <p>请先在上方选择一个知识库</p>
+    <div ref="answersRef" class="flex flex-1 flex-col gap-6 overflow-y-auto p-5">
+      <div v-if="!selectedKbId" class="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400">
+        <BookOpen class="h-12 w-12 text-zinc-200" />
+        <p class="text-sm">请先在上方选择一个知识库</p>
       </div>
 
-      <div v-else-if="turns.length === 0 && !streaming" class="rag-empty">
-        <el-icon size="56" color="#dcdfe6"><Search /></el-icon>
-        <p>基于「{{ selectedKbName }}」提问，回答将引用文档内容</p>
+      <div v-else-if="turns.length === 0 && !streaming" class="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400">
+        <FileSearch class="h-12 w-12 text-zinc-200" />
+        <p class="text-sm">基于「{{ selectedKbName }}」提问，回答将引用文档内容</p>
       </div>
 
-      <div v-for="(turn, idx) in turns" :key="idx" class="qa-turn">
+      <div v-for="(turn, idx) in turns" :key="idx" class="flex flex-col gap-3">
         <!-- 问题 -->
-        <div class="qa-question">
-          <el-avatar class="qa-avatar user-avatar" :icon="UserFilled" :size="32" />
-          <div class="qa-q-bubble">{{ turn.question }}</div>
+        <div class="flex flex-row-reverse items-start gap-3">
+          <AppAvatar :icon="User" />
+          <div class="max-w-[72%] break-words rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm leading-relaxed text-white">
+            {{ turn.question }}
+          </div>
         </div>
 
         <!-- 回答 -->
-        <div class="qa-answer">
-          <el-avatar class="qa-avatar ai-avatar" :icon="Cpu" :size="32" />
-          <div class="qa-a-bubble">
-            <div class="markdown-body" v-html="renderMd(turn.answer)" />
-            <span v-if="streaming && idx === turns.length - 1 && !turn.answer" class="cursor-blink">▋</span>
+        <div class="flex items-start gap-3">
+          <AppAvatar :icon="Bot" variant="dark" />
+          <div class="max-w-[80%] break-words rounded-2xl bg-zinc-100/50 px-4 py-3 text-sm leading-relaxed text-zinc-800">
+            <div class="prose prose-zinc max-w-none prose-pre:overflow-x-auto" v-html="renderMd(turn.answer)" />
+            <span v-if="streaming && idx === turns.length - 1 && !turn.answer" class="inline-block animate-pulse font-bold">▋</span>
 
             <!-- 引用来源 -->
-            <div v-if="turn.sources.length" class="qa-sources">
-              <div class="qa-sources-title">
-                <el-icon size="13"><Document /></el-icon>
+            <div v-if="turn.sources.length" class="mt-3 border-t border-dashed border-zinc-200/80 pt-2.5">
+              <div class="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500">
+                <FileText class="h-3.5 w-3.5" />
                 引用来源（{{ turn.sources.length }}）
               </div>
-              <el-collapse>
-                <el-collapse-item
-                  v-for="(src, sIdx) in turn.sources"
-                  :key="sIdx"
-                  :name="sIdx"
+              <CollapsibleRoot v-for="(src, sIdx) in turn.sources" :key="sIdx" class="mb-1 last:mb-0">
+                <CollapsibleTrigger
+                  class="flex w-full items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-3 py-2 text-left text-sm text-zinc-800 transition-all duration-200 ease-out hover:bg-zinc-50 [&[data-state=open]>svg]:rotate-180"
                 >
-                  <template #title>
-                    <span class="src-name">{{ src.file_name || '未知文档' }}</span>
-                    <el-tag size="small" type="info" effect="plain" class="src-score">
-                      相关度 {{ (src.score * 100).toFixed(0) }}%
-                    </el-tag>
-                  </template>
-                  <div class="src-content">{{ src.content }}</div>
-                </el-collapse-item>
-              </el-collapse>
+                  <span class="flex-1 truncate">{{ src.file_name || '未知文档' }}</span>
+                  <AppTag variant="info">相关度 {{ (src.score * 100).toFixed(0) }}%</AppTag>
+                  <ChevronDown class="h-4 w-4 shrink-0 text-zinc-400 transition-all duration-200 ease-out" />
+                </CollapsibleTrigger>
+                <CollapsibleContent
+                  class="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-xl bg-zinc-50 px-3 py-2 text-sm leading-relaxed text-zinc-500"
+                >
+                  {{ src.content }}
+                </CollapsibleContent>
+              </CollapsibleRoot>
             </div>
           </div>
         </div>
@@ -80,56 +72,54 @@
     </div>
 
     <!-- 输入区 -->
-    <div class="rag-input-area">
-      <el-input
+    <div class="flex shrink-0 items-end gap-2.5 border-t border-zinc-200/80 px-4 py-3">
+      <AppTextarea
         v-model="question"
-        type="textarea"
-        :rows="2"
+        :rows="1"
+        auto-grow
         :disabled="!selectedKbId"
-        placeholder="输入你的问题，Ctrl + Enter 提问"
-        resize="none"
-        @keydown.ctrl.enter.prevent="handleAsk"
+        placeholder="输入你的问题，Enter 提问，Shift + Enter 换行"
+        @keydown="onInputKeydown"
       />
-      <el-button
+      <button
         v-if="streaming"
-        type="danger"
-        :icon="CircleClose"
-        class="ask-btn"
+        class="flex h-12 shrink-0 items-center gap-1.5 rounded-xl bg-red-600 px-5 text-sm text-white transition-all duration-200 ease-out hover:bg-red-500"
         @click="handleStop"
       >
+        <CircleStop class="h-4 w-4" />
         停止
-      </el-button>
-      <el-button
+      </button>
+      <button
         v-else
-        type="primary"
-        :icon="Promotion"
-        :disabled="!question.trim() || !selectedKbId"
-        class="ask-btn"
+        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white transition-all duration-200 ease-out hover:bg-zinc-800"
+        :class="question.trim() && selectedKbId ? '' : 'pointer-events-none opacity-50'"
         @click="handleAsk"
       >
-        提问
-      </el-button>
+        <Send class="h-4 w-4" />
+      </button>
     </div>
   </div>
 </template>
 
+<script setup lang="ts">
 /**
  * 知识库问答页（RAG）
  *
- * 功能：
  * 1. 顶部选择知识库，切换时重置会话
  * 2. 以 QaTurn（问题 + 答案 + 来源）为单位展示问答历史
- * 3. 流式接收 LLM 回答，同步渲染 sources 引用来源折叠面板
+ * 3. 流式接收 LLM 回答，sources 引用来源用 Radix Collapsible 折叠展示
  *
- * 每轮问答独立持有一个 QaTurn 引用，流式 token 直接追加到该对象，
- * 无需像 Chat 页那样维护分离的 streamingContent。
+ * 每轮问答独立持有一个 QaTurn 引用，流式 token 直接追加到该对象。
  */
-<script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
-import { Search, Reading, Document, Delete, Cpu, UserFilled, Promotion, CircleClose } from '@element-plus/icons-vue'
+import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from 'radix-vue'
+import {
+  FileSearch, BookOpen, FileText, Trash2, Bot, User, Send, CircleStop, ChevronDown
+} from 'lucide-vue-next'
 import MarkdownIt from 'markdown-it'
 import type { KnowledgeBase, RagSource } from '@/types'
 import { listKnowledgeBases, ragChatStream } from '@/api/kb'
+import { AppSelect, AppButton, AppTextarea, AppAvatar, AppTag, toast } from '@/components/ui'
 
 /** 单轮问答数据结构，流式输出期间 answer 逐步填充 */
 interface QaTurn {
@@ -141,7 +131,6 @@ interface QaTurn {
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true })
 const renderMd = (content: string) => md.render(content || '')
 
-const kbLoading = ref(false)
 const knowledgeBases = ref<KnowledgeBase[]>([])
 const selectedKbId = ref<number>()
 const question = ref('')
@@ -149,7 +138,9 @@ const streaming = ref(false)
 const turns = ref<QaTurn[]>([])
 const answersRef = ref<HTMLElement>()
 let streamController: AbortController | null = null
+let scrollRaf = 0
 
+const kbOptions = computed(() => knowledgeBases.value.map((kb) => ({ label: kb.kbName, value: kb.id })))
 const selectedKbName = computed(
   () => knowledgeBases.value.find((kb) => kb.id === selectedKbId.value)?.kbName ?? ''
 )
@@ -157,13 +148,10 @@ const selectedKbName = computed(
 onMounted(loadKbs)
 
 async function loadKbs() {
-  kbLoading.value = true
   try {
     knowledgeBases.value = await listKnowledgeBases()
   } catch {
     knowledgeBases.value = []
-  } finally {
-    kbLoading.value = false
   }
 }
 
@@ -174,10 +162,27 @@ const scrollToBottom = async () => {
   }
 }
 
+function scheduleScroll() {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0
+    if (answersRef.value) {
+      answersRef.value.scrollTop = answersRef.value.scrollHeight
+    }
+  })
+}
+
 function resetConversation() {
   if (streaming.value) return
   turns.value = []
   question.value = ''
+}
+
+function onInputKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault()
+    handleAsk()
+  }
 }
 
 function handleAsk() {
@@ -196,7 +201,7 @@ function handleAsk() {
     { kbId: selectedKbId.value, question: q, sessionId: `rag-${selectedKbId.value}` },
     (text) => {
       turn.answer += text
-      scrollToBottom()
+      scheduleScroll()
     },
     (sources) => {
       turn.sources = sources
@@ -211,7 +216,7 @@ function handleAsk() {
       streamController = null
       // 若连一个 token 都未收到则移除占位轮次，避免展示空气泡
       if (!turn.answer) turns.value.pop()
-      ElMessage.error('问答失败：' + err)
+      toast.error('问答失败：' + err)
     },
     streamController.signal
   )
@@ -221,166 +226,3 @@ function handleStop() {
   streamController?.abort()
 }
 </script>
-
-<style scoped>
-.rag-page {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 100px);
-  background: #fff;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-}
-
-.rag-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 20px;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.rag-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  margin-right: auto;
-}
-
-.answers-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.rag-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: #c0c4cc;
-  font-size: 14px;
-}
-
-.qa-turn {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.qa-question,
-.qa-answer {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.qa-question {
-  flex-direction: row-reverse;
-}
-
-.qa-avatar {
-  flex-shrink: 0;
-}
-
-.ai-avatar {
-  background: #409EFF;
-}
-
-.user-avatar {
-  background: #67C23A;
-}
-
-.qa-q-bubble {
-  max-width: 72%;
-  padding: 10px 14px;
-  background: #409EFF;
-  color: #fff;
-  border-radius: 12px 2px 12px 12px;
-  font-size: 14px;
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-.qa-a-bubble {
-  max-width: 80%;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 2px 12px 12px 12px;
-  font-size: 14px;
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-.cursor-blink {
-  display: inline-block;
-  animation: blink 0.8s step-end infinite;
-  color: #409EFF;
-  font-weight: bold;
-}
-
-@keyframes blink {
-  50% { opacity: 0; }
-}
-
-.qa-sources {
-  margin-top: 12px;
-  border-top: 1px dashed #dcdfe6;
-  padding-top: 8px;
-}
-
-.qa-sources-title {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 4px;
-}
-
-.src-name {
-  font-size: 13px;
-  color: #303133;
-  margin-right: 10px;
-}
-
-.src-score {
-  margin-left: auto;
-}
-
-.src-content {
-  font-size: 13px;
-  color: #606266;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.rag-input-area {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-  padding: 12px 16px;
-  border-top: 1px solid #ebeef5;
-}
-
-.rag-input-area :deep(.el-textarea__inner) {
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-.ask-btn {
-  height: 56px;
-  padding: 0 22px;
-}
-</style>

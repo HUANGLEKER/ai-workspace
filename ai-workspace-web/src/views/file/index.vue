@@ -1,92 +1,66 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>文件中心</h2>
-      <el-upload
-        action="/api/file/upload"
-        :headers="uploadHeaders"
-        :show-file-list="false"
-        :on-success="onUploadSuccess"
-        :on-error="onUploadError"
-        multiple
-      >
-        <el-button type="primary" :icon="Upload">上传文件</el-button>
-      </el-upload>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">文件中心</h2>
+      <AppUpload action="/api/file/upload" multiple @success="onUploadSuccess" @error="onUploadError">
+        <AppButton variant="primary" :icon="Upload">上传文件</AppButton>
+      </AppUpload>
     </div>
 
-    <el-card shadow="never">
+    <AppCard>
       <!-- 搜索栏 -->
-      <div class="toolbar">
-        <el-input
-          v-model="searchName"
-          placeholder="搜索文件名..."
-          :prefix-icon="Search"
-          clearable
-          style="width: 260px"
-          @input="handleSearch"
-        />
-        <el-button :icon="Refresh" @click="loadFiles">刷新</el-button>
+      <div class="mb-4 flex items-center gap-3">
+        <AppSearch v-model="searchName" placeholder="搜索文件名..." class="!w-64 max-w-64" @update:model-value="handleSearch" />
+        <AppButton :icon="RefreshCw" @click="loadFiles">刷新</AppButton>
       </div>
 
-      <el-table :data="files" v-loading="loading" stripe border style="margin-top:12px">
-        <el-table-column label="文件名" prop="fileName" min-width="220" show-overflow-tooltip>
-          <template #default="{ row }">
-            <div style="display:flex;align-items:center;gap:8px">
-              <el-icon :color="fileIconColor(row.fileType)" size="18">
-                <component :is="fileIcon(row.fileType)" />
-              </el-icon>
-              <span>{{ row.fileName }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" prop="fileType" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" type="info">{{ row.fileType?.toUpperCase() || '—' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="大小" prop="fileSize" width="100" align="right">
-          <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
-        </el-table-column>
-        <el-table-column label="上传人" prop="uploadBy" width="100" align="center" />
-        <el-table-column label="上传时间" prop="createTime" width="160" align="center">
-          <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="120" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link :icon="Download" @click="handleDownload(row as FileInfo)">下载</el-button>
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <AppTable :columns="columns" :data="files" :loading="loading">
+        <template #cell-fileName="{ row }">
+          <div class="flex items-center gap-2">
+            <component :is="fileIcon(row.fileType)" class="h-4.5 w-4.5 shrink-0 text-zinc-500" />
+            <span class="break-words">{{ row.fileName }}</span>
+          </div>
+        </template>
+        <template #cell-fileType="{ row }">
+          <AppTag variant="info">{{ row.fileType?.toUpperCase() || '—' }}</AppTag>
+        </template>
+        <template #cell-fileSize="{ row }">{{ formatSize(row.fileSize) }}</template>
+        <template #cell-createTime="{ row }">{{ formatDate(row.createTime) }}</template>
+        <template #cell-actions="{ row }">
+          <div class="flex justify-center gap-1">
+            <AppButton size="sm" variant="ghost" :icon="Download" @click="handleDownload(row)">下载</AppButton>
+            <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(row.id)">删除</AppButton>
+          </div>
+        </template>
+      </AppTable>
 
-      <el-pagination
+      <AppPagination
         v-if="total > 0"
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
+        v-model:page="page"
+        v-model:size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="pagination"
+        class="mt-4"
         @change="loadFiles"
       />
-    </el-card>
+    </AppCard>
   </div>
 </template>
 
-/**
- * 文件中心页
- *
- * 功能：
- * 1. 文件列表展示（分页、按文件名搜索），按 uploadBy 隔离
- * 2. 上传文件（el-upload 直传 /api/file/upload）
- * 3. 下载文件（后端返回 MinIO 预签名 URL，浏览器直接访问）
- * 4. 删除文件（软删除）
- */
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { Upload, Search, Refresh, Delete, Download } from '@element-plus/icons-vue'
+/**
+ * 文件中心页：文件分页列表（按 uploadBy 隔离）、上传、
+ * 下载（后端返回 MinIO 预签名 URL）、删除（软删除）。
+ */
+import { ref, onMounted } from 'vue'
+import {
+  Upload, RefreshCw, Trash2, Download, FileText, Image, Video, Headphones, Archive, File as FileIcon
+} from 'lucide-vue-next'
 import type { FileInfo } from '@/types'
 import { listFiles, deleteFile, getFileUrl } from '@/api/file'
+import {
+  AppButton, AppCard, AppSearch, AppTable, AppTag, AppUpload, AppPagination,
+  toast, confirm, type TableColumn
+} from '@/components/ui'
 
 const loading = ref(false)
 const files = ref<FileInfo[]>([])
@@ -96,10 +70,14 @@ const total = ref(0)
 const searchName = ref('')
 let searchTimer: ReturnType<typeof setTimeout>
 
-// el-upload 不走 Axios 拦截器，需手动注入 Authorization 头
-const uploadHeaders = computed(() => ({
-  Authorization: `Bearer ${localStorage.getItem('token') || ''}`
-}))
+const columns: TableColumn[] = [
+  { key: 'fileName', label: '文件名' },
+  { key: 'fileType', label: '类型', width: '90px', align: 'center' },
+  { key: 'fileSize', label: '大小', width: '100px', align: 'right' },
+  { key: 'uploadBy', label: '上传人', width: '110px', align: 'center' },
+  { key: 'createTime', label: '上传时间', width: '170px', align: 'center' },
+  { key: 'actions', label: '操作', width: '170px', align: 'center' }
+]
 
 onMounted(loadFiles)
 
@@ -126,24 +104,25 @@ function handleSearch() {
 }
 
 function onUploadSuccess() {
-  ElMessage.success('上传成功')
+  toast.success('上传成功')
   loadFiles()
 }
 
 function onUploadError() {
-  ElMessage.error('上传失败')
+  toast.error('上传失败')
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定删除该文件吗？', '删除确认', {
-    confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning'
-  }).catch(() => { throw new Error('cancel') })
+  const ok = await confirm({
+    title: '删除确认', message: '确定删除该文件吗？', confirmText: '确定删除', danger: true
+  })
+  if (!ok) return
   try {
     await deleteFile(id)
-    ElMessage.success('删除成功')
+    toast.success('删除成功')
     loadFiles()
-  } catch (e) {
-    if ((e as Error).message !== 'cancel') ElMessage.error('删除失败')
+  } catch {
+    toast.error('删除失败')
   }
 }
 
@@ -153,27 +132,18 @@ async function handleDownload(file: FileInfo) {
     const url = await getFileUrl(file.id)
     window.open(url, '_blank')
   } catch {
-    ElMessage.error('下载失败')
+    toast.error('下载失败')
   }
 }
 
 const fileIcon = (type: string) => {
   const t = (type || '').toLowerCase()
-  if (['pdf'].includes(t)) return 'Document'
-  if (['doc', 'docx'].includes(t)) return 'Memo'
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(t)) return 'Picture'
-  if (['mp4', 'avi', 'mov'].includes(t)) return 'VideoPlay'
-  if (['mp3', 'wav'].includes(t)) return 'Headset'
-  if (['zip', 'rar', '7z'].includes(t)) return 'Files'
-  return 'Document'
-}
-
-const fileIconColor = (type: string) => {
-  const t = (type || '').toLowerCase()
-  if (t === 'pdf') return '#F56C6C'
-  if (['doc', 'docx'].includes(t)) return '#409EFF'
-  if (['jpg', 'jpeg', 'png', 'gif'].includes(t)) return '#67C23A'
-  return '#909399'
+  if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(t)) return FileText
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(t)) return Image
+  if (['mp4', 'avi', 'mov'].includes(t)) return Video
+  if (['mp3', 'wav'].includes(t)) return Headphones
+  if (['zip', 'rar', '7z'].includes(t)) return Archive
+  return FileIcon
 }
 
 const formatSize = (bytes: number) => {
@@ -185,9 +155,3 @@ const formatSize = (bytes: number) => {
 
 const formatDate = (d: string) => d ? new Date(d).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-') : '—'
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-.toolbar { display: flex; gap: 12px; align-items: center; }
-.pagination { margin-top: 16px; justify-content: flex-end; }
-</style>

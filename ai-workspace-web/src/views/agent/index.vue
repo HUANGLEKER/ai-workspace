@@ -1,124 +1,122 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>Agent</h2>
-      <el-button type="primary" :icon="Plus" @click="openDialog()">新建 Agent</el-button>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">Agent</h2>
+      <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建 Agent</AppButton>
     </div>
 
-    <el-card shadow="never">
-      <el-table :data="agents" v-loading="loading" stripe border>
-        <el-table-column label="ID" prop="id" width="70" align="center" />
-        <el-table-column label="名称" prop="name" width="160" />
-        <el-table-column label="描述" prop="description" min-width="200" show-overflow-tooltip />
-        <el-table-column label="模型" prop="model" width="140">
-          <template #default="{ row }">{{ row.model || '默认' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.enabled === 1 ? 'success' : 'info'" size="small">
-              {{ row.enabled === 1 ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="220" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" :icon="VideoPlay" @click="openRun(row as Agent)">运行</el-button>
-            <el-button link :icon="Edit" @click="openDialog(row as Agent)">编辑</el-button>
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-if="!loading && agents.length === 0" description="还没有 Agent，点击右上角新建" />
-    </el-card>
+    <!-- Agent 卡片网格 -->
+    <div class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        v-for="a in agents"
+        :key="a.id"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
+      >
+        <div class="mb-2 flex items-center gap-3">
+          <AppAvatar :icon="Bot" variant="dark" size="lg" />
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-semibold text-zinc-800">{{ a.name }}</div>
+            <AppTag :variant="a.enabled === 1 ? 'success' : 'info'">{{ a.enabled === 1 ? '启用' : '禁用' }}</AppTag>
+          </div>
+        </div>
+        <p class="line-clamp-2 flex-1 text-sm text-zinc-500">{{ a.description || '暂无描述' }}</p>
+        <div class="mt-2 flex gap-3 text-xs text-zinc-400">
+          <span>模型：{{ a.model || '默认' }}</span>
+          <span>工具 {{ parseNames(a.tools).length }}</span>
+          <span>MCP {{ parseNames(a.mcpServers).length }}</span>
+        </div>
+        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 pt-3">
+          <AppButton size="sm" variant="ghost" :icon="Play" @click="openRun(a)">运行</AppButton>
+          <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(a)">编辑</AppButton>
+          <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(a.id!)">删除</AppButton>
+        </div>
+      </div>
+
+      <AppEmpty v-if="!loading && agents.length === 0" class="col-span-full py-16" description="还没有 Agent，点击右上角新建" :icon="Bot" />
+      <AppLoading v-if="loading" overlay />
+    </div>
 
     <!-- 新增/编辑 -->
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑 Agent' : '新建 Agent'" width="560px" @close="resetForm">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="给 Agent 起个名字" clearable />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" placeholder="一句话描述用途" clearable />
-        </el-form-item>
-        <el-form-item label="系统提示词">
-          <el-input v-model="form.systemPrompt" type="textarea" :rows="4" placeholder="定义 Agent 的角色与行为" />
-        </el-form-item>
-        <el-form-item label="模型">
-          <el-select v-model="form.model" placeholder="留空使用默认模型" clearable style="width:100%">
-            <el-option v-for="m in models" :key="m.modelName" :label="m.modelName" :value="m.modelName || ''" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="工具">
-          <el-select v-model="selectedTools" multiple clearable placeholder="选择工具中心的 HTTP 工具" style="width:100%">
-            <el-option v-for="t in toolOptions" :key="t.id" :label="t.name" :value="t.name" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="MCP 服务器">
-          <el-select v-model="selectedMcp" multiple clearable placeholder="选择 SSE 类型的 MCP 服务器" style="width:100%">
-            <el-option v-for="s in mcpOptions" :key="s.id" :label="s.name" :value="s.name" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="form.enabled">
-            <el-radio :value="1">启用</el-radio>
-            <el-radio :value="0">禁用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+    <AppDialog v-model="dialogVisible" :title="editing ? '编辑 Agent' : '新建 Agent'" width="560px" @close="resetForm">
+      <AppFormItem label="名称" required>
+        <AppInput v-model="form.name" placeholder="给 Agent 起个名字" />
+      </AppFormItem>
+      <AppFormItem label="描述">
+        <AppInput v-model="form.description" placeholder="一句话描述用途" />
+      </AppFormItem>
+      <AppFormItem label="系统提示词">
+        <AppTextarea v-model="form.systemPrompt" :rows="4" placeholder="定义 Agent 的角色与行为" />
+      </AppFormItem>
+      <AppFormItem label="模型">
+        <AppSelect v-model="form.model" :options="modelOptions" placeholder="留空使用默认模型" />
+      </AppFormItem>
+      <AppFormItem label="工具">
+        <AppMultiSelect v-model="selectedTools" :options="toolOptions.map(t => t.name)" placeholder="选择工具中心的 HTTP 工具" />
+      </AppFormItem>
+      <AppFormItem label="MCP 服务器">
+        <AppMultiSelect v-model="selectedMcp" :options="mcpOptions.map(s => s.name)" placeholder="选择 SSE 类型的 MCP 服务器" />
+      </AppFormItem>
+      <AppFormItem label="状态">
+        <AppRadioGroup v-model="form.enabled" numeric :options="[{ label: '启用', value: 1 }, { label: '禁用', value: 0 }]" />
+      </AppFormItem>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+        <AppButton @click="dialogVisible = false">取消</AppButton>
+        <AppButton variant="primary" :loading="submitting" @click="handleSubmit">
           {{ editing ? '保存修改' : '确认创建' }}
-        </el-button>
+        </AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
 
     <!-- 运行 -->
-    <el-dialog v-model="runVisible" :title="`运行 · ${runTarget?.name}`" width="600px">
-      <el-input v-model="runInput" type="textarea" :rows="3" placeholder="输入你的问题或指令" />
-      <div class="run-actions">
-        <el-button type="primary" :loading="running" @click="doRun">运行</el-button>
+    <AppDialog v-model="runVisible" :title="`运行 · ${runTarget?.name}`" width="600px">
+      <AppTextarea v-model="runInput" :rows="3" placeholder="输入你的问题或指令" />
+      <div class="mt-3 text-right">
+        <AppButton variant="primary" :loading="running" @click="doRun">运行</AppButton>
       </div>
-      <div v-if="runOutput" class="run-output">
-        <div class="run-output-label">输出</div>
-        <pre>{{ runOutput }}</pre>
+      <div v-if="runOutput" class="mt-4">
+        <div class="mb-1.5 text-sm font-semibold text-zinc-800">输出</div>
+        <pre class="whitespace-pre-wrap break-words rounded-xl bg-zinc-50 p-3 text-sm text-zinc-800">{{ runOutput }}</pre>
       </div>
-      <div v-if="runSteps.length" class="run-steps">
-        <div class="run-output-label">执行轨迹</div>
-        <el-timeline>
-          <el-timeline-item v-for="(s, i) in runSteps" :key="i" :type="s.type === 'warning' ? 'warning' : 'primary'"
-            :timestamp="stepLabel(s.type)" placement="top">
-            <div class="step-text">{{ stepText(s) }}</div>
-          </el-timeline-item>
-        </el-timeline>
+      <div v-if="runSteps.length" class="mt-4">
+        <div class="mb-2 text-sm font-semibold text-zinc-800">执行轨迹</div>
+        <ol class="relative flex flex-col gap-3 border-l border-zinc-200/80 pl-4">
+          <li v-for="(s, i) in runSteps" :key="i" class="relative">
+            <span
+              class="absolute -left-[21.5px] top-1.5 h-2.5 w-2.5 rounded-full"
+              :class="s.type === 'warning' ? 'bg-amber-400' : 'bg-zinc-900'"
+            />
+            <div class="text-xs text-zinc-400">{{ stepLabel(s.type) }}</div>
+            <div class="whitespace-pre-wrap break-words text-sm text-zinc-500">{{ stepText(s) }}</div>
+          </li>
+        </ol>
       </div>
       <template #footer>
-        <el-button @click="runVisible = false">关闭</el-button>
+        <AppButton @click="runVisible = false">关闭</AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
+<script setup lang="ts">
 /**
- * Agent 管理页
+ * Agent 管理页：Card Grid + CRUD（含工具/MCP 服务器多选关联），
+ * 运行 Agent 展示 output 及 steps 执行轨迹。
  *
- * 功能：
- * 1. Agent CRUD（含工具/MCP 服务器多选关联）
- * 2. 运行 Agent：发送 input，展示 output 及 steps 执行轨迹
- *
- * tools/mcpServers 在 DB 中以 JSON 字符串存储，编辑时解析为 string[] 绑定到 el-select。
+ * tools/mcpServers 在 DB 中以 JSON 字符串存储，编辑时解析为 string[] 绑定多选，
  * 提交前重新序列化，运行时由后端 AgentService 解析为完整工具规格传给 FastAPI。
  */
-<script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Edit, Delete, VideoPlay } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Plus, Bot, Play, Pencil, Trash2 } from 'lucide-vue-next'
 import {
   listAgents, addAgent, updateAgent, deleteAgent, runAgent, type Agent
 } from '@/api/agent'
 import { listModels } from '@/api/chat'
 import { listTools, type Tool } from '@/api/tool'
 import { listMcpServers, type McpServer } from '@/api/mcp'
+import {
+  AppButton, AppDialog, AppFormItem, AppInput, AppTextarea, AppSelect, AppMultiSelect,
+  AppRadioGroup, AppTag, AppAvatar, AppEmpty, AppLoading, toast, confirm
+} from '@/components/ui'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -128,13 +126,14 @@ const toolOptions = ref<Tool[]>([])
 const mcpOptions = ref<McpServer[]>([])
 const dialogVisible = ref(false)
 const editing = ref<Agent | null>(null)
-const formRef = ref<FormInstance>()
 
 const form = reactive<Agent>({ name: '', description: '', systemPrompt: '', model: '', enabled: 1 })
-// tools/mcpServers 在后端以 JSON 字符串存储，前端编辑时转为 string[] 绑定多选
 const selectedTools = ref<string[]>([])
 const selectedMcp = ref<string[]>([])
-const rules: FormRules = { name: [{ required: true, message: '请输入名称', trigger: 'blur' }] }
+
+const modelOptions = computed(() =>
+  models.value.filter((m) => m.modelName).map((m) => ({ label: m.modelName!, value: m.modelName! }))
+)
 
 const runVisible = ref(false)
 const runTarget = ref<Agent | null>(null)
@@ -173,15 +172,16 @@ function openDialog(row?: Agent) {
   dialogVisible.value = true
 }
 function resetForm() {
-  formRef.value?.resetFields()
   editing.value = null
   selectedTools.value = []
   selectedMcp.value = []
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!form.name.trim()) {
+    toast.warning('请输入名称')
+    return
+  }
   submitting.value = true
   const payload: Agent = {
     ...form,
@@ -189,16 +189,17 @@ async function handleSubmit() {
     mcpServers: JSON.stringify(selectedMcp.value)
   }
   try {
-    if (editing.value) { await updateAgent({ ...payload, id: editing.value.id }); ElMessage.success('修改成功') }
-    else { await addAgent(payload); ElMessage.success('创建成功') }
+    if (editing.value) { await updateAgent({ ...payload, id: editing.value.id }); toast.success('修改成功') }
+    else { await addAgent(payload); toast.success('创建成功') }
     dialogVisible.value = false
     load()
   } catch { } finally { submitting.value = false }
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定删除该 Agent 吗？', '删除确认', { type: 'warning' }).catch(() => { throw new Error('cancel') })
-  try { await deleteAgent(id); ElMessage.success('删除成功'); load() } catch { }
+  const ok = await confirm({ title: '删除确认', message: '确定删除该 Agent 吗？', confirmText: '确定删除', danger: true })
+  if (!ok) return
+  try { await deleteAgent(id); toast.success('删除成功'); load() } catch { }
 }
 
 function openRun(row: Agent) {
@@ -231,13 +232,3 @@ function stepText(s: Record<string, unknown>): string {
   return String(s.content ?? '')
 }
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-.run-actions { margin-top: 12px; text-align: right; }
-.run-output { margin-top: 16px; }
-.run-output-label { font-weight: 600; margin-bottom: 6px; color: #303133; }
-.run-output pre { white-space: pre-wrap; word-break: break-word; background: #f5f7fa; padding: 12px; border-radius: 6px; margin: 0; }
-.run-steps { margin-top: 16px; }
-.step-text { white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #606266; }
-</style>

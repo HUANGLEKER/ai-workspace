@@ -1,126 +1,89 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>模型管理</h2>
-      <el-button type="primary" :icon="Plus" @click="openDialog()">新增模型</el-button>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">模型管理</h2>
+      <AppButton variant="primary" :icon="Plus" @click="openDialog()">新增模型</AppButton>
     </div>
 
-    <el-card shadow="never">
+    <AppCard>
       <!-- 搜索栏 -->
-      <div class="toolbar">
-        <el-input
-          v-model="searchName"
-          placeholder="搜索模型名称..."
-          :prefix-icon="Search"
-          clearable
-          style="width: 220px"
-          @keyup.enter="loadModels"
-        />
-        <el-button type="primary" :icon="Search" @click="loadModels">搜索</el-button>
-        <el-button @click="resetSearch">重置</el-button>
+      <div class="mb-4 flex flex-wrap items-center gap-3">
+        <AppSearch v-model="searchName" placeholder="搜索模型名称..." class="!w-56 max-w-56" @enter="loadModels" />
+        <AppButton variant="primary" :icon="Search" @click="loadModels">搜索</AppButton>
+        <AppButton @click="resetSearch">重置</AppButton>
       </div>
 
-      <el-table :data="models" v-loading="loading" stripe border style="margin-top:12px">
-        <el-table-column label="ID" prop="id" width="70" align="center" />
-        <el-table-column label="模型名称" prop="modelName" min-width="160" show-overflow-tooltip />
-        <el-table-column label="提供商" prop="provider" width="130" />
-        <el-table-column label="API 地址" prop="apiUrl" min-width="200" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.apiUrl || '默认' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" prop="enabled" width="90" align="center">
-          <template #default="{ row }">
-            <el-switch
-              :model-value="row.enabled === 1"
-              active-text="启用"
-              inactive-text="禁用"
-              inline-prompt
-              @change="(v: string | number | boolean) => handleToggleStatus(row as ChatModel, v as boolean)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="创建时间" prop="createTime" width="160" align="center">
-          <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link :icon="Edit" @click="openDialog(row as ChatModel)">编辑</el-button>
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <AppTable :columns="columns" :data="models" :loading="loading">
+        <template #cell-apiUrl="{ row }">{{ row.apiUrl || '默认' }}</template>
+        <template #cell-enabled="{ row }">
+          <AppSwitch
+            :model-value="row.enabled === 1"
+            @change="(v: boolean) => handleToggleStatus(row, v)"
+          />
+        </template>
+        <template #cell-createTime="{ row }">{{ formatDate(row.createTime) }}</template>
+        <template #cell-actions="{ row }">
+          <div class="flex justify-center gap-1">
+            <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(row)">编辑</AppButton>
+            <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(row.id!)">删除</AppButton>
+          </div>
+        </template>
+      </AppTable>
 
-      <el-pagination
+      <AppPagination
         v-if="total > 0"
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
+        v-model:page="page"
+        v-model:size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="pagination"
+        class="mt-4"
         @change="loadModels"
       />
-    </el-card>
+    </AppCard>
 
     <!-- 新增/编辑弹窗 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="editing ? '编辑模型' : '新增模型'"
-      width="480px"
-      @close="resetForm"
-    >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="模型名称" prop="modelName">
-          <el-input v-model="form.modelName" placeholder="如 gpt-4o、deepseek-chat" clearable />
-        </el-form-item>
-        <el-form-item label="提供商" prop="provider">
-          <el-input v-model="form.provider" placeholder="如 OpenAI、DeepSeek、Ollama" clearable />
-        </el-form-item>
-        <el-form-item label="API 地址" prop="apiUrl">
-          <el-input v-model="form.apiUrl" placeholder="留空则使用服务端默认配置" clearable />
-        </el-form-item>
-        <el-form-item label="API Key" prop="apiKey">
-          <el-input
-            v-model="form.apiKey"
-            type="password"
-            :placeholder="editing ? '留空则不修改' : '留空则使用服务端默认配置'"
-            show-password
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="状态" prop="enabled">
-          <el-radio-group v-model="form.enabled">
-            <el-radio :value="1">启用</el-radio>
-            <el-radio :value="0">禁用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+    <AppDialog v-model="dialogVisible" :title="editing ? '编辑模型' : '新增模型'" width="480px" @close="resetForm">
+      <AppFormItem label="模型名称" required>
+        <AppInput v-model="form.modelName" placeholder="如 gpt-4o、deepseek-chat" />
+      </AppFormItem>
+      <AppFormItem label="提供商" required>
+        <AppInput v-model="form.provider" placeholder="如 OpenAI、DeepSeek、Ollama" />
+      </AppFormItem>
+      <AppFormItem label="API 地址">
+        <AppInput v-model="form.apiUrl" placeholder="留空则使用服务端默认配置" />
+      </AppFormItem>
+      <AppFormItem label="API Key">
+        <AppInput
+          v-model="form.apiKey"
+          type="password"
+          :placeholder="editing ? '留空则不修改' : '留空则使用服务端默认配置'"
+        />
+      </AppFormItem>
+      <AppFormItem label="状态">
+        <AppRadioGroup v-model="form.enabled" numeric :options="[{ label: '启用', value: 1 }, { label: '禁用', value: 0 }]" />
+      </AppFormItem>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+        <AppButton @click="dialogVisible = false">取消</AppButton>
+        <AppButton variant="primary" :loading="submitting" @click="handleSubmit">
           {{ editing ? '保存修改' : '确认添加' }}
-        </el-button>
+        </AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
-/**
- * 模型管理页（仅管理员）
- *
- * 功能：
- * 1. 模型分页查询（支持按模型名搜索）
- * 2. 新增/编辑/删除模型配置
- * 3. 启用/禁用模型（el-switch 直接切换）
- *
- * apiKey 在列表中由后端脱敏不返回，编辑弹窗中留空则不修改原有值。
- * 模型选择按请求透传给 FastAPI，FastAPI 不直接读此表。
- */
 <script setup lang="ts">
+/**
+ * 模型管理页（仅管理员）：分页查询、新增/编辑/删除、启用/禁用。
+ * apiKey 在列表中由后端脱敏不返回，编辑弹窗中留空则不修改原有值。
+ */
 import { ref, reactive, onMounted } from 'vue'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Search, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, Search, Pencil, Trash2 } from 'lucide-vue-next'
 import type { ChatModel } from '@/types'
 import { pageModels, addModel, updateModel, deleteModel, toggleModelStatus } from '@/api/chat'
+import {
+  AppButton, AppCard, AppSearch, AppTable, AppSwitch, AppDialog, AppFormItem, AppInput,
+  AppRadioGroup, AppPagination, toast, confirm, type TableColumn
+} from '@/components/ui'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -131,15 +94,19 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const searchName = ref('')
-const formRef = ref<FormInstance>()
+
+const columns: TableColumn[] = [
+  { key: 'id', label: 'ID', width: '70px', align: 'center' },
+  { key: 'modelName', label: '模型名称', width: '180px' },
+  { key: 'provider', label: '提供商', width: '130px' },
+  { key: 'apiUrl', label: 'API 地址' },
+  { key: 'enabled', label: '状态', width: '90px', align: 'center' },
+  { key: 'createTime', label: '创建时间', width: '170px', align: 'center' },
+  { key: 'actions', label: '操作', width: '160px', align: 'center' }
+]
 
 const emptyForm = (): ChatModel => ({ modelName: '', provider: '', apiUrl: '', apiKey: '', enabled: 1 })
 const form = reactive<ChatModel>(emptyForm())
-
-const rules: FormRules = {
-  modelName: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
-  provider: [{ required: true, message: '请输入提供商', trigger: 'blur' }]
-}
 
 onMounted(loadModels)
 
@@ -170,21 +137,22 @@ function openDialog(model?: ChatModel) {
 }
 
 function resetForm() {
-  formRef.value?.resetFields()
   editing.value = null
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!form.modelName.trim() || !form.provider?.trim()) {
+    toast.warning('请填写模型名称和提供商')
+    return
+  }
   submitting.value = true
   try {
     if (editing.value) {
       await updateModel(form)
-      ElMessage.success('修改成功')
+      toast.success('修改成功')
     } else {
       await addModel(form)
-      ElMessage.success('添加成功')
+      toast.success('添加成功')
     }
     dialogVisible.value = false
     loadModels()
@@ -196,15 +164,16 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定删除该模型吗？', '删除确认', {
-    confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning'
-  }).catch(() => { throw new Error('cancel') })
+  const ok = await confirm({
+    title: '删除确认', message: '确定删除该模型吗？', confirmText: '确定删除', danger: true
+  })
+  if (!ok) return
   try {
     await deleteModel(id)
-    ElMessage.success('删除成功')
+    toast.success('删除成功')
     loadModels()
-  } catch (e) {
-    if ((e as Error).message !== 'cancel') ElMessage.error('删除失败')
+  } catch {
+    toast.error('删除失败')
   }
 }
 
@@ -213,7 +182,7 @@ async function handleToggleStatus(row: ChatModel, enabled: boolean) {
   try {
     await toggleModelStatus(row.id!, newStatus)
     row.enabled = newStatus
-    ElMessage.success(enabled ? '模型已启用' : '模型已禁用')
+    toast.success(enabled ? '模型已启用' : '模型已禁用')
   } catch {
     // 拦截器处理
   }
@@ -221,9 +190,3 @@ async function handleToggleStatus(row: ChatModel, enabled: boolean) {
 
 const formatDate = (d?: string) => d ? new Date(d).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-') : '—'
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.pagination { margin-top: 16px; justify-content: flex-end; }
-</style>

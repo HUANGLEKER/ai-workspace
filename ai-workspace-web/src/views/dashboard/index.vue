@@ -1,79 +1,69 @@
 <template>
-  <div class="dashboard">
-    <div class="page-header">
-      <h2>仪表盘</h2>
-      <span class="date-text">{{ todayText }}</span>
+  <div class="pb-6">
+    <div class="mb-6 flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-lg font-semibold text-zinc-800">仪表盘</h2>
+        <p class="mt-0.5 text-sm text-zinc-500">{{ todayText }}</p>
+      </div>
     </div>
 
     <!-- 统计卡片 -->
-    <el-row :gutter="16" class="stats-row">
-      <el-col :xs="12" :sm="6" v-for="stat in stats" :key="stat.label">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-inner">
-            <div class="stat-icon" :style="{ background: stat.color }">
-              <el-icon size="22" color="#fff"><component :is="stat.icon" /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stat.value }}</div>
-              <div class="stat-label">{{ stat.label }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div
+        v-for="stat in stats"
+        :key="stat.label"
+        class="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:shadow-md"
+      >
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-zinc-500">{{ stat.label }}</span>
+          <component :is="stat.icon" class="h-4 w-4 text-zinc-400" />
+        </div>
+        <div class="mt-3 text-3xl font-semibold tracking-tight text-zinc-800">{{ stat.value }}</div>
+      </div>
+    </div>
 
-    <!-- 欢迎区域 -->
-    <el-row :gutter="16" style="margin-top: 16px">
-      <el-col :span="16">
-        <el-card shadow="never">
-          <template #header>
-            <span>快速入口</span>
-          </template>
-          <div class="quick-actions">
-            <div
-              v-for="action in quickActions"
-              :key="action.label"
-              class="quick-item"
-              @click="router.push(action.path)"
-            >
-              <div class="quick-icon" :style="{ background: action.color }">
-                <el-icon size="20" color="#fff"><component :is="action.icon" /></el-icon>
-              </div>
-              <span>{{ action.label }}</span>
+    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <!-- 快速入口 -->
+      <AppCard title="快速入口" class="lg:col-span-2">
+        <div class="grid grid-cols-3 gap-3">
+          <button
+            v-for="action in quickActions"
+            :key="action.label"
+            class="flex flex-col items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-white px-2 py-5 text-sm text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 hover:text-zinc-800 hover:shadow-sm"
+            @click="router.push(action.path)"
+          >
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100/50">
+              <component :is="action.icon" class="h-5 w-5 text-zinc-800" />
             </div>
+            {{ action.label }}
+          </button>
+        </div>
+      </AppCard>
+
+      <!-- 系统信息 -->
+      <AppCard title="系统信息">
+        <dl class="flex flex-col gap-3 text-sm">
+          <div v-for="info in sysInfo" :key="info.label" class="flex items-center justify-between">
+            <dt class="text-zinc-500">{{ info.label }}</dt>
+            <dd class="text-zinc-800">{{ info.value }}</dd>
           </div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card shadow="never">
-          <template #header>
-            <span>系统信息</span>
-          </template>
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="版本">v1.0.0</el-descriptions-item>
-            <el-descriptions-item label="前端框架">Vue 3 + Element Plus</el-descriptions-item>
-            <el-descriptions-item label="后端框架">Spring Boot 3.5</el-descriptions-item>
-            <el-descriptions-item label="AI 框架">LangChain + LangGraph</el-descriptions-item>
-            <el-descriptions-item label="向量数据库">ChromaDB</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
-    </el-row>
+        </dl>
+      </AppCard>
+    </div>
   </div>
 </template>
 
-/**
- * 仪表盘页
- *
- * 功能：
- * 1. 展示当前用户的统计概览（今日对话、知识库、文档、文件数量）
- * 2. 提供常用功能的快速入口
- * 3. 展示系统技术栈信息
- */
 <script setup lang="ts">
+/**
+ * 仪表盘页：当前用户统计概览 + 快速入口 + 系统技术栈信息
+ */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import {
+  MessageSquare, BookOpen, FileText, Folder, Sparkles, Workflow, Cpu
+} from 'lucide-vue-next'
 import { getDashboardStats } from '@/api/dashboard'
+import { AppCard } from '@/components/ui'
 
 const router = useRouter()
 
@@ -82,10 +72,10 @@ const todayText = new Date().toLocaleDateString('zh-CN', {
 })
 
 const stats = ref([
-  { label: '今日对话', value: 0, icon: 'ChatDotRound', color: '#409EFF' },
-  { label: '知识库数量', value: 0, icon: 'Reading', color: '#67C23A' },
-  { label: '文档总数', value: 0, icon: 'Document', color: '#E6A23C' },
-  { label: '文件总数', value: 0, icon: 'Folder', color: '#F56C6C' }
+  { label: '今日对话', value: 0, icon: MessageSquare },
+  { label: '知识库数量', value: 0, icon: BookOpen },
+  { label: '文档总数', value: 0, icon: FileText },
+  { label: '文件总数', value: 0, icon: Folder }
 ])
 
 onMounted(async () => {
@@ -101,93 +91,19 @@ onMounted(async () => {
 })
 
 const quickActions = [
-  { label: '新建对话', icon: 'ChatDotRound', path: '/chat', color: '#409EFF' },
-  { label: '知识库管理', icon: 'Reading', path: '/knowledge/base', color: '#67C23A' },
-  { label: '上传文件', icon: 'Folder', path: '/file', color: '#E6A23C' },
-  { label: '提示词中心', icon: 'MagicStick', path: '/prompt', color: '#9C27B0' },
-  { label: '工作流', icon: 'Connection', path: '/workflow', color: '#00BCD4' },
-  { label: 'Agent', icon: 'Cpu', path: '/agent', color: '#FF5722' }
+  { label: '新建对话', icon: MessageSquare, path: '/chat' },
+  { label: '知识库管理', icon: BookOpen, path: '/knowledge/base' },
+  { label: '上传文件', icon: Folder, path: '/file' },
+  { label: '提示词中心', icon: Sparkles, path: '/prompt' },
+  { label: '工作流', icon: Workflow, path: '/workflow' },
+  { label: 'Agent', icon: Cpu, path: '/agent' }
+]
+
+const sysInfo = [
+  { label: '版本', value: 'v1.0.0' },
+  { label: '前端框架', value: 'Vue 3 + Tailwind' },
+  { label: '后端框架', value: 'Go + Gin' },
+  { label: 'AI 框架', value: 'LangChain + LangGraph' },
+  { label: '向量数据库', value: 'ChromaDB' }
 ]
 </script>
-
-<style scoped>
-.dashboard {
-  padding-bottom: 20px;
-}
-
-.date-text {
-  color: #909399;
-  font-size: 13px;
-}
-
-.stats-row {
-  margin-bottom: 4px;
-}
-
-.stat-card {
-  margin-bottom: 0;
-}
-
-.stat-inner {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 4px 0;
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #303133;
-  line-height: 1.2;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 2px;
-}
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.quick-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-  font-size: 13px;
-  color: #606266;
-}
-
-.quick-item:hover {
-  background: #f5f7fa;
-  color: #409EFF;
-}
-
-.quick-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-</style>

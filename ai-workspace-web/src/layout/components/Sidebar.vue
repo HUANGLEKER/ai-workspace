@@ -1,227 +1,120 @@
 <template>
-  <div class="sidebar" :class="{ collapsed }">
+  <aside
+    class="relative flex h-full shrink-0 flex-col border-r border-zinc-200/80 bg-zinc-50 transition-all duration-200 ease-out"
+    :class="collapsed ? 'w-[72px]' : 'w-[260px]'"
+  >
     <!-- Logo -->
-    <div class="sidebar-logo">
-      <el-icon class="logo-icon" size="24"><Cpu /></el-icon>
-      <span v-if="!collapsed" class="logo-text">AI Workspace</span>
+    <div class="flex h-14 items-center gap-2.5 border-b border-zinc-200/80 px-4">
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-zinc-900">
+        <Bot class="h-4.5 w-4.5 text-white" />
+      </div>
+      <span v-if="!collapsed" class="truncate text-sm font-semibold text-zinc-800">AI Workspace</span>
     </div>
 
-    <!-- 导航菜单 -->
-    <el-menu
-      :default-active="activeMenu"
-      :collapse="collapsed"
-      :collapse-transition="false"
-      background-color="#1d2535"
-      text-color="#bfcbd9"
-      active-text-color="#ffffff"
-      router
-      class="sidebar-menu"
-    >
-      <el-menu-item index="/dashboard">
-        <el-icon><Odometer /></el-icon>
-        <template #title>仪表盘</template>
-      </el-menu-item>
+    <!-- 导航 -->
+    <nav class="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3">
+      <template v-for="group in visibleGroups" :key="group.label">
+        <div
+          v-if="group.label && !collapsed"
+          class="mb-1 mt-4 px-3 text-xs font-medium text-zinc-400 first:mt-0"
+        >
+          {{ group.label }}
+        </div>
+        <div v-else-if="group.label && collapsed" class="my-3 h-px bg-zinc-200/80" />
 
-      <el-menu-item index="/chat">
-        <el-icon><ChatDotRound /></el-icon>
-        <template #title>AI 对话</template>
-      </el-menu-item>
-
-      <el-sub-menu index="knowledge">
-        <template #title>
-          <el-icon><Reading /></el-icon>
-          <span>知识库</span>
-        </template>
-        <el-menu-item index="/knowledge/base">
-          <el-icon><Collection /></el-icon>
-          <template #title>知识库管理</template>
-        </el-menu-item>
-<el-menu-item index="/knowledge/rag">
-          <el-icon><Search /></el-icon>
-          <template #title>知识库问答</template>
-        </el-menu-item>
-      </el-sub-menu>
-
-      <el-menu-item index="/file">
-        <el-icon><Folder /></el-icon>
-        <template #title>文件中心</template>
-      </el-menu-item>
-
-      <el-menu-item index="/prompt">
-        <el-icon><MagicStick /></el-icon>
-        <template #title>提示词中心</template>
-      </el-menu-item>
-
-      <el-menu-item index="/workflow">
-        <el-icon><Connection /></el-icon>
-        <template #title>工作流</template>
-      </el-menu-item>
-
-      <el-menu-item index="/agent">
-        <el-icon><Cpu /></el-icon>
-        <template #title>Agent</template>
-      </el-menu-item>
-
-      <el-menu-item index="/tool">
-        <el-icon><Tools /></el-icon>
-        <template #title>工具中心</template>
-      </el-menu-item>
-
-      <el-menu-item index="/mcp">
-        <el-icon><Link /></el-icon>
-        <template #title>MCP 服务器</template>
-      </el-menu-item>
-
-      <el-menu-item v-if="authStore.isAdmin" index="/monitor">
-        <el-icon><Monitor /></el-icon>
-        <template #title>监控</template>
-      </el-menu-item>
-
-      <el-sub-menu v-if="authStore.isAdmin" index="system">
-        <template #title>
-          <el-icon><Setting /></el-icon>
-          <span>系统管理</span>
-        </template>
-        <el-menu-item index="/system/user">
-          <el-icon><User /></el-icon>
-          <template #title>用户管理</template>
-        </el-menu-item>
-        <el-menu-item index="/system/model">
-          <el-icon><Cpu /></el-icon>
-          <template #title>模型管理</template>
-        </el-menu-item>
-        <el-menu-item index="/system/job">
-          <el-icon><Timer /></el-icon>
-          <template #title>定时任务</template>
-        </el-menu-item>
-      </el-sub-menu>
-    </el-menu>
+        <router-link
+          v-for="item in group.items"
+          :key="item.path"
+          :to="item.path"
+          class="mb-0.5 flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all duration-200 ease-out"
+          :class="[
+            isActive(item.path)
+              ? 'bg-zinc-900 text-white'
+              : 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-800',
+            collapsed ? 'justify-center px-0' : ''
+          ]"
+        >
+          <AppTooltip v-if="collapsed" :content="item.title" side="right">
+            <component :is="item.icon" class="h-4 w-4 shrink-0" />
+          </AppTooltip>
+          <component :is="item.icon" v-else class="h-4 w-4 shrink-0" />
+          <span v-if="!collapsed" class="truncate">{{ item.title }}</span>
+        </router-link>
+      </template>
+    </nav>
 
     <!-- 折叠按钮 -->
-    <div class="sidebar-collapse" @click="$emit('toggle')">
-      <el-icon size="16">
-        <DArrowLeft v-if="!collapsed" />
-        <DArrowRight v-else />
-      </el-icon>
-    </div>
-  </div>
+    <button
+      class="flex h-11 items-center justify-center border-t border-zinc-200/80 text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-100/50 hover:text-zinc-800"
+      @click="$emit('toggle')"
+    >
+      <PanelLeft class="h-4 w-4" />
+    </button>
+  </aside>
 </template>
 
-/**
- * 侧边导航栏组件
- *
- * 功能：
- * 1. 展示全局导航菜单，支持折叠/展开
- * 2. 根据当前路由高亮激活菜单项
- * 3. 管理员专属菜单（监控、系统管理）通过 isAdmin 守卫隐藏，防止普通用户看到入口
- */
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 import { useRoute } from 'vue-router'
+import {
+  Bot, PanelLeft, LayoutDashboard, MessageSquare, BookOpen, FileSearch,
+  Folder, Sparkles, Workflow, Cpu, Wrench, Plug, Activity, Users, Boxes, Timer
+} from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { AppTooltip } from '@/components/ui'
+
+interface NavItem {
+  path: string
+  title: string
+  icon: Component
+}
 
 defineProps<{ collapsed: boolean }>()
 defineEmits<{ toggle: [] }>()
 
 const route = useRoute()
 const authStore = useAuthStore()
-// el-menu 的 router 模式下，index 值需与路由 path 完全匹配
-const activeMenu = computed(() => route.path)
+
+const groups: { label: string; admin?: boolean; items: NavItem[] }[] = [
+  {
+    label: '',
+    items: [
+      { path: '/dashboard', title: '仪表盘', icon: LayoutDashboard },
+      { path: '/chat', title: 'AI 对话', icon: MessageSquare }
+    ]
+  },
+  {
+    label: '知识库',
+    items: [
+      { path: '/knowledge/base', title: '知识库管理', icon: BookOpen },
+      { path: '/knowledge/rag', title: '知识库问答', icon: FileSearch }
+    ]
+  },
+  {
+    label: '工作台',
+    items: [
+      { path: '/file', title: '文件中心', icon: Folder },
+      { path: '/prompt', title: '提示词中心', icon: Sparkles },
+      { path: '/workflow', title: '工作流', icon: Workflow },
+      { path: '/agent', title: 'Agent', icon: Cpu },
+      { path: '/tool', title: '工具中心', icon: Wrench },
+      { path: '/mcp', title: 'MCP 服务器', icon: Plug }
+    ]
+  },
+  {
+    label: '系统',
+    admin: true,
+    items: [
+      { path: '/monitor', title: '监控', icon: Activity },
+      { path: '/system/user', title: '用户管理', icon: Users },
+      { path: '/system/model', title: '模型管理', icon: Boxes },
+      { path: '/system/job', title: '定时任务', icon: Timer }
+    ]
+  }
+]
+
+// 管理员分组对普通用户隐藏，防止暴露系统入口
+const visibleGroups = computed(() => groups.filter((g) => !g.admin || authStore.isAdmin))
+
+const isActive = (path: string) => route.path === path || route.path.startsWith(path + '/')
 </script>
-
-<style scoped>
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  width: 220px;
-  height: 100%;
-  background-color: #1d2535;
-  transition: width 0.3s;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.sidebar.collapsed {
-  width: 64px;
-}
-
-.sidebar-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 18px;
-  height: 60px;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  border-bottom: 1px solid #2d3748;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.logo-icon {
-  flex-shrink: 0;
-  color: var(--brand-primary);
-}
-
-.sidebar-menu {
-  flex: 1;
-  border-right: none;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 0;
-}
-
-.sidebar-menu :deep(.el-menu-item),
-.sidebar-menu :deep(.el-sub-menu__title) {
-  height: 48px;
-  line-height: 48px;
-  position: relative;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-active) {
-  background-color: rgba(64, 158, 255, 0.18) !important;
-  color: #fff !important;
-}
-
-/* active 项左侧高亮条 */
-.sidebar-menu :deep(.el-menu-item.is-active)::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background-color: var(--brand-primary);
-}
-
-.sidebar-menu :deep(.el-menu-item:hover),
-.sidebar-menu :deep(.el-sub-menu__title:hover) {
-  background-color: #2d3748 !important;
-}
-
-.sidebar-menu :deep(.el-sub-menu__title) {
-  color: #bfcbd9;
-}
-
-/* 子菜单内项缩进时高亮条对齐左边缘 */
-.sidebar-menu :deep(.el-menu .el-menu-item) {
-  min-width: auto;
-}
-
-.sidebar-collapse {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 44px;
-  color: #bfcbd9;
-  cursor: pointer;
-  border-top: 1px solid #2d3748;
-  transition: background-color 0.2s;
-}
-
-.sidebar-collapse:hover {
-  background-color: #2d3748;
-  color: #fff;
-}
-</style>

@@ -1,89 +1,73 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <div style="display:flex;align-items:center;gap:10px">
-        <el-button :icon="ArrowLeft" circle @click="router.back()" />
-        <h2>文档管理 <span v-if="kbName" style="font-weight:400;color:#909399;font-size:14px">— {{ kbName }}</span></h2>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div class="flex items-center gap-2.5">
+        <AppButton size="icon" :icon="ArrowLeft" @click="router.back()" />
+        <h2 class="text-lg font-semibold text-zinc-800">
+          文档管理
+          <span v-if="kbName" class="text-sm font-normal text-zinc-500">— {{ kbName }}</span>
+        </h2>
       </div>
-      <div style="display:flex;gap:8px">
-        <el-upload
-          :action="`/api/document/upload`"
-          :headers="uploadHeaders"
+      <div class="flex gap-2">
+        <AppUpload
+          action="/api/document/upload"
           :data="{ kbId }"
-          :show-file-list="false"
-          :before-upload="beforeUpload"
-          :on-success="onUploadSuccess"
-          :on-error="onUploadError"
           multiple
           accept=".pdf,.doc,.docx,.txt,.md"
+          :before-upload="beforeUpload"
+          @success="onUploadSuccess"
+          @error="onUploadError"
         >
-          <el-button type="primary" :icon="Upload">上传文档</el-button>
-        </el-upload>
-        <el-tooltip content="重建 RAG 索引">
-          <el-button :icon="Refresh" @click="handleRebuild">重建索引</el-button>
-        </el-tooltip>
+          <AppButton variant="primary" :icon="Upload">上传文档</AppButton>
+        </AppUpload>
+        <AppTooltip content="重建 RAG 索引">
+          <AppButton :icon="RefreshCw" @click="handleRebuild">重建索引</AppButton>
+        </AppTooltip>
       </div>
     </div>
 
-    <!-- 文档表格 -->
-    <el-card shadow="never">
-      <el-table :data="documents" v-loading="loading" stripe border>
-        <el-table-column label="文件名" prop="fileName" min-width="200" show-overflow-tooltip />
-        <el-table-column label="类型" prop="fileType" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" type="info">{{ row.fileType?.toUpperCase() }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="大小" prop="fileSize" width="100" align="right">
-          <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
-        </el-table-column>
-        <el-table-column label="处理状态" prop="status" width="110" align="center">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="small">
-              {{ statusText(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="上传时间" prop="createTime" width="160" align="center">
-          <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="100" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <AppCard>
+      <AppTable :columns="columns" :data="documents" :loading="loading">
+        <template #cell-fileType="{ row }">
+          <AppTag variant="info">{{ row.fileType?.toUpperCase() || '—' }}</AppTag>
+        </template>
+        <template #cell-fileSize="{ row }">{{ formatSize(row.fileSize) }}</template>
+        <template #cell-status="{ row }">
+          <AppTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</AppTag>
+        </template>
+        <template #cell-createTime="{ row }">{{ formatDate(row.createTime) }}</template>
+        <template #cell-actions="{ row }">
+          <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(row.id)">删除</AppButton>
+        </template>
+      </AppTable>
 
-      <el-pagination
+      <AppPagination
         v-if="total > 0"
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
+        v-model:page="page"
+        v-model:size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="pagination"
+        class="mt-4"
         @change="loadDocuments"
       />
-    </el-card>
+    </AppCard>
   </div>
 </template>
 
-/**
- * 文档管理页
- *
- * 功能：
- * 1. 展示指定知识库下的文档列表（分页）
- * 2. 上传新文档（触发后端异步嵌入管道，status 流转 PENDING→PROCESSING→DONE/FAILED）
- * 3. 删除文档 / 重建整个知识库的 RAG 索引
- *
- * 路由参数：通过 query.kbId + query.kbName 从知识库管理页跳转传入
- */
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+/**
+ * 文档管理页：指定知识库下的文档分页列表，上传触发后端异步嵌入管道
+ * （status 流转 PENDING→PROCESSING→DONE/FAILED），支持删除与重建索引。
+ * 路由参数：query.kbId + query.kbName 从知识库管理页传入。
+ */
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Upload, Refresh, Delete } from '@element-plus/icons-vue'
+import { ArrowLeft, Upload, RefreshCw, Trash2 } from 'lucide-vue-next'
 import type { KbDocument } from '@/types'
 import { listDocuments, deleteDocument, rebuildRag } from '@/api/kb'
+import {
+  AppButton, AppCard, AppTable, AppTag, AppTooltip, AppUpload, AppPagination,
+  toast, confirm, type TableColumn
+} from '@/components/ui'
 
 const route = useRoute()
 const router = useRouter()
@@ -97,14 +81,18 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-// el-upload 直接发 XMLHttpRequest，不经过 Axios 拦截器，需手动注入 Authorization 头
-const uploadHeaders = computed(() => ({
-  Authorization: `Bearer ${localStorage.getItem('token') || ''}`
-}))
+const columns: TableColumn[] = [
+  { key: 'fileName', label: '文件名' },
+  { key: 'fileType', label: '类型', width: '90px', align: 'center' },
+  { key: 'fileSize', label: '大小', width: '100px', align: 'right' },
+  { key: 'status', label: '处理状态', width: '110px', align: 'center' },
+  { key: 'createTime', label: '上传时间', width: '170px', align: 'center' },
+  { key: 'actions', label: '操作', width: '100px', align: 'center' }
+]
 
 onMounted(() => {
   if (!kbId) {
-    ElMessage.warning('未指定知识库，已跳转回知识库管理')
+    toast.warning('未指定知识库，已跳转回知识库管理')
     router.replace('/knowledge/base')
     return
   }
@@ -132,52 +120,57 @@ function beforeUpload(file: File) {
   const maxSize = 50 * 1024 * 1024
   // 部分浏览器对 .md 文件上报 MIME 为 text/plain 或空字符串，额外检查扩展名兜底
   if (!allowed.includes(file.type) && !file.name.endsWith('.md')) {
-    ElMessage.warning('仅支持 PDF、Word、TXT、Markdown 格式')
+    toast.warning('仅支持 PDF、Word、TXT、Markdown 格式')
     return false
   }
   if (file.size > maxSize) {
-    ElMessage.warning('文件大小不能超过 50MB')
+    toast.warning('文件大小不能超过 50MB')
     return false
   }
   return true
 }
 
 function onUploadSuccess() {
-  ElMessage.success('上传成功，正在处理中...')
+  toast.success('上传成功，正在处理中...')
   loadDocuments()
 }
 
 function onUploadError() {
-  ElMessage.error('上传失败，请重试')
+  toast.error('上传失败，请重试')
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定删除该文档吗？', '删除确认', {
-    confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning'
-  }).catch(() => { throw new Error('cancel') })
+  const ok = await confirm({
+    title: '删除确认', message: '确定删除该文档吗？', confirmText: '确定删除', danger: true
+  })
+  if (!ok) return
   try {
     await deleteDocument(id)
-    ElMessage.success('删除成功')
+    toast.success('删除成功')
     loadDocuments()
-  } catch (e) {
-    if ((e as Error).message !== 'cancel') ElMessage.error('删除失败')
+  } catch {
+    toast.error('删除失败')
   }
 }
 
 async function handleRebuild() {
   if (!kbId) {
-    ElMessage.error('知识库 ID 无效，请重新进入文档管理页')
+    toast.error('知识库 ID 无效，请重新进入文档管理页')
     return
   }
-  await ElMessageBox.confirm('重建索引会重新处理所有文档，可能耗时较长，确认继续？', '重建索引', {
-    confirmButtonText: '确认重建', cancelButtonText: '取消', type: 'warning'
-  }).catch(() => { throw new Error('cancel') })
+  const ok = await confirm({
+    title: '重建索引',
+    message: '重建索引会重新处理所有文档，可能耗时较长，确认继续？',
+    confirmText: '确认重建',
+    danger: true
+  })
+  if (!ok) return
   try {
     // 后端为异步嵌入管道，接口仅提交任务即返回，实际进度需轮询文档状态
     await rebuildRag(kbId)
-    ElMessage.success('已提交重建任务，请稍后刷新查看状态')
-  } catch (e) {
-    if ((e as Error).message !== 'cancel') ElMessage.error('提交失败')
+    toast.success('已提交重建任务，请稍后刷新查看状态')
+  } catch {
+    toast.error('提交失败')
   }
 }
 
@@ -185,9 +178,10 @@ const statusText = (s: string) => ({
   PENDING: '等待处理', PROCESSING: '处理中', DONE: '已完成', FAILED: '处理失败'
 }[s] || s)
 
-const statusTagType = (s: string) => ({
-  PENDING: 'info', PROCESSING: 'warning', DONE: 'success', FAILED: 'danger'
-}[s] as 'info' | 'warning' | 'success' | 'danger' || 'info')
+const statusVariant = (s: string) =>
+  (({ PENDING: 'info', PROCESSING: 'warning', DONE: 'success', FAILED: 'danger' }) as const)[
+    s as 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
+  ] || 'info'
 
 const formatSize = (bytes: number) => {
   if (!bytes) return '—'
@@ -198,8 +192,3 @@ const formatSize = (bytes: number) => {
 
 const formatDate = (d: string) => d ? new Date(d).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-') : '—'
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-.pagination { margin-top: 16px; justify-content: flex-end; }
-</style>

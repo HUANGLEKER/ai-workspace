@@ -1,126 +1,108 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <h2>定时任务</h2>
-      <el-button v-if="activeTab === 'jobs'" type="primary" :icon="Plus" @click="openDialog()">新建任务</el-button>
-      <el-button v-else type="danger" :icon="Delete" @click="handleCleanLogs">清空日志</el-button>
+  <div class="pb-6">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <h2 class="text-lg font-semibold text-zinc-800">定时任务</h2>
+      <AppButton v-if="activeTab === 'jobs'" variant="primary" :icon="Plus" @click="openDialog()">新建任务</AppButton>
+      <AppButton v-else variant="danger" :icon="Trash2" @click="handleCleanLogs">清空日志</AppButton>
     </div>
 
-    <el-card shadow="never">
-      <el-tabs v-model="activeTab" @tab-change="onTabChange">
+    <AppCard>
+      <AppTabs v-model="activeTab" :tabs="[{ name: 'jobs', label: '任务' }, { name: 'logs', label: '执行日志' }]" @change="onTabChange">
         <!-- 任务列表 -->
-        <el-tab-pane label="任务" name="jobs">
-          <div class="toolbar">
-            <el-input v-model="jobSearch" placeholder="搜索任务名..." :prefix-icon="Search" clearable
-              style="width: 220px" @keyup.enter="loadJobs" />
-            <el-button type="primary" :icon="Search" @click="loadJobs">搜索</el-button>
+        <template #jobs>
+          <div class="mb-4 flex flex-wrap items-center gap-3">
+            <AppSearch v-model="jobSearch" placeholder="搜索任务名..." class="!w-56 max-w-56" @enter="loadJobs" />
+            <AppButton variant="primary" :icon="Search" @click="loadJobs">搜索</AppButton>
           </div>
-          <el-table :data="jobs" v-loading="jobLoading" stripe border style="margin-top:12px">
-            <el-table-column label="ID" prop="id" width="64" align="center" />
-            <el-table-column label="任务名称" prop="jobName" width="150" show-overflow-tooltip />
-            <el-table-column label="调用目标" prop="invokeTarget" width="130" />
-            <el-table-column label="Cron" prop="cronExpression" width="150" />
-            <el-table-column label="备注" prop="remark" min-width="140" show-overflow-tooltip />
-            <el-table-column label="状态" width="100" align="center">
-              <template #default="{ row }">
-                <el-switch :model-value="row.status === 0" active-text="运行" inactive-text="暂停" inline-prompt
-                  @change="(v: string | number | boolean) => toggleStatus(row as SysJob, v as boolean)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="220" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button link type="primary" :icon="VideoPlay" @click="handleRun(row.id)">执行</el-button>
-                <el-button link :icon="Edit" @click="openDialog(row as SysJob)">编辑</el-button>
-                <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination v-if="jobTotal > 0" v-model:current-page="jobPage" v-model:page-size="jobSize"
-            :total="jobTotal" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next"
-            class="pagination" @change="loadJobs" />
-        </el-tab-pane>
+          <AppTable :columns="jobColumns" :data="jobs" :loading="jobLoading">
+            <template #cell-status="{ row }">
+              <AppSwitch :model-value="row.status === 0" @change="(v: boolean) => toggleStatus(row, v)" />
+            </template>
+            <template #cell-actions="{ row }">
+              <div class="flex justify-center gap-1">
+                <AppButton size="sm" variant="ghost" :icon="Play" @click="handleRun(row.id!)">执行</AppButton>
+                <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(row)">编辑</AppButton>
+                <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(row.id!)">删除</AppButton>
+              </div>
+            </template>
+          </AppTable>
+          <AppPagination
+            v-if="jobTotal > 0"
+            v-model:page="jobPage"
+            v-model:size="jobSize"
+            :total="jobTotal"
+            class="mt-4"
+            @change="loadJobs"
+          />
+        </template>
 
         <!-- 执行日志 -->
-        <el-tab-pane label="执行日志" name="logs">
-          <el-table :data="logs" v-loading="logLoading" stripe border>
-            <el-table-column label="ID" prop="id" width="64" align="center" />
-            <el-table-column label="任务名称" prop="jobName" width="150" show-overflow-tooltip />
-            <el-table-column label="调用目标" prop="invokeTarget" width="130" />
-            <el-table-column label="结果" width="90" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 0 ? 'success' : 'danger'" size="small">
-                  {{ row.status === 0 ? '成功' : '失败' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="信息" prop="jobMessage" min-width="180" show-overflow-tooltip />
-            <el-table-column label="耗时(ms)" prop="costMs" width="100" align="center" />
-            <el-table-column label="执行时间" prop="createTime" width="170" align="center">
-              <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
-            </el-table-column>
-          </el-table>
-          <el-pagination v-if="logTotal > 0" v-model:current-page="logPage" v-model:page-size="logSize"
-            :total="logTotal" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next"
-            class="pagination" @change="loadLogs" />
-        </el-tab-pane>
-      </el-tabs>
-    </el-card>
+        <template #logs>
+          <AppTable :columns="logColumns" :data="logs" :loading="logLoading">
+            <template #cell-status="{ row }">
+              <AppTag :variant="row.status === 0 ? 'success' : 'danger'">{{ row.status === 0 ? '成功' : '失败' }}</AppTag>
+            </template>
+            <template #cell-createTime="{ row }">{{ formatDate(row.createTime!) }}</template>
+          </AppTable>
+          <AppPagination
+            v-if="logTotal > 0"
+            v-model:page="logPage"
+            v-model:size="logSize"
+            :total="logTotal"
+            class="mt-4"
+            @change="loadLogs"
+          />
+        </template>
+      </AppTabs>
+    </AppCard>
 
     <!-- 新增/编辑任务 -->
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑任务' : '新建任务'" width="520px" @close="resetForm">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="任务名称" prop="jobName">
-          <el-input v-model="form.jobName" placeholder="请输入任务名称" clearable />
-        </el-form-item>
-        <el-form-item label="调用目标" prop="invokeTarget">
-          <el-select v-model="form.invokeTarget" placeholder="选择任务处理器" style="width:100%">
-            <el-option v-for="h in handlers" :key="h" :label="h" :value="h" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Cron表达式" prop="cronExpression">
-          <el-input v-model="form.cronExpression" placeholder="6段：秒 分 时 日 月 周，如 0 0/5 * * * ?" clearable />
-        </el-form-item>
-        <el-form-item label="参数">
-          <el-input v-model="form.jobParams" placeholder="可选，传给处理器的字符串" clearable />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="form.remark" placeholder="可选" clearable />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="form.status">
-            <el-radio :value="0">运行</el-radio>
-            <el-radio :value="1">暂停</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+    <AppDialog v-model="dialogVisible" :title="editing ? '编辑任务' : '新建任务'" width="520px" @close="resetForm">
+      <AppFormItem label="任务名称" required>
+        <AppInput v-model="form.jobName" placeholder="请输入任务名称" />
+      </AppFormItem>
+      <AppFormItem label="调用目标" required>
+        <AppSelect v-model="form.invokeTarget" :options="handlers.map(h => ({ label: h, value: h }))" placeholder="选择任务处理器" />
+      </AppFormItem>
+      <AppFormItem label="Cron表达式" required>
+        <AppInput v-model="form.cronExpression" placeholder="6段：秒 分 时 日 月 周，如 0 0/5 * * * ?" />
+      </AppFormItem>
+      <AppFormItem label="参数">
+        <AppInput v-model="form.jobParams" placeholder="可选，传给处理器的字符串" />
+      </AppFormItem>
+      <AppFormItem label="备注">
+        <AppInput v-model="form.remark" placeholder="可选" />
+      </AppFormItem>
+      <AppFormItem label="状态">
+        <AppRadioGroup v-model="form.status" numeric :options="[{ label: '运行', value: 0 }, { label: '暂停', value: 1 }]" />
+      </AppFormItem>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+        <AppButton @click="dialogVisible = false">取消</AppButton>
+        <AppButton variant="primary" :loading="submitting" @click="handleSubmit">
           {{ editing ? '保存修改' : '确认创建' }}
-        </el-button>
+        </AppButton>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
-/**
- * 定时任务管理页（仅管理员）
- *
- * 功能：
- * 1. 任务列表（分页、搜索）、启用/暂停、立即执行、CRUD
- * 2. 执行日志列表（分页），支持全量清空（物理删除）
- *
- * Cron 为 Spring 6 段式（含秒字段）。
- * 切换 Tab 时按需加载对应数据，避免无谓请求。
- */
 <script setup lang="ts">
+/**
+ * 定时任务管理页（仅管理员）：任务分页/搜索/启停/立即执行/CRUD，
+ * 执行日志分页与全量清空（物理删除）。Cron 为 6 段式（含秒字段）。
+ * 切换 Tab 时按需加载对应数据。
+ */
 import { ref, reactive, onMounted } from 'vue'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Search, Edit, Delete, VideoPlay } from '@element-plus/icons-vue'
+import { Plus, Search, Pencil, Trash2, Play } from 'lucide-vue-next'
 import {
   pageJobs, listHandlers, addJob, updateJob, deleteJob, changeJobStatus, runJob,
   pageJobLogs, cleanJobLogs, type SysJob, type SysJobLog
 } from '@/api/job'
+import {
+  AppButton, AppCard, AppTabs, AppSearch, AppTable, AppSwitch, AppTag, AppDialog,
+  AppFormItem, AppInput, AppSelect, AppRadioGroup, AppPagination,
+  toast, confirm, type TableColumn
+} from '@/components/ui'
 
 const activeTab = ref('jobs')
 
@@ -131,7 +113,7 @@ const jobPage = ref(1)
 const jobSize = ref(10)
 const jobTotal = ref(0)
 const jobSearch = ref('')
-/** 可用的 JobHandler bean 名称列表，由后端 JobHandlerRegistry 枚举 */
+/** 可用的 JobHandler 名称列表，由后端枚举 */
 const handlers = ref<string[]>([])
 
 // 执行日志相关状态
@@ -141,16 +123,30 @@ const logPage = ref(1)
 const logSize = ref(10)
 const logTotal = ref(0)
 
+const jobColumns: TableColumn[] = [
+  { key: 'id', label: 'ID', width: '64px', align: 'center' },
+  { key: 'jobName', label: '任务名称', width: '150px' },
+  { key: 'invokeTarget', label: '调用目标', width: '130px' },
+  { key: 'cronExpression', label: 'Cron', width: '150px' },
+  { key: 'remark', label: '备注' },
+  { key: 'status', label: '状态', width: '90px', align: 'center' },
+  { key: 'actions', label: '操作', width: '230px', align: 'center' }
+]
+
+const logColumns: TableColumn[] = [
+  { key: 'id', label: 'ID', width: '64px', align: 'center' },
+  { key: 'jobName', label: '任务名称', width: '150px' },
+  { key: 'invokeTarget', label: '调用目标', width: '130px' },
+  { key: 'status', label: '结果', width: '90px', align: 'center' },
+  { key: 'jobMessage', label: '信息' },
+  { key: 'costMs', label: '耗时(ms)', width: '100px', align: 'center' },
+  { key: 'createTime', label: '执行时间', width: '170px', align: 'center' }
+]
+
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const editing = ref<SysJob | null>(null)
-const formRef = ref<FormInstance>()
 const form = reactive<SysJob>({ jobName: '', invokeTarget: '', cronExpression: '', jobParams: '', remark: '', status: 1 })
-const rules: FormRules = {
-  jobName: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  invokeTarget: [{ required: true, message: '请选择调用目标', trigger: 'change' }],
-  cronExpression: [{ required: true, message: '请输入Cron表达式', trigger: 'blur' }]
-}
 
 onMounted(() => { loadJobs(); loadHandlers() })
 
@@ -176,7 +172,7 @@ async function loadLogs() {
   } catch { logs.value = [] } finally { logLoading.value = false }
 }
 
-function onTabChange(name: string | number) {
+function onTabChange(name: string) {
   if (name === 'logs') loadLogs()
   else loadJobs()
 }
@@ -188,51 +184,48 @@ function openDialog(row?: SysJob) {
   dialogVisible.value = true
 }
 function resetForm() {
-  formRef.value?.resetFields()
   editing.value = null
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!form.jobName.trim() || !form.invokeTarget || !form.cronExpression.trim()) {
+    toast.warning('请填写任务名称、调用目标和 Cron 表达式')
+    return
+  }
   submitting.value = true
   try {
-    if (editing.value) { await updateJob({ ...form, id: editing.value.id }); ElMessage.success('修改成功') }
-    else { await addJob(form); ElMessage.success('创建成功') }
+    if (editing.value) { await updateJob({ ...form, id: editing.value.id }); toast.success('修改成功') }
+    else { await addJob(form); toast.success('创建成功') }
     dialogVisible.value = false
     loadJobs()
   } catch { } finally { submitting.value = false }
 }
 
 async function handleDelete(id: number) {
-  await ElMessageBox.confirm('确定删除该任务吗？', '删除确认', { type: 'warning' }).catch(() => { throw new Error('cancel') })
-  try { await deleteJob(id); ElMessage.success('删除成功'); loadJobs() } catch { }
+  const ok = await confirm({ title: '删除确认', message: '确定删除该任务吗？', confirmText: '确定删除', danger: true })
+  if (!ok) return
+  try { await deleteJob(id); toast.success('删除成功'); loadJobs() } catch { }
 }
 
 async function toggleStatus(row: SysJob, running: boolean) {
-  // status: 0=运行/调度中，1=暂停；el-switch 的 model-value 绑定 status===0
+  // status: 0=运行/调度中，1=暂停；开关绑定 status===0
   const status = running ? 0 : 1
   try {
     await changeJobStatus(row.id!, status)
     row.status = status
-    ElMessage.success(running ? '已启动调度' : '已暂停')
+    toast.success(running ? '已启动调度' : '已暂停')
   } catch { }
 }
 
 async function handleRun(id: number) {
-  try { await runJob(id); ElMessage.success('已触发执行，稍后可在执行日志查看') } catch { }
+  try { await runJob(id); toast.success('已触发执行，稍后可在执行日志查看') } catch { }
 }
 
 async function handleCleanLogs() {
-  await ElMessageBox.confirm('确定清空所有执行日志吗？', '清空确认', { type: 'warning' }).catch(() => { throw new Error('cancel') })
-  try { await cleanJobLogs(); ElMessage.success('已清空'); loadLogs() } catch { }
+  const ok = await confirm({ title: '清空确认', message: '确定清空所有执行日志吗？', confirmText: '确定清空', danger: true })
+  if (!ok) return
+  try { await cleanJobLogs(); toast.success('已清空'); loadLogs() } catch { }
 }
 
 const formatDate = (d: string) => d ? new Date(d).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-') : '—'
 </script>
-
-<style scoped>
-.page-wrapper { padding-bottom: 20px; }
-.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.pagination { margin-top: 16px; justify-content: flex-end; }
-</style>
