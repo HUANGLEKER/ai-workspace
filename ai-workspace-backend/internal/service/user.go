@@ -114,6 +114,28 @@ func (s *userService) GetByID(id int64) (*model.SysUser, error) {
 	return &user, nil
 }
 
+// UpdatePassword 允许用户修改自己的密码
+func (s *userService) UpdatePassword(userID int64, oldPassword, newPassword string) error {
+	var user model.SysUser
+	if err := database.DB.First(&user, userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return common.ErrNotFound("用户")
+		}
+		return err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
+		return common.NewBizError(common.CodeBadRequest, "原密码错误")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return database.DB.Model(&user).Update("password", string(hash)).Error
+}
+
 // GetRoles 查询用户的角色码列表，用于 JWT 生成和权限校验
 func (s *userService) GetRoles(userID int64) []string {
 	var roles []string

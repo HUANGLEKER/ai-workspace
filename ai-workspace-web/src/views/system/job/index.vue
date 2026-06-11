@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">定时任务</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">定时任务</h2>
       <AppButton v-if="activeTab === 'jobs'" variant="primary" :icon="Plus" @click="openDialog()">新建任务</AppButton>
       <AppButton v-else variant="danger" :icon="Trash2" @click="handleCleanLogs">清空日志</AppButton>
     </div>

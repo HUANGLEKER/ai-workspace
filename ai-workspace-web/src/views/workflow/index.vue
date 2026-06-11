@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">工作流</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">工作流</h2>
       <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建工作流</AppButton>
     </div>
 
@@ -10,20 +10,20 @@
       <div
         v-for="w in workflows"
         :key="w.id"
-        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
       >
         <div class="mb-2 flex items-center gap-3">
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100/50">
-            <Workflow class="h-5 w-5 text-zinc-800" />
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800/50">
+            <Workflow class="h-5 w-5 text-zinc-800 dark:text-zinc-100" />
           </div>
           <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-semibold text-zinc-800">{{ w.name }}</div>
+            <div class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ w.name }}</div>
             <AppTag :variant="w.enabled === 1 ? 'success' : 'info'">{{ w.enabled === 1 ? '启用' : '禁用' }}</AppTag>
           </div>
         </div>
-        <p class="line-clamp-2 flex-1 text-sm text-zinc-500">{{ w.description || '暂无描述' }}</p>
-        <div class="mt-2 text-xs text-zinc-400">模型：{{ w.model || '默认' }}</div>
-        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 pt-3">
+        <p class="line-clamp-2 flex-1 text-sm text-zinc-500 dark:text-zinc-400">{{ w.description || '暂无描述' }}</p>
+        <div class="mt-2 text-xs text-zinc-400 dark:text-zinc-500">模型：{{ w.model || '默认' }}</div>
+        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 dark:border-zinc-800 pt-3">
           <AppButton size="sm" variant="ghost" :icon="Play" @click="openRun(w)">运行</AppButton>
           <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(w)">编辑</AppButton>
           <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(w.id!)">删除</AppButton>
@@ -66,11 +66,11 @@
         <AppButton variant="primary" :loading="running" @click="doRun">运行</AppButton>
       </div>
       <div v-if="runStatus" class="mt-4">
-        <div class="mb-1.5 flex items-center gap-2 text-sm font-semibold text-zinc-800">
+        <div class="mb-1.5 flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
           状态：
           <AppTag :variant="runStatus === 'completed' ? 'success' : 'danger'">{{ runStatus }}</AppTag>
         </div>
-        <pre class="whitespace-pre-wrap break-words rounded-xl bg-zinc-50 p-3 text-sm text-zinc-800">{{ runOutput }}</pre>
+        <pre class="whitespace-pre-wrap break-words rounded-xl bg-zinc-50 dark:bg-zinc-950 p-3 text-sm text-zinc-800 dark:text-zinc-100">{{ runOutput }}</pre>
       </div>
       <template #footer>
         <AppButton @click="runVisible = false">关闭</AppButton>

@@ -7,13 +7,13 @@
     <label
       v-for="opt in options"
       :key="String(opt.value)"
-      class="flex cursor-pointer items-center gap-2 text-sm text-zinc-800"
+      class="flex cursor-pointer items-center gap-2 text-sm text-zinc-800 dark:text-zinc-100"
     >
       <RadioGroupItem
         :value="String(opt.value)"
-        class="flex h-4 w-4 items-center justify-center rounded-full border border-zinc-200/80 bg-white transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 data-[state=checked]:border-zinc-900"
+        class="flex h-4 w-4 items-center justify-center rounded-full border border-zinc-200/80 bg-white transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 data-[state=checked]:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:focus-visible:ring-zinc-300 dark:data-[state=checked]:border-zinc-100"
       >
-        <RadioGroupIndicator class="h-2 w-2 rounded-full bg-zinc-900" />
+        <RadioGroupIndicator class="h-2 w-2 rounded-full bg-zinc-900 dark:bg-zinc-100" />
       </RadioGroupItem>
       {{ opt.label }}
     </label>

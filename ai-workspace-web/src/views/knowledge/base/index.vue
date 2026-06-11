@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">知识库管理</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">知识库管理</h2>
       <AppButton variant="primary" :icon="Plus" @click="openCreateDialog">新建知识库</AppButton>
     </div>
 
@@ -10,22 +10,22 @@
       <div
         v-for="kb in knowledgeBases"
         :key="kb.id"
-        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
       >
         <div class="mb-3 flex items-start gap-3.5">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100/50">
-            <BookOpen class="h-5 w-5 text-zinc-800" />
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800/50">
+            <BookOpen class="h-5 w-5 text-zinc-800 dark:text-zinc-100" />
           </div>
           <div class="min-w-0">
-            <div class="truncate text-sm font-semibold text-zinc-800">{{ kb.kbName }}</div>
-            <p class="mt-1 line-clamp-2 text-sm text-zinc-500">{{ kb.description || '暂无描述' }}</p>
+            <div class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ kb.kbName }}</div>
+            <p class="mt-1 line-clamp-2 text-sm text-zinc-500 dark:text-zinc-400">{{ kb.description || '暂无描述' }}</p>
           </div>
         </div>
-        <div class="flex gap-3 text-xs text-zinc-400">
+        <div class="flex gap-3 text-xs text-zinc-400 dark:text-zinc-500">
           <span>创建人：{{ kb.createBy }}</span>
           <span>{{ formatDate(kb.createTime) }}</span>
         </div>
-        <div class="mt-4 flex gap-2 border-t border-zinc-200/80 pt-3">
+        <div class="mt-4 flex gap-2 border-t border-zinc-200/80 dark:border-zinc-800 pt-3">
           <AppButton size="sm" :icon="FileText" @click="goDocuments(kb)">文档管理</AppButton>
           <AppButton size="sm" :icon="Pencil" @click="openEditDialog(kb)">编辑</AppButton>
           <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(kb.id)">删除</AppButton>

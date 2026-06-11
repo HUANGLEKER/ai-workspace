@@ -5,13 +5,12 @@
  * 所有列表接口均使用 PageResult<T> 包装（无分页时后端返回 total=records.length）。
  */
 
-/** MyBatis Plus 分页返回结构，与后端 PageResult 对应 */
+/** 分页返回结构，与后端 common.PageResult 对应 */
 export interface PageResult<T> {
   records: T[]
   total: number
-  current: number
-  size: number
-  pages: number
+  pageNum: number
+  pageSize: number
 }
 
 // 认证相关
@@ -22,18 +21,19 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string
+  userId: number
+  username: string
+  nickname: string
+  roles: string[]
 }
 
 export interface UserInfo {
-  id: number
+  userId: number
   username: string
   nickname: string
   avatar: string
-  email: string
-  phone: string
-  status: number
-  createTime: string
   roles: string[]
+  isAdmin: boolean
 }
 
 // 对话相关
@@ -122,7 +122,8 @@ export interface SysUser {
   nickname: string
   avatar?: string
   email: string
-  phone: string
+  /** 用户备注 */
+  remark?: string
   status: number
   createTime?: string
 }

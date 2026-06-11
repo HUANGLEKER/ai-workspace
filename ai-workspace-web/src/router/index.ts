@@ -9,7 +9,6 @@
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getUserInfo } from '@/api/auth'
 import Layout from '@/layout/index.vue'
 
 const router = createRouter({
@@ -143,10 +142,10 @@ router.beforeEach(async (to, _from, next) => {
   // token 失效时 getUserInfo 会 401，由响应拦截器统一处理跳转
   if (!authStore.userInfo) {
     try {
-      const info = await getUserInfo()
-      authStore.setUserInfo(info)
-    } catch {
-      // 拦截器已处理 401 跳转，此处静默忽略
+      await authStore.fetchUserInfo()
+    } catch (err) {
+      // token 失效时拦截器已处理 401 跳转，此处仅记录便于排查非鉴权类异常
+      console.warn('[router] 拉取用户信息失败：', err)
     }
   }
 

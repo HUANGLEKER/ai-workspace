@@ -15,3 +15,6 @@ export const logout = () =>
 
 export const getUserInfo = () =>
   request.get<unknown, UserInfo>('/auth/info')
+
+export const updatePassword = (data: { oldPassword: string; newPassword: string }) =>
+  request.put<unknown, void>('/auth/password', data)

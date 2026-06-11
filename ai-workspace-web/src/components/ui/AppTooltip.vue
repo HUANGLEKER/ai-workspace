@@ -7,7 +7,7 @@
       <TooltipContent
         :side="side"
         :side-offset="6"
-        class="z-[9500] rounded-xl bg-zinc-900 px-2.5 py-1.5 text-xs text-white shadow-md transition-all duration-200 ease-out"
+        class="z-[9500] rounded-xl bg-zinc-900 px-2.5 py-1.5 text-xs text-white shadow-md transition-all duration-200 ease-out dark:bg-zinc-100 dark:text-zinc-900"
       >
         {{ content }}
       </TooltipContent>

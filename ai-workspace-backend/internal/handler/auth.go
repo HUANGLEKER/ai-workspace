@@ -114,3 +114,23 @@ func GetAuthInfo(c *gin.Context) {
 		IsAdmin:  isAdmin,
 	})
 }
+
+// UpdatePassword PUT /api/auth/password — 用户修改自己的密码
+func UpdatePassword(c *gin.Context) {
+	var req struct {
+		OldPassword string `json:"oldPassword" binding:"required"`
+		NewPassword string `json:"newPassword" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.BadRequest(c, err.Error())
+		return
+	}
+
+	userID := middleware.CurrentUserID(c)
+	if err := service.UserSvc.UpdatePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		handleBizError(c, err)
+		return
+	}
+
+	common.OKMsg(c, "密码修改成功，请重新登录")
+}

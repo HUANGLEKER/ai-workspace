@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">MCP 服务器</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">MCP 服务器</h2>
       <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建 MCP 服务器</AppButton>
     </div>
 
@@ -10,25 +10,25 @@
       <div
         v-for="s in servers"
         :key="s.id"
-        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
       >
         <div class="mb-2 flex items-center gap-3">
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100/50">
-            <Plug class="h-5 w-5 text-zinc-800" />
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800/50">
+            <Plug class="h-5 w-5 text-zinc-800 dark:text-zinc-100" />
           </div>
           <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-semibold text-zinc-800">{{ s.name }}</div>
+            <div class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ s.name }}</div>
             <div class="mt-0.5 flex items-center gap-1.5">
               <AppTag :variant="s.transport === 'sse' ? 'info' : 'warning'">{{ s.transport }}</AppTag>
               <AppTag :variant="s.enabled === 1 ? 'success' : 'info'">{{ s.enabled === 1 ? '启用' : '禁用' }}</AppTag>
             </div>
           </div>
         </div>
-        <p class="line-clamp-1 text-sm text-zinc-500">{{ s.description || '—' }}</p>
-        <p class="mt-1.5 truncate rounded-xl bg-zinc-50 px-3 py-1.5 text-xs text-zinc-500">
+        <p class="line-clamp-1 text-sm text-zinc-500 dark:text-zinc-400">{{ s.description || '—' }}</p>
+        <p class="mt-1.5 truncate rounded-xl bg-zinc-50 dark:bg-zinc-950 px-3 py-1.5 text-xs text-zinc-500 dark:text-zinc-400">
           {{ s.transport === 'sse' ? s.url : s.command }}
         </p>
-        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 pt-3">
+        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 dark:border-zinc-800 pt-3">
           <AppButton size="sm" variant="ghost" :icon="Zap" :loading="testingId === s.id" @click="handleTest(s.id!)">测试</AppButton>
           <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(s)">编辑</AppButton>
           <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(s.id!)">删除</AppButton>

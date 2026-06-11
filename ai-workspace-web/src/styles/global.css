@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
+/* 暗色模式采用 class 策略：祖先元素带 .dark 时 dark: 变体生效（由 theme store 切换 documentElement）。 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 html,
 body,
 #app {
@@ -8,6 +11,15 @@ body,
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', sans-serif;
+}
+
+/* 主题间颜色过渡，避免切换瞬间生硬跳变 */
+html {
+  color-scheme: light;
+  transition: background-color 0.2s ease;
+}
+html.dark {
+  color-scheme: dark;
 }
 
 ::-webkit-scrollbar {
@@ -23,4 +35,11 @@ body,
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: theme(--color-zinc-600);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: theme(--color-zinc-500);
 }

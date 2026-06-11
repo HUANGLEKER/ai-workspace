@@ -14,6 +14,8 @@ func registerAuthRoutes(rg *gin.RouterGroup) {
 	g.POST("/logout", handler.Logout)
 	// /info 需要登录才能查询
 	g.GET("/info", middleware.JWTAuth(), handler.GetAuthInfo)
+	// 修改密码
+	g.PUT("/password", middleware.JWTAuth(), handler.UpdatePassword)
 }
 
 func registerUserRoutes(rg *gin.RouterGroup) {

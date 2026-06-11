@@ -3,9 +3,9 @@
     <div class="mb-4 flex items-start justify-between gap-4">
       <div class="flex items-center gap-2.5">
         <AppButton size="icon" :icon="ArrowLeft" @click="router.back()" />
-        <h2 class="text-lg font-semibold text-zinc-800">
+        <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">
           文档管理
-          <span v-if="kbName" class="text-sm font-normal text-zinc-500">— {{ kbName }}</span>
+          <span v-if="kbName" class="text-sm font-normal text-zinc-500 dark:text-zinc-400">— {{ kbName }}</span>
         </h2>
       </div>
       <div class="flex gap-2">

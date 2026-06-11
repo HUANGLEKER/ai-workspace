@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">工具中心</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">工具中心</h2>
       <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建工具</AppButton>
     </div>
 

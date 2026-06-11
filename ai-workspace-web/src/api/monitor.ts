@@ -8,18 +8,17 @@ import request from './request'
 
 /** 服务器运行时指标，由 JDK MXBeans 采集 */
 export interface ServerInfo {
-  cpu: { cores: number; sysUsedPercent: number; procUsedPercent: number }
+  cpu: { cores: number; usedPercent: number; procUsedPercent: number }
   memory: { total: number; used: number; usedPercent: number }
-  jvm: {
+  runtime: {
     version: string
-    vendor: string
-    uptime: number
-    max: number
-    total: number
-    used: number
+    numGoroutine: number
+    heapAlloc: number
+    heapSys: number
+    heapInuse: number
     usedPercent: number
   }
-  os: { name: string; arch: string; version: string }
+  os: { goos: string; goarch: string }
   disks: { path: string; total: number; used: number; usedPercent: number }[]
 }
 
@@ -30,8 +29,8 @@ export interface ServiceHealth {
   /** 被探测的 URL 或地址 */
   target: string
   /** 探测延迟（毫秒），DOWN 时无意义 */
-  latencyMs: number
-  error: string | null
+  latency: number
+  message: string | null
 }
 
 export const getServerInfo = () =>

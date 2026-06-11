@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center justify-end gap-3 text-sm text-zinc-500">
+  <div class="flex items-center justify-end gap-3 text-sm text-zinc-500 dark:text-zinc-400">
     <span>共 {{ total }} 条</span>
     <AppSelect
       :model-value="size"
@@ -10,15 +10,15 @@
     />
     <div class="flex items-center gap-1">
       <button
-        class="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+        class="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
         :disabled="page <= 1"
         @click="go(page - 1)"
       >
         <ChevronLeft class="h-4 w-4" />
       </button>
-      <span class="px-2 text-zinc-800">{{ page }} / {{ pageCount }}</span>
+      <span class="px-2 text-zinc-800 dark:text-zinc-100">{{ page }} / {{ pageCount }}</span>
       <button
-        class="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+        class="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
         :disabled="page >= pageCount"
         @click="go(page + 1)"
       >

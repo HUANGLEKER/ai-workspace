@@ -9,6 +9,8 @@
  */
 import axios from 'axios'
 import { toast } from '@/components/ui/toast'
+import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 
 const request = axios.create({
   baseURL: '/api',
@@ -35,10 +37,11 @@ request.interceptors.response.use(
   },
   error => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      // 避免登录页本身触发 401 后陷入无限重定向
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login'
+      // 清空鉴权态（同时同步 Store 与 localStorage），再用 router 跳转避免整页刷新
+      useAuthStore().logout()
+      const current = router.currentRoute.value
+      if (current.path !== '/login') {
+        void router.push({ path: '/login', query: { redirect: current.fullPath } })
       }
       return Promise.reject(error)
     }

@@ -1,12 +1,12 @@
 <template>
-  <div class="relative overflow-x-auto rounded-xl border border-zinc-200/80">
+  <div class="relative overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-zinc-800">
     <table class="w-full border-collapse text-sm">
       <thead>
-        <tr class="border-b border-zinc-200/80 bg-zinc-50">
+        <tr class="border-b border-zinc-200/80 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
           <th
             v-for="col in columns"
             :key="col.key"
-            class="whitespace-nowrap px-4 py-3 text-xs font-medium text-zinc-500"
+            class="whitespace-nowrap px-4 py-3 text-xs font-medium text-zinc-500 dark:text-zinc-400"
             :class="alignClass(col.align)"
             :style="col.width ? { width: col.width, minWidth: col.width } : undefined"
           >
@@ -18,12 +18,12 @@
         <tr
           v-for="(row, rIdx) in data"
           :key="rIdx"
-          class="border-b border-zinc-200/80 last:border-b-0 transition-all duration-200 ease-out hover:bg-zinc-100/50"
+          class="border-b border-zinc-200/80 last:border-b-0 transition-all duration-200 ease-out hover:bg-zinc-100/50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
         >
           <td
             v-for="col in columns"
             :key="col.key"
-            class="px-4 py-3 text-zinc-800"
+            class="px-4 py-3 text-zinc-800 dark:text-zinc-200"
             :class="alignClass(col.align)"
           >
             <slot :name="`cell-${col.key}`" :row="row">

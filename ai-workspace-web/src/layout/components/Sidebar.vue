@@ -1,14 +1,14 @@
 <template>
   <aside
-    class="relative flex h-full shrink-0 flex-col border-r border-zinc-200/80 bg-zinc-50 transition-all duration-200 ease-out"
+    class="relative flex h-full shrink-0 flex-col border-r border-zinc-200/80 bg-zinc-50 transition-all duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-900"
     :class="collapsed ? 'w-[72px]' : 'w-[260px]'"
   >
     <!-- Logo -->
-    <div class="flex h-14 items-center gap-2.5 border-b border-zinc-200/80 px-4">
-      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-zinc-900">
-        <Bot class="h-4.5 w-4.5 text-white" />
+    <div class="flex h-14 items-center gap-2.5 border-b border-zinc-200/80 px-4 dark:border-zinc-800">
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100">
+        <Bot class="h-4.5 w-4.5 text-white dark:text-zinc-900" />
       </div>
-      <span v-if="!collapsed" class="truncate text-sm font-semibold text-zinc-800">AI Workspace</span>
+      <span v-if="!collapsed" class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">AI Workspace</span>
     </div>
 
     <!-- 导航 -->
@@ -16,11 +16,11 @@
       <template v-for="group in visibleGroups" :key="group.label">
         <div
           v-if="group.label && !collapsed"
-          class="mb-1 mt-4 px-3 text-xs font-medium text-zinc-400 first:mt-0"
+          class="mb-1 mt-4 px-3 text-xs font-medium text-zinc-400 first:mt-0 dark:text-zinc-500"
         >
           {{ group.label }}
         </div>
-        <div v-else-if="group.label && collapsed" class="my-3 h-px bg-zinc-200/80" />
+        <div v-else-if="group.label && collapsed" class="my-3 h-px bg-zinc-200/80 dark:bg-zinc-800" />
 
         <router-link
           v-for="item in group.items"
@@ -29,8 +29,8 @@
           class="mb-0.5 flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all duration-200 ease-out"
           :class="[
             isActive(item.path)
-              ? 'bg-zinc-900 text-white'
-              : 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-800',
+              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+              : 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
             collapsed ? 'justify-center px-0' : ''
           ]"
         >
@@ -45,7 +45,7 @@
 
     <!-- 折叠按钮 -->
     <button
-      class="flex h-11 items-center justify-center border-t border-zinc-200/80 text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-100/50 hover:text-zinc-800"
+      class="flex h-11 items-center justify-center border-t border-zinc-200/80 text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-100/50 hover:text-zinc-800 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
       @click="$emit('toggle')"
     >
       <PanelLeft class="h-4 w-4" />

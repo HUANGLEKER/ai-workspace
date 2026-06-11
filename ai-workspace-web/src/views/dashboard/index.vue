@@ -2,8 +2,8 @@
   <div class="pb-6">
     <div class="mb-6 flex items-start justify-between gap-4">
       <div>
-        <h2 class="text-lg font-semibold text-zinc-800">仪表盘</h2>
-        <p class="mt-0.5 text-sm text-zinc-500">{{ todayText }}</p>
+        <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">仪表盘</h2>
+        <p class="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{{ todayText }}</p>
       </div>
     </div>
 
@@ -12,42 +12,32 @@
       <div
         v-for="stat in stats"
         :key="stat.label"
-        class="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:shadow-md"
+        class="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
       >
         <div class="flex items-center justify-between">
-          <span class="text-sm text-zinc-500">{{ stat.label }}</span>
-          <component :is="stat.icon" class="h-4 w-4 text-zinc-400" />
+          <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ stat.label }}</span>
+          <component :is="stat.icon" class="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
         </div>
-        <div class="mt-3 text-3xl font-semibold tracking-tight text-zinc-800">{{ stat.value }}</div>
+        <div class="mt-3 text-3xl font-semibold tracking-tight text-zinc-800 dark:text-zinc-100">{{ stat.value }}</div>
       </div>
     </div>
 
-    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div class="mt-4">
       <!-- 快速入口 -->
-      <AppCard title="快速入口" class="lg:col-span-2">
-        <div class="grid grid-cols-3 gap-3">
+      <AppCard title="快速入口">
+        <div class="grid grid-cols-3 gap-3 lg:grid-cols-6">
           <button
             v-for="action in quickActions"
             :key="action.label"
-            class="flex flex-col items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-white px-2 py-5 text-sm text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 hover:text-zinc-800 hover:shadow-sm"
+            class="flex flex-col items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-white px-2 py-5 text-sm text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 hover:text-zinc-800 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
             @click="router.push(action.path)"
           >
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100/50">
-              <component :is="action.icon" class="h-5 w-5 text-zinc-800" />
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100/50 dark:bg-zinc-800">
+              <component :is="action.icon" class="h-5 w-5 text-zinc-800 dark:text-zinc-100" />
             </div>
             {{ action.label }}
           </button>
         </div>
-      </AppCard>
-
-      <!-- 系统信息 -->
-      <AppCard title="系统信息">
-        <dl class="flex flex-col gap-3 text-sm">
-          <div v-for="info in sysInfo" :key="info.label" class="flex items-center justify-between">
-            <dt class="text-zinc-500">{{ info.label }}</dt>
-            <dd class="text-zinc-800">{{ info.value }}</dd>
-          </div>
-        </dl>
       </AppCard>
     </div>
   </div>
@@ -85,8 +75,9 @@ onMounted(async () => {
     stats.value[1].value = data.kbCount
     stats.value[2].value = data.docCount
     stats.value[3].value = data.fileCount
-  } catch {
-    // stats stay at 0 on error
+  } catch (err) {
+    // 拉取失败时统计保持 0，记录便于排查
+    console.error('[dashboard] 加载统计数据失败：', err)
   }
 })
 
@@ -99,11 +90,5 @@ const quickActions = [
   { label: 'Agent', icon: Cpu, path: '/agent' }
 ]
 
-const sysInfo = [
-  { label: '版本', value: 'v1.0.0' },
-  { label: '前端框架', value: 'Vue 3 + Tailwind' },
-  { label: '后端框架', value: 'Go + Gin' },
-  { label: 'AI 框架', value: 'LangChain + LangGraph' },
-  { label: '向量数据库', value: 'ChromaDB' }
-]
+
 </script>

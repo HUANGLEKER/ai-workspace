@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Workspace</title>
+    <script>
+      // 首屏防闪烁：在应用挂载前根据持久化偏好（或系统）预置 .dark，避免亮→暗跳变
+      (function () {
+        var p = localStorage.getItem('theme') || 'system'
+        var dark = p === 'dark' || (p === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark')
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

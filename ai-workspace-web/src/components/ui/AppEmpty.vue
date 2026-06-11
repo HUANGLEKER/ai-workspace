@@ -1,9 +1,9 @@
 <template>
   <div class="flex flex-col items-center justify-center gap-3 py-10 text-center">
     <slot name="icon">
-      <component :is="icon || Inbox" class="h-10 w-10 text-zinc-300" />
+      <component :is="icon || Inbox" class="h-10 w-10 text-zinc-300 dark:text-zinc-600" />
     </slot>
-    <p class="text-sm text-zinc-500">{{ description }}</p>
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ description }}</p>
     <slot />
   </div>
 </template>

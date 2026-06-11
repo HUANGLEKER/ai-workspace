@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">提示词中心</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">提示词中心</h2>
       <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建提示词</AppButton>
     </div>
 
@@ -18,14 +18,14 @@
       <div
         v-for="p in prompts"
         :key="p.id"
-        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
       >
         <div class="flex items-center justify-between gap-2">
-          <span class="truncate text-sm font-semibold text-zinc-800">{{ p.title }}</span>
+          <span class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ p.title }}</span>
           <AppTag v-if="p.category" variant="info">{{ p.category }}</AppTag>
         </div>
-        <p class="mt-1.5 text-sm text-zinc-500">{{ p.description || '—' }}</p>
-        <div class="mt-3 max-h-28 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-zinc-50 p-3 text-sm text-zinc-500">{{ p.content }}</div>
+        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ p.description || '—' }}</p>
+        <div class="mt-3 max-h-28 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-zinc-50 dark:bg-zinc-950 p-3 text-sm text-zinc-500 dark:text-zinc-400">{{ p.content }}</div>
         <div class="mt-3 flex justify-end gap-1">
           <AppButton size="sm" variant="ghost" :icon="Copy" @click="copy(p.content)">复制</AppButton>
           <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(p)">编辑</AppButton>

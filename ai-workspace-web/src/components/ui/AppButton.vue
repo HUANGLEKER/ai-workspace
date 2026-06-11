@@ -2,7 +2,7 @@
   <button
     :type="nativeType"
     :disabled="disabled || loading"
-    class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+    class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-zinc-300"
     :class="[variantClass, sizeClass, block ? 'w-full' : '']"
   >
     <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
@@ -31,11 +31,11 @@ const props = withDefaults(
 const variantClass = computed(
   () =>
     ({
-      primary: 'bg-zinc-900 text-white hover:bg-zinc-800',
-      secondary: 'border border-zinc-200/80 bg-white text-zinc-800 hover:bg-zinc-50',
-      ghost: 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-800',
+      primary: 'bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200',
+      secondary: 'border border-zinc-200/80 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700',
+      ghost: 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
       danger: 'bg-red-600 text-white hover:bg-red-500',
-      'danger-ghost': 'text-red-500 hover:bg-red-50'
+      'danger-ghost': 'text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40'
     })[props.variant]
 )
 

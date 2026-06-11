@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">Agent</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Agent</h2>
       <AppButton variant="primary" :icon="Plus" @click="openDialog()">新建 Agent</AppButton>
     </div>
 
@@ -10,22 +10,22 @@
       <div
         v-for="a in agents"
         :key="a.id"
-        class="flex flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
+        class="flex flex-col rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
       >
         <div class="mb-2 flex items-center gap-3">
           <AppAvatar :icon="Bot" variant="dark" size="lg" />
           <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-semibold text-zinc-800">{{ a.name }}</div>
+            <div class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ a.name }}</div>
             <AppTag :variant="a.enabled === 1 ? 'success' : 'info'">{{ a.enabled === 1 ? '启用' : '禁用' }}</AppTag>
           </div>
         </div>
-        <p class="line-clamp-2 flex-1 text-sm text-zinc-500">{{ a.description || '暂无描述' }}</p>
-        <div class="mt-2 flex gap-3 text-xs text-zinc-400">
+        <p class="line-clamp-2 flex-1 text-sm text-zinc-500 dark:text-zinc-400">{{ a.description || '暂无描述' }}</p>
+        <div class="mt-2 flex gap-3 text-xs text-zinc-400 dark:text-zinc-500">
           <span>模型：{{ a.model || '默认' }}</span>
           <span>工具 {{ parseNames(a.tools).length }}</span>
           <span>MCP {{ parseNames(a.mcpServers).length }}</span>
         </div>
-        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 pt-3">
+        <div class="mt-4 flex gap-1 border-t border-zinc-200/80 dark:border-zinc-800 pt-3">
           <AppButton size="sm" variant="ghost" :icon="Play" @click="openRun(a)">运行</AppButton>
           <AppButton size="sm" variant="ghost" :icon="Pencil" @click="openDialog(a)">编辑</AppButton>
           <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(a.id!)">删除</AppButton>
@@ -74,19 +74,19 @@
         <AppButton variant="primary" :loading="running" @click="doRun">运行</AppButton>
       </div>
       <div v-if="runOutput" class="mt-4">
-        <div class="mb-1.5 text-sm font-semibold text-zinc-800">输出</div>
-        <pre class="whitespace-pre-wrap break-words rounded-xl bg-zinc-50 p-3 text-sm text-zinc-800">{{ runOutput }}</pre>
+        <div class="mb-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-100">输出</div>
+        <pre class="whitespace-pre-wrap break-words rounded-xl bg-zinc-50 dark:bg-zinc-950 p-3 text-sm text-zinc-800 dark:text-zinc-100">{{ runOutput }}</pre>
       </div>
       <div v-if="runSteps.length" class="mt-4">
-        <div class="mb-2 text-sm font-semibold text-zinc-800">执行轨迹</div>
-        <ol class="relative flex flex-col gap-3 border-l border-zinc-200/80 pl-4">
+        <div class="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">执行轨迹</div>
+        <ol class="relative flex flex-col gap-3 border-l border-zinc-200/80 dark:border-zinc-800 pl-4">
           <li v-for="(s, i) in runSteps" :key="i" class="relative">
             <span
               class="absolute -left-[21.5px] top-1.5 h-2.5 w-2.5 rounded-full"
-              :class="s.type === 'warning' ? 'bg-amber-400' : 'bg-zinc-900'"
+              :class="s.type === 'warning' ? 'bg-amber-400' : 'bg-zinc-900 dark:bg-zinc-100'"
             />
-            <div class="text-xs text-zinc-400">{{ stepLabel(s.type) }}</div>
-            <div class="whitespace-pre-wrap break-words text-sm text-zinc-500">{{ stepText(s) }}</div>
+            <div class="text-xs text-zinc-400 dark:text-zinc-500">{{ stepLabel(s.type) }}</div>
+            <div class="whitespace-pre-wrap break-words text-sm text-zinc-500 dark:text-zinc-400">{{ stepText(s) }}</div>
           </li>
         </ol>
       </div>

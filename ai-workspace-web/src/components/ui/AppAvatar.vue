@@ -1,7 +1,7 @@
 <template>
   <div
     class="flex shrink-0 items-center justify-center rounded-xl"
-    :class="[sizeClass, variant === 'dark' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500']"
+    :class="[sizeClass, variant === 'dark' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400']"
   >
     <component :is="icon" v-if="icon" :class="iconSizeClass" />
     <span v-else class="text-sm font-medium">{{ text?.slice(0, 1).toUpperCase() }}</span>

@@ -1,8 +1,8 @@
 <template>
-  <div class="flex h-[calc(100vh-104px)] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)]">
+  <div class="flex h-[calc(100vh-104px)] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900">
     <!-- 顶部：知识库选择 -->
-    <div class="flex h-14 shrink-0 items-center gap-3.5 border-b border-zinc-200/80 px-5">
-      <div class="mr-auto flex items-center gap-2 text-sm font-semibold text-zinc-800">
+    <div class="flex h-14 shrink-0 items-center gap-3.5 border-b border-zinc-200/80 px-5 dark:border-zinc-800">
+      <div class="mr-auto flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
         <FileSearch class="h-4.5 w-4.5" />
         知识库问答
       </div>
@@ -18,14 +18,14 @@
     </div>
 
     <!-- 问答区 -->
-    <div ref="answersRef" class="flex flex-1 flex-col gap-6 overflow-y-auto p-5">
-      <div v-if="!selectedKbId" class="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400">
-        <BookOpen class="h-12 w-12 text-zinc-200" />
+    <div ref="containerRef" class="flex flex-1 flex-col gap-6 overflow-y-auto p-5">
+      <div v-if="!selectedKbId" class="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400 dark:text-zinc-500">
+        <BookOpen class="h-12 w-12 text-zinc-200 dark:text-zinc-700" />
         <p class="text-sm">请先在上方选择一个知识库</p>
       </div>
 
-      <div v-else-if="turns.length === 0 && !streaming" class="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400">
-        <FileSearch class="h-12 w-12 text-zinc-200" />
+      <div v-else-if="turns.length === 0 && !streaming" class="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400 dark:text-zinc-500">
+        <FileSearch class="h-12 w-12 text-zinc-200 dark:text-zinc-700" />
         <p class="text-sm">基于「{{ selectedKbName }}」提问，回答将引用文档内容</p>
       </div>
 
@@ -33,7 +33,7 @@
         <!-- 问题 -->
         <div class="flex flex-row-reverse items-start gap-3">
           <AppAvatar :icon="User" />
-          <div class="max-w-[72%] break-words rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm leading-relaxed text-white">
+          <div class="max-w-[72%] break-words rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm leading-relaxed text-white dark:bg-zinc-100 dark:text-zinc-900">
             {{ turn.question }}
           </div>
         </div>
@@ -41,26 +41,26 @@
         <!-- 回答 -->
         <div class="flex items-start gap-3">
           <AppAvatar :icon="Bot" variant="dark" />
-          <div class="max-w-[80%] break-words rounded-2xl bg-zinc-100/50 px-4 py-3 text-sm leading-relaxed text-zinc-800">
-            <div class="prose prose-zinc max-w-none prose-pre:overflow-x-auto" v-html="renderMd(turn.answer)" />
+          <div class="max-w-[80%] break-words rounded-2xl bg-zinc-100/50 px-4 py-3 text-sm leading-relaxed text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
+            <MarkdownView :content="turn.answer" />
             <span v-if="streaming && idx === turns.length - 1 && !turn.answer" class="inline-block animate-pulse font-bold">▋</span>
 
             <!-- 引用来源 -->
-            <div v-if="turn.sources.length" class="mt-3 border-t border-dashed border-zinc-200/80 pt-2.5">
-              <div class="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500">
+            <div v-if="turn.sources.length" class="mt-3 border-t border-dashed border-zinc-200/80 pt-2.5 dark:border-zinc-700">
+              <div class="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                 <FileText class="h-3.5 w-3.5" />
                 引用来源（{{ turn.sources.length }}）
               </div>
               <CollapsibleRoot v-for="(src, sIdx) in turn.sources" :key="sIdx" class="mb-1 last:mb-0">
                 <CollapsibleTrigger
-                  class="flex w-full items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-3 py-2 text-left text-sm text-zinc-800 transition-all duration-200 ease-out hover:bg-zinc-50 [&[data-state=open]>svg]:rotate-180"
+                  class="flex w-full items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-3 py-2 text-left text-sm text-zinc-800 transition-all duration-200 ease-out hover:bg-zinc-50 [&[data-state=open]>svg]:rotate-180 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
                 >
                   <span class="flex-1 truncate">{{ src.file_name || '未知文档' }}</span>
                   <AppTag variant="info">相关度 {{ (src.score * 100).toFixed(0) }}%</AppTag>
                   <ChevronDown class="h-4 w-4 shrink-0 text-zinc-400 transition-all duration-200 ease-out" />
                 </CollapsibleTrigger>
                 <CollapsibleContent
-                  class="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-xl bg-zinc-50 px-3 py-2 text-sm leading-relaxed text-zinc-500"
+                  class="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-xl bg-zinc-50 px-3 py-2 text-sm leading-relaxed text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400"
                 >
                   {{ src.content }}
                 </CollapsibleContent>
@@ -72,7 +72,7 @@
     </div>
 
     <!-- 输入区 -->
-    <div class="flex shrink-0 items-end gap-2.5 border-t border-zinc-200/80 px-4 py-3">
+    <div class="flex shrink-0 items-end gap-2.5 border-t border-zinc-200/80 px-4 py-3 dark:border-zinc-800">
       <AppTextarea
         v-model="question"
         :rows="1"
@@ -91,7 +91,7 @@
       </button>
       <button
         v-else
-        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white transition-all duration-200 ease-out hover:bg-zinc-800"
+        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white transition-all duration-200 ease-out hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
         :class="question.trim() && selectedKbId ? '' : 'pointer-events-none opacity-50'"
         @click="handleAsk"
       >
@@ -111,15 +111,15 @@
  *
  * 每轮问答独立持有一个 QaTurn 引用，流式 token 直接追加到该对象。
  */
-import { ref, computed, nextTick, onMounted } from 'vue'
 import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from 'radix-vue'
 import {
   FileSearch, BookOpen, FileText, Trash2, Bot, User, Send, CircleStop, ChevronDown
 } from 'lucide-vue-next'
-import MarkdownIt from 'markdown-it'
 import type { KnowledgeBase, RagSource } from '@/types'
 import { listKnowledgeBases, ragChatStream } from '@/api/kb'
-import { AppSelect, AppButton, AppTextarea, AppAvatar, AppTag, toast } from '@/components/ui'
+import { toast } from '@/components/ui'
+import { useChatScroll } from '@/composables/useChatScroll'
+import { useStreamingMarkdown } from '@/composables/useStreamingMarkdown'
 
 /** 单轮问答数据结构，流式输出期间 answer 逐步填充 */
 interface QaTurn {
@@ -128,17 +128,13 @@ interface QaTurn {
   sources: RagSource[]
 }
 
-const md = new MarkdownIt({ html: false, linkify: true, typographer: true })
-const renderMd = (content: string) => md.render(content || '')
-
 const knowledgeBases = ref<KnowledgeBase[]>([])
 const selectedKbId = ref<number>()
 const question = ref('')
 const streaming = ref(false)
 const turns = ref<QaTurn[]>([])
-const answersRef = ref<HTMLElement>()
+const { containerRef, scrollToBottom, scheduleScroll } = useChatScroll()
 let streamController: AbortController | null = null
-let scrollRaf = 0
 
 const kbOptions = computed(() => knowledgeBases.value.map((kb) => ({ label: kb.kbName, value: kb.id })))
 const selectedKbName = computed(
@@ -153,23 +149,6 @@ async function loadKbs() {
   } catch {
     knowledgeBases.value = []
   }
-}
-
-const scrollToBottom = async () => {
-  await nextTick()
-  if (answersRef.value) {
-    answersRef.value.scrollTop = answersRef.value.scrollHeight
-  }
-}
-
-function scheduleScroll() {
-  if (scrollRaf) return
-  scrollRaf = requestAnimationFrame(() => {
-    scrollRaf = 0
-    if (answersRef.value) {
-      answersRef.value.scrollTop = answersRef.value.scrollHeight
-    }
-  })
 }
 
 function resetConversation() {
@@ -196,22 +175,26 @@ function handleAsk() {
 
   streaming.value = true
   streamController = new AbortController()
+  // 节流渲染：token 高频到达时每帧至多把累积文本同步进 turn.answer 一次
+  const stream = useStreamingMarkdown((text) => { turn.answer = text })
 
   ragChatStream(
     { kbId: selectedKbId.value, question: q, sessionId: `rag-${selectedKbId.value}` },
     (text) => {
-      turn.answer += text
+      stream.append(text)
       scheduleScroll()
     },
     (sources) => {
       turn.sources = sources
     },
     () => {
+      stream.flush()
       streaming.value = false
       streamController = null
       scrollToBottom()
     },
     (err) => {
+      stream.flush()
       streaming.value = false
       streamController = null
       // 若连一个 token 都未收到则移除占位轮次，避免展示空气泡

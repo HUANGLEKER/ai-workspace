@@ -6,6 +6,7 @@
  * cleanJobLogs 为物理删除，sys_job_log 表不含 deleted 字段。
  */
 import request from './request'
+import type { PageResult } from '@/types'
 
 export interface SysJob {
   id?: number
@@ -36,10 +37,7 @@ export interface SysJobLog {
   createTime: string
 }
 
-export interface PageResult<T> {
-  records: T[]
-  total: number
-}
+
 
 export const pageJobs = (params: { page: number; size: number; jobName?: string }) =>
   request.get<unknown, PageResult<SysJob>>('/job/page', { params })

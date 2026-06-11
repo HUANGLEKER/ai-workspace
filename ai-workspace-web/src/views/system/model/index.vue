@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">模型管理</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">模型管理</h2>
       <AppButton variant="primary" :icon="Plus" @click="openDialog()">新增模型</AppButton>
     </div>
 

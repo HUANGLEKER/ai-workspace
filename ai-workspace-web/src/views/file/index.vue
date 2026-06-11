@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">文件中心</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">文件中心</h2>
       <AppUpload action="/api/file/upload" multiple @success="onUploadSuccess" @error="onUploadError">
         <AppButton variant="primary" :icon="Upload">上传文件</AppButton>
       </AppUpload>
@@ -17,7 +17,7 @@
       <AppTable :columns="columns" :data="files" :loading="loading">
         <template #cell-fileName="{ row }">
           <div class="flex items-center gap-2">
-            <component :is="fileIcon(row.fileType)" class="h-4.5 w-4.5 shrink-0 text-zinc-500" />
+            <component :is="fileIcon(row.fileType)" class="h-4.5 w-4.5 shrink-0 text-zinc-500 dark:text-zinc-400" />
             <span class="break-words">{{ row.fileName }}</span>
           </div>
         </template>

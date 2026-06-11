@@ -1,12 +1,12 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-zinc-50">
-    <div class="w-[400px] max-w-[calc(100vw-2rem)] rounded-2xl border border-zinc-200/80 bg-white p-10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)]">
+  <div class="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+    <div class="w-[400px] max-w-[calc(100vw-2rem)] rounded-2xl border border-zinc-200/80 bg-white p-10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900">
       <div class="mb-8 flex flex-col items-center gap-3">
-        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900">
-          <Bot class="h-6 w-6 text-white" />
+        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 dark:bg-zinc-100">
+          <Bot class="h-6 w-6 text-white dark:text-zinc-900" />
         </div>
-        <h1 class="text-xl font-semibold text-zinc-800">AI Workspace</h1>
-        <p class="text-sm text-zinc-500">登录你的个人 AI 中枢</p>
+        <h1 class="text-xl font-semibold text-zinc-800 dark:text-zinc-100">AI Workspace</h1>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">登录你的个人 AI 中枢</p>
       </div>
 
       <form class="flex flex-col gap-4" @submit.prevent="handleLogin">

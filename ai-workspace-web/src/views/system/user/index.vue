@@ -1,7 +1,7 @@
 <template>
   <div class="pb-6">
     <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800">用户管理</h2>
+      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">用户管理</h2>
       <AppButton variant="primary" :icon="Plus" @click="openDialog()">新增用户</AppButton>
     </div>
 
@@ -53,8 +53,8 @@
       <AppFormItem label="邮箱">
         <AppInput v-model="form.email" placeholder="请输入邮箱" />
       </AppFormItem>
-      <AppFormItem label="手机号">
-        <AppInput v-model="form.phone" placeholder="请输入手机号" />
+      <AppFormItem label="备注">
+        <AppInput v-model="form.remark" placeholder="请输入备注" />
       </AppFormItem>
       <AppFormItem label="状态">
         <AppRadioGroup v-model="form.status" numeric :options="[{ label: '启用', value: 1 }, { label: '禁用', value: 0 }]" />
@@ -98,14 +98,14 @@ const columns: TableColumn[] = [
   { key: 'username', label: '用户名', width: '130px' },
   { key: 'nickname', label: '昵称', width: '130px' },
   { key: 'email', label: '邮箱' },
-  { key: 'phone', label: '手机号', width: '130px', align: 'center' },
+  { key: 'remark', label: '备注' },
   { key: 'status', label: '状态', width: '90px', align: 'center' },
   { key: 'createTime', label: '创建时间', width: '170px', align: 'center' },
   { key: 'actions', label: '操作', width: '160px', align: 'center' }
 ]
 
 const form = reactive<SysUser>({
-  username: '', password: '', nickname: '', email: '', phone: '', status: 1
+  username: '', password: '', nickname: '', email: '', remark: '', status: 1
 })
 
 onMounted(loadUsers)
@@ -134,7 +134,7 @@ function openDialog(user?: SysUser) {
   if (user) {
     Object.assign(form, { ...user, password: '' })
   } else {
-    Object.assign(form, { username: '', password: '', nickname: '', email: '', phone: '', status: 1 })
+    Object.assign(form, { username: '', password: '', nickname: '', email: '', remark: '', status: 1 })
   }
   dialogVisible.value = true
 }
