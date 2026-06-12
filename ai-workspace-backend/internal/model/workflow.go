@@ -7,9 +7,9 @@ type Workflow struct {
 	Name        string `gorm:"column:name;size:100"          json:"name"`
 	Description string `gorm:"column:description;size:500"   json:"description"`
 	// LangGraph 工作流图定义 JSON，节点与边均在此字段中描述
-	Definition  string `gorm:"column:definition;type:text"   json:"definition"`
-	Model       string `gorm:"column:model;size:100"         json:"model"`
-	Enabled     int8   `gorm:"column:enabled;default:1"      json:"enabled"`
+	Definition string `gorm:"column:definition;type:text"   json:"definition"`
+	Model      string `gorm:"column:model;size:100"         json:"model"`
+	Enabled    int8   `gorm:"column:enabled;default:1"      json:"enabled"`
 }
 
 func (Workflow) TableName() string { return "workflow" }

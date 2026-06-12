@@ -11,7 +11,7 @@ type FileInfo struct {
 	// MIME 类型，如 image/png、application/pdf
 	FileType string `gorm:"column:file_type;size:100"   json:"fileType"`
 	// 归属用户 ID，注意此处使用 upload_by 而非 create_by，保持与 Spring Boot 表结构一致
-	UploadBy int64  `gorm:"column:upload_by;index"      json:"uploadBy"`
+	UploadBy int64 `gorm:"column:upload_by;index"      json:"uploadBy"`
 }
 
 func (FileInfo) TableName() string { return "file_info" }

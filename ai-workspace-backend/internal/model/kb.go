@@ -22,7 +22,7 @@ type KbDocument struct {
 	FileSize int64  `gorm:"column:file_size"             json:"fileSize"`
 	FileType string `gorm:"column:file_type;size:50"     json:"fileType"`
 	// 嵌入状态机：PENDING → PROCESSING → DONE / FAILED
-	Status   string `gorm:"column:status;size:20;default:PENDING" json:"status"`
+	Status string `gorm:"column:status;size:20;default:PENDING" json:"status"`
 }
 
 func (KbDocument) TableName() string { return "kb_document" }
@@ -31,7 +31,7 @@ func (KbDocument) TableName() string { return "kb_document" }
 // 每次触发文档嵌入（含重建）都写入一条记录，失败时保存错误信息用于排查。
 type KbChunkTask struct {
 	BaseModel
-	DocumentID int64  `gorm:"column:document_id;index"      json:"documentId"`
+	DocumentID int64 `gorm:"column:document_id;index"      json:"documentId"`
 	// 任务状态：PENDING / RUNNING / SUCCESS / FAILED
 	TaskStatus string `gorm:"column:task_status;size:20"    json:"taskStatus"`
 	ErrorMsg   string `gorm:"column:error_msg;type:text"    json:"errorMsg"`

@@ -97,7 +97,7 @@ FastAPI 使用 Redis DB 1；Go 后端使用 DB 0。切换嵌入模型后必须�
 
 ### 数据库
 
-`docker-compose.infra.yml` 将 `ai-workspace/sql/init.sql` 挂载为 MySQL 初始化脚本，但该文件当前为空（0 字节）。首次启动前需自行填入建表 SQL，或在服务起来后手动建表，否则数据库为空。
+`docker-compose.infra.yml` 将 `ai-workspace/sql/init.sql` 挂载为 MySQL 初始化脚本（仅数据卷首次初始化时执行），包含全部 19 张表的 DDL 与种子数据（admin/123456、ROLE_ADMIN、默认 chat_model）。**维护约定：任何表结构变更必须同步更新 init.sql**（可用 `docker exec ai-workspace-mysql mysqldump -uroot -p123456 --no-data ai_workspace` 重新导出）。
 
 ### 本地基础设施（全部 Docker 化）
 
@@ -191,7 +191,7 @@ FastAPI 健康检查：`GET http://localhost:8001/health`
 ## 数据库关键表
 
 - `sys_user`、`sys_role`、`sys_user_role` —— RBAC 系统（`role_code` 带 `ROLE_` 前缀）
-- `chat_session`、`chat_message`、`chat_model` —— chat 模块。`chat_model` 由 Go 后端完全管理；FastAPI **不**读 MySQL，模型名按请求透传。
+- `chat_session`、`chat_message`、`chat_model` —— chat 模块。`chat_model` 由 Go 后端完全管理；FastAPI **不**读 MySQL。多模型路由：Go 按会话/请求的模型名查 `chat_model`，将 `api_url`/`api_key` 以 `llm_config {api_base, api_key}` 字段随 `/chat`、`/rag/chat` 请求透传，FastAPI 据此按请求构建（LRU 缓存）LLM 客户端；未配置时回退 `.env` 的 `LLM_*`。`llm_config` 仅在服务间内网流转，不对客户端暴露。
 - `kb_knowledge_base`、`kb_document`、`kb_chunk_task` —— 知识库 + RAG 管道（`kb_chunk_task.task_status`：PENDING/RUNNING/SUCCESS/FAILED；`kb_document.status`：PENDING/PROCESSING/DONE/FAILED）
 - `file_info` —— 文件中心（归属列 `upload_by`）
 - `agent` —— Agent 定义，`tools` 是 JSON 数组字符串
@@ -201,7 +201,7 @@ FastAPI 健康检查：`GET http://localhost:8001/health`
 - `tool` —— 工具注册表
 - `mcp_server` —— MCP 服务器注册表；`transport` 为 sse/stdio
 
-所有表均使用 `BIGINT AUTO_INCREMENT` 主键、`deleted TINYINT` 软删除（通过 GORM soft_delete 插件）、`utf8mb4` 排序规则。时间戳由 GORM 的 `AutoCreateTime`/`AutoUpdateTime` 自动填充（`sys_job_log` 例外——只有 `create_time`）。
+所有表均使用 `BIGINT AUTO_INCREMENT` 主键、`deleted BIGINT` 软删除（GORM soft_delete 插件 **milli 模式**：0=未删除，非 0=删除时刻毫秒时间戳）、`utf8mb4` 排序规则。`sys_user`/`sys_role` 的唯一键为 `(username, deleted)` / `(role_code, deleted)` 复合键，软删后可重建同名记录。时间戳由 GORM 的 `AutoCreateTime`/`AutoUpdateTime` 自动填充（`sys_job_log` 例外——只有 `create_time`）。
 
 ## Sprint 路线图
 

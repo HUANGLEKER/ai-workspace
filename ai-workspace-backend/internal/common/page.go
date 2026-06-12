@@ -11,7 +11,7 @@ type PageResult[T any] struct {
 	PageNum  int   `json:"pageNum"`
 	PageSize int   `json:"pageSize"`
 	// 字段名 records 与前端 PageResult<T> 类型（沿用 MyBatis Plus 分页结构）对齐
-	List     []T   `json:"records"`
+	List []T `json:"records"`
 }
 
 type PageQuery struct {

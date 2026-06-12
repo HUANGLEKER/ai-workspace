@@ -18,8 +18,8 @@ var Manager = newManager()
 var OnJobDone func(jobID int64, jobName, invokeTarget, params string, status int8, msg string, costMs int64)
 
 type jobManager struct {
-	mu       sync.Mutex
-	c        *cron.Cron
+	mu sync.Mutex
+	c  *cron.Cron
 	// entryMap 存储 jobID -> cron.EntryID 的映射，用于动态移除任务
 	entryMap map[int64]cron.EntryID
 }
@@ -104,8 +104,8 @@ func ValidateCron(expr string) error {
 func (m *jobManager) runJob(jobID int64, jobName, invokeTarget, params string, handler JobHandler) {
 	start := time.Now()
 	var (
-		status  int8
-		msg     string
+		status int8
+		msg    string
 	)
 	if err := handler.Execute(params); err != nil {
 		status = 1 // 失败

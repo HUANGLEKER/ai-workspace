@@ -8,15 +8,15 @@ type McpServer struct {
 	Name        string `gorm:"column:name;size:100"         json:"name"`
 	Description string `gorm:"column:description;size:500"  json:"description"`
 	// sse: HTTP SSE 传输；stdio: 标准输入输出（仅本地）
-	Transport   string `gorm:"column:transport;size:20"     json:"transport"`
+	Transport string `gorm:"column:transport;size:20"     json:"transport"`
 	// SSE 服务器基础 URL，连通性检测与 Agent 运行时均使用此字段
-	URL         string `gorm:"column:url;size:500"          json:"url"`
+	URL string `gorm:"column:url;size:500"          json:"url"`
 	// stdio 传输的命令行启动指令
-	Command     string `gorm:"column:command;size:500"      json:"command"`
+	Command string `gorm:"column:command;size:500"      json:"command"`
 	// 扩展配置 JSON：{"headers":{...},"env":{...},"args":[...]}
-	Config      string `gorm:"column:config;type:text"      json:"config"`
+	Config string `gorm:"column:config;type:text"      json:"config"`
 	// 1=启用，0=禁用
-	Enabled     int8   `gorm:"column:enabled;default:1"     json:"enabled"`
+	Enabled int8 `gorm:"column:enabled;default:1"     json:"enabled"`
 }
 
 func (McpServer) TableName() string { return "mcp_server" }
