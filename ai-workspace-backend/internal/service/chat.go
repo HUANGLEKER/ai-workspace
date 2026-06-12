@@ -85,6 +85,14 @@ func (s *ChatService) AutoTitleFromFirstMessage(sess *model.ChatSession, content
 	return title
 }
 
+// SetSystemPrompt 设置/清除会话级系统提示词（空串=清除），先校验归属（防 IDOR）
+func (s *ChatService) SetSystemPrompt(id, userID int64, prompt string) error {
+	if err := s.getOwned(id, userID); err != nil {
+		return err
+	}
+	return s.db.Model(&model.ChatSession{}).Where("id = ?", id).Update("system_prompt", prompt).Error
+}
+
 // RenameSession 重命名会话，先校验归属再更新标题（防 IDOR）
 func (s *ChatService) RenameSession(id, userID int64, title string) error {
 	if err := s.getOwned(id, userID); err != nil {

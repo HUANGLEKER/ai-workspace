@@ -40,6 +40,9 @@ export const createSession = (data: { title?: string; modelName?: string }) =>
 export const renameSession = (id: number, title: string) =>
   request.put<unknown, void>(`/chat/session/${id}`, { title })
 
+export const updateSessionPrompt = (id: number, systemPrompt: string) =>
+  request.put<unknown, void>(`/chat/session/${id}/prompt`, { systemPrompt })
+
 export const deleteSession = (id: number) =>
   request.delete<unknown, void>(`/chat/session/${id}`)
 

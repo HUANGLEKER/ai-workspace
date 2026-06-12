@@ -9,6 +9,8 @@ type ChatSession struct {
 	Title  string `gorm:"column:title;size:200"     json:"title"`
 	// 会话绑定的模型名称，由前端从 chat_model 列表选定后传入，FastAPI 不读 MySQL
 	ModelName string `gorm:"column:model_name;size:100" json:"modelName"`
+	// 会话级系统提示词（来自提示词中心），非空时由 Go 侧拼到上下文首条 system 消息
+	SystemPrompt string `gorm:"column:system_prompt;type:text" json:"systemPrompt"`
 }
 
 func (ChatSession) TableName() string { return "chat_session" }

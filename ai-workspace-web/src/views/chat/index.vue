@@ -84,7 +84,17 @@
       <template v-else>
         <!-- 对话标题栏 -->
         <div class="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200/80 px-5 dark:border-zinc-800">
-          <span class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ currentSession.title }}</span>
+          <div class="flex min-w-0 items-center gap-2">
+            <span class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ currentSession.title }}</span>
+            <button
+              v-if="currentSession.systemPrompt"
+              class="flex shrink-0 items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-200 hover:text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+              :title="'系统提示词：' + currentSession.systemPrompt + '（点击移除）'"
+              @click="clearSystemPrompt"
+            >
+              <Sparkles class="h-3 w-3" />提示词<X class="h-3 w-3" />
+            </button>
+          </div>
           <div class="flex items-center gap-1">
             <AppButton v-if="artifact.artifacts.value.length && !artifact.open.value" variant="ghost" size="sm" :icon="LayoutPanelLeft" @click="artifact.show(artifact.artifacts.value)">Artifact</AppButton>
             <AppButton variant="ghost" size="sm" :icon="Trash2" @click="clearMessages">清空</AppButton>
@@ -136,10 +146,11 @@
             </div>
 
             <!-- 输入区域 -->
-            <div class="shrink-0 border-t border-zinc-200/80 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+            <div class="relative shrink-0 border-t border-zinc-200/80 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+              <PromptPicker ref="pickerRef" :open="pickerOpen" :query="pickerQuery" @use="handlePromptUse" />
               <div class="mb-2 flex items-center justify-between">
                 <AppSelect v-model="selectedModel" :options="modelOptions" placeholder="选择模型" class="!w-44 max-w-44" />
-                <span class="text-xs text-zinc-400 dark:text-zinc-500">Enter 发送 · Shift + Enter 换行</span>
+                <span class="text-xs text-zinc-400 dark:text-zinc-500">Enter 发送 · Shift + Enter 换行 · / 提示词</span>
               </div>
               <div class="flex items-end gap-2.5">
                 <AppTextarea v-model="inputText" :rows="1" auto-grow placeholder="输入消息..." @keydown="onInputKeydown" />
@@ -200,13 +211,14 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'radix-vue'
-import { Plus, Trash2, Pencil, Send, CircleStop, MessageSquare, PanelLeft, ArrowDown, LayoutPanelLeft } from 'lucide-vue-next'
+import { Plus, Trash2, Pencil, Send, CircleStop, MessageSquare, PanelLeft, ArrowDown, LayoutPanelLeft, Sparkles, X } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import type { ChatSession, ChatMessage, TokenUsage } from '@/types'
-import { sendMessageStream } from '@/api/chat'
+import { sendMessageStream, updateSessionPrompt } from '@/api/chat'
 import { useChatStore } from '@/stores/chat'
 import { AppButton, AppEmpty, AppLoading, AppSelect, AppTextarea, AppTooltip, toast, confirm } from '@/components/ui'
 import ChatMessageList from '@/components/chat/ChatMessageList.vue'
+import PromptPicker from '@/components/chat/PromptPicker.vue'
 import ArtifactPanel from '@/components/chat/ArtifactPanel.vue'
 import { useStreamingMarkdown } from '@/composables/useStreamingMarkdown'
 import { useThinkingPhases } from '@/composables/useThinkingPhases'
@@ -356,7 +368,56 @@ onBeforeUnmount(() => {
   if (fadeTimer) clearTimeout(fadeTimer)
 })
 
+// ── 提示词选择器（P1-5）：输入框以 / 开头唤起，键盘事件由此转发 ──
+const pickerRef = ref<InstanceType<typeof PromptPicker> | null>(null)
+const pickerOpen = computed(() => !!currentSession.value && !streaming.value && inputText.value.startsWith('/'))
+const pickerQuery = computed(() => (pickerOpen.value ? inputText.value.slice(1) : ''))
+
+async function handlePromptUse(text: string, asSystem: boolean) {
+  if (!asSystem) {
+    inputText.value = text
+    return
+  }
+  if (!currentSession.value) return
+  try {
+    await updateSessionPrompt(currentSession.value.id, text)
+    currentSession.value.systemPrompt = text
+    inputText.value = ''
+    toast.success('已设为本会话系统提示词')
+  } catch {
+    toast.error('设置失败')
+  }
+}
+
+async function clearSystemPrompt() {
+  if (!currentSession.value) return
+  try {
+    await updateSessionPrompt(currentSession.value.id, '')
+    currentSession.value.systemPrompt = ''
+    toast.success('已移除系统提示词')
+  } catch {
+    toast.error('移除失败')
+  }
+}
+
 function onInputKeydown(e: KeyboardEvent) {
+  if (pickerOpen.value) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      pickerRef.value?.moveActive(e.key === 'ArrowDown' ? 1 : -1)
+      return
+    }
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault()
+      pickerRef.value?.chooseActive()
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      inputText.value = ''
+      return
+    }
+  }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault()
     handleSend()

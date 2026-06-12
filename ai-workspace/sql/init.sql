@@ -83,6 +83,7 @@ CREATE TABLE `chat_session` (
   `user_id` bigint NOT NULL COMMENT 'ç”¨æˆ·ID',
   `title` varchar(255) NOT NULL DEFAULT 'æ–°å¯¹è¯' COMMENT 'ä¼šè¯æ ‡é¢˜',
   `model_name` varchar(100) DEFAULT NULL COMMENT 'ä½¿ç”¨çš„æ¨¡åž‹',
+  `system_prompt` text COMMENT '会话级系统提示词',
   `deleted` bigint NOT NULL DEFAULT '0',
   `create_time` datetime DEFAULT NULL COMMENT 'åˆ›å»ºæ—¶é—´',
   `update_time` datetime DEFAULT NULL COMMENT 'æ›´æ–°æ—¶é—´',

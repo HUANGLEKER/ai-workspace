@@ -37,6 +37,7 @@ func registerChatRoutes(rg *gin.RouterGroup) {
 	g.GET("/session/list", handler.ListSessions)
 	g.POST("/session/add", handler.AddSession)
 	g.PUT("/session/:id", handler.RenameSession)
+	g.PUT("/session/:id/prompt", handler.UpdateSessionPrompt)
 	g.DELETE("/session/:id", handler.DeleteSession)
 	g.GET("/session/:id/messages", handler.ListMessages)
 

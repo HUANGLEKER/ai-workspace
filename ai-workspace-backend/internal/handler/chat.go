@@ -62,6 +62,27 @@ func RenameSession(c *gin.Context) {
 	common.OKMsg(c, "重命名成功")
 }
 
+// UpdateSessionPrompt PUT /api/chat/session/:id/prompt — 设置/清除会话级系统提示词
+// 来自提示词中心的"设为系统提示词"动作；空 systemPrompt 表示清除
+func UpdateSessionPrompt(c *gin.Context) {
+	id, err := parseID(c)
+	if err != nil {
+		return
+	}
+	var req struct {
+		SystemPrompt string `json:"systemPrompt"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.BadRequest(c, err.Error())
+		return
+	}
+	if err := service.ChatSvc.SetSystemPrompt(id, middleware.CurrentUserID(c), req.SystemPrompt); err != nil {
+		handleBizError(c, err)
+		return
+	}
+	common.OKMsg(c, "已更新系统提示词")
+}
+
 // DeleteSession DELETE /api/chat/session/:id — 删除会话（级联删除消息）
 func DeleteSession(c *gin.Context) {
 	id, err := parseID(c)
@@ -144,7 +165,12 @@ func ChatSend(c *gin.Context) {
 		common.ServerError(c, err.Error())
 		return
 	}
-	messages := make([]map[string]string, 0, len(history))
+	messages := make([]map[string]string, 0, len(history)+1)
+	// 会话绑定了系统提示词（来自提示词中心）：拼为上下文首条 system 消息，
+	// FastAPI 侧按 role 映射为 SystemMessage，无需任何改动
+	if sess.SystemPrompt != "" {
+		messages = append(messages, map[string]string{"role": "system", "content": sess.SystemPrompt})
+	}
 	for _, m := range history {
 		messages = append(messages, map[string]string{"role": m.Role, "content": m.Content})
 	}

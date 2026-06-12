@@ -109,6 +109,29 @@ func TestAutoTitleFromFirstMessage(t *testing.T) {
 	}
 }
 
+// 会话级系统提示词：本人可设置/清除，他人 403
+func TestSetSystemPrompt(t *testing.T) {
+	s := newChatSvc(t)
+	sess := mustCreateSession(t, s, userA, "sp")
+
+	if err := s.SetSystemPrompt(sess.ID, userA, "你是一个翻译助手"); err != nil {
+		t.Fatalf("设置失败: %v", err)
+	}
+	got, _ := s.GetOwnedSession(sess.ID, userA)
+	if got.SystemPrompt != "你是一个翻译助手" {
+		t.Fatalf("系统提示词未落库: %q", got.SystemPrompt)
+	}
+
+	assertBizCode(t, s.SetSystemPrompt(sess.ID, userB, "hacked"), common.CodeForbidden)
+
+	// 空串清除
+	_ = s.SetSystemPrompt(sess.ID, userA, "")
+	got, _ = s.GetOwnedSession(sess.ID, userA)
+	if got.SystemPrompt != "" {
+		t.Fatalf("应已清除: %q", got.SystemPrompt)
+	}
+}
+
 // 删除会话必须级联删除消息，且对 LLM 上下文不可见
 func TestDeleteSessionCascadesMessages(t *testing.T) {
 	s := newChatSvc(t)
