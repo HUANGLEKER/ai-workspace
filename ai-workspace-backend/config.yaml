@@ -35,3 +35,6 @@ log:
   max_backups: 7
   max_age: 30      # days
   compress: true
+
+ratelimit:
+  llm_per_minute: 20  # 每用户每分钟 LLM 端点请求上限；<=0 关闭

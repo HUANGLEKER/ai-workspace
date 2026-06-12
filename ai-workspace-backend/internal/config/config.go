@@ -8,13 +8,19 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	FastAPI  FastAPIConfig  `mapstructure:"fastapi"`
-	MinIO    MinIOConfig    `mapstructure:"minio"`
-	Log      LogConfig      `mapstructure:"log"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	Redis     RedisConfig     `mapstructure:"redis"`
+	JWT       JWTConfig       `mapstructure:"jwt"`
+	FastAPI   FastAPIConfig   `mapstructure:"fastapi"`
+	MinIO     MinIOConfig     `mapstructure:"minio"`
+	Log       LogConfig       `mapstructure:"log"`
+	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
+}
+
+type RateLimitConfig struct {
+	// 每用户每分钟允许的 LLM 端点请求数；<=0 表示关闭限流
+	LLMPerMinute int `mapstructure:"llm_per_minute"`
 }
 
 type ServerConfig struct {

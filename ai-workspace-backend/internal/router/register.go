@@ -30,7 +30,8 @@ func registerUserRoutes(rg *gin.RouterGroup) {
 
 func registerChatRoutes(rg *gin.RouterGroup) {
 	g := rg.Group("/chat")
-	g.POST("/send", handler.ChatSend)
+	// LLM 直通端点挂限流，防止刷请求造成 LLM 账单失控
+	g.POST("/send", middleware.LLMRateLimit(), handler.ChatSend)
 	g.GET("/session/list", handler.ListSessions)
 	g.POST("/session/add", handler.AddSession)
 	g.PUT("/session/:id", handler.RenameSession)
@@ -60,7 +61,7 @@ func registerKBRoutes(rg *gin.RouterGroup) {
 	doc.DELETE("/delete/:id", handler.DeleteDocument)
 
 	rag := rg.Group("/rag")
-	rag.POST("/chat", handler.RAGChat)
+	rag.POST("/chat", middleware.LLMRateLimit(), handler.RAGChat)
 	rag.POST("/rebuild", handler.RAGRebuild)
 }
 
@@ -79,7 +80,7 @@ func registerAgentRoutes(rg *gin.RouterGroup) {
 	g.POST("/add", handler.AddAgent)
 	g.PUT("/update", handler.UpdateAgent)
 	g.DELETE("/delete/:id", handler.DeleteAgent)
-	g.POST("/:id/run", handler.RunAgent)
+	g.POST("/:id/run", middleware.LLMRateLimit(), handler.RunAgent)
 }
 
 func registerWorkflowRoutes(rg *gin.RouterGroup) {
@@ -89,7 +90,7 @@ func registerWorkflowRoutes(rg *gin.RouterGroup) {
 	g.POST("/add", handler.AddWorkflow)
 	g.PUT("/update", handler.UpdateWorkflow)
 	g.DELETE("/delete/:id", handler.DeleteWorkflow)
-	g.POST("/:id/run", handler.RunWorkflow)
+	g.POST("/:id/run", middleware.LLMRateLimit(), handler.RunWorkflow)
 }
 
 func registerPromptRoutes(rg *gin.RouterGroup) {

@@ -75,6 +75,19 @@ export async function streamSSE(url: string, body: unknown, opts: StreamSSEOptio
       return
     }
 
+    // 后端约定错误（如限流 429）以 HTTP 200 + JSON 包装返回，并非 SSE 流。
+    // 不在此拦截的话这类响应没有任何 data: 行，会被静默当作空流结束。
+    const contentType = response.headers.get('content-type') ?? ''
+    if (contentType.includes('application/json')) {
+      try {
+        const result = await response.json()
+        onError(result.message || `请求失败：${result.code ?? '未知错误'}`)
+      } catch {
+        onError('请求失败：响应格式异常')
+      }
+      return
+    }
+
     const reader = response.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
