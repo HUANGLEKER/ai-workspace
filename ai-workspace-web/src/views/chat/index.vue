@@ -67,34 +67,41 @@
           <AppButton variant="ghost" size="sm" :icon="Trash2" @click="clearMessages">清空</AppButton>
         </div>
 
-        <!-- 消息列表 -->
+        <!-- 消息列表（外层为滚动容器，保持为原生 div 以便 useChatScroll 直接操作 scrollTop） -->
         <div ref="containerRef" class="flex flex-1 flex-col gap-5 overflow-y-auto p-5">
-          <div
-            v-for="(msg, idx) in messages"
-            :key="idx"
-            class="flex items-start gap-3"
-            :class="msg.role === 'user' ? 'flex-row-reverse' : ''"
-          >
-            <AppAvatar :icon="msg.role === 'user' ? User : Bot" :variant="msg.role === 'user' ? 'light' : 'dark'" />
+          <!--
+            TransitionGroup 承载列表语义；逐条消息的入场动画由 VueUse Motion 的 v-motion 指令
+            在各自挂载时独立驱动，互不影响 → 新消息插入既不会重播已有消息，也不会引起整列重排
+            抖动。tag 设为 contents：不产生额外盒子，消息直接参与外层 flex 间距（gap-5）。
+          -->
+          <TransitionGroup tag="div" name="msg" class="contents">
             <div
-              class="max-w-[72%] break-words rounded-2xl px-4 py-3 text-sm leading-relaxed"
-              :class="msg.role === 'user' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100/50 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'"
+              v-for="(msg, idx) in messages"
+              :key="msg.id ?? `local-${idx}`"
+              v-motion="messageMotion(msg.role, idx === noAnimateIdx)"
+              class="flex items-start gap-3"
+              :class="msg.role === 'user' ? 'flex-row-reverse' : ''"
             >
-              <MarkdownView v-if="msg.role === 'assistant'" :content="msg.content" />
-              <span v-else>{{ msg.content }}</span>
+              <AppAvatar :icon="msg.role === 'user' ? User : Bot" :variant="msg.role === 'user' ? 'light' : 'dark'" />
+              <div
+                class="max-w-[72%] break-words rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                :class="msg.role === 'user' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100/50 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'"
+              >
+                <MarkdownView v-if="msg.role === 'assistant'" :content="msg.content" />
+                <span v-else>{{ msg.content }}</span>
+              </div>
             </div>
-          </div>
+          </TransitionGroup>
 
-          <!-- 流式输出中 -->
-          <div v-if="streaming" class="flex items-start gap-3">
+          <!-- 流式输出中（流结束后仍保留 300ms 让光标平滑淡出，再提交进 messages） -->
+          <div v-if="streaming || caretFading" v-motion="assistantMessageMotion" class="flex items-start gap-3">
             <AppAvatar :icon="Bot" variant="dark" />
             <div class="max-w-[72%] break-words rounded-2xl bg-zinc-100/50 px-4 py-3 text-sm leading-relaxed text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-              <MarkdownView :content="streamDisplay" />
-              <span class="inline-block animate-pulse font-bold text-zinc-800 dark:text-zinc-100">▋</span>
+              <MarkdownView :content="streamDisplay" :caret="caretFading ? 'fade' : 'blink'" />
             </div>
           </div>
 
-          <div v-if="messages.length === 0 && !streaming" class="flex flex-1 flex-col items-center justify-center gap-2 text-zinc-400 dark:text-zinc-500">
+          <div v-if="messages.length === 0 && !streaming && !caretFading" class="flex flex-1 flex-col items-center justify-center gap-2 text-zinc-400 dark:text-zinc-500">
             <MessageSquare class="h-10 w-10 text-zinc-200 dark:text-zinc-700" />
             <p class="text-sm">发送消息开始对话</p>
           </div>
@@ -160,6 +167,7 @@ import { listModels, listSessions, createSession, deleteSession, listMessages, s
 import { toast, confirm, AppTooltip } from '@/components/ui'
 import { useChatScroll } from '@/composables/useChatScroll'
 import { useStreamingMarkdown } from '@/composables/useStreamingMarkdown'
+import { messageMotion, assistantMessageMotion } from '@/composables/useMessageMotion'
 
 const sessionsLoading = ref(false)
 const sessions = ref<ChatSession[]>([])
@@ -167,14 +175,53 @@ const currentSession = ref<ChatSession | null>(null)
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const streaming = ref(false)
+// 光标淡出态：流结束后短暂为 true，使 ChatGPT 风格光标平滑淡出，期间气泡保持挂载
+const caretFading = ref(false)
 const models = ref<ChatModel[]>([])
 const selectedModel = ref('')
 const collapsed = ref(false)
+// 流式气泡定稿后提交进 messages 的那条消息索引：该消息此前已可见，故跳过入场动画避免淡入重影
+const noAnimateIdx = ref(-1)
 
 const { containerRef, scrollToBottom, scheduleScroll } = useChatScroll()
 // 流式态与历史态分离：流式期间 token 累加到 streamMd，结束后将 text 提交进 messages
 const { text: streamText, display: streamDisplay, append: appendStream, flush: flushStream, reset: resetStream } = useStreamingMarkdown()
 let streamController: AbortController | null = null
+// 光标淡出定时器：切换会话/重新发送时需取消，避免把上一条流式结果误提交到新上下文
+let fadeTimer: ReturnType<typeof setTimeout> | null = null
+const CARET_FADE_MS = 300
+
+/**
+ * 流结束后的收尾：先进入淡出态让光标平滑消失，CARET_FADE_MS 后再把内容提交进 messages。
+ * 提交与卸载淡出气泡同帧发生，内容一致，视觉上无缝衔接，且不会出现「气泡 + 定稿消息」双重渲染。
+ */
+function finalizeStream(finalText: string) {
+  if (!finalText) {
+    caretFading.value = false
+    resetStream()
+    return
+  }
+  caretFading.value = true
+  fadeTimer = setTimeout(() => {
+    fadeTimer = null
+    // 该条已由流式气泡呈现，标记为不播放入场，避免提交瞬间二次淡入
+    noAnimateIdx.value = messages.value.length
+    messages.value.push({ role: 'assistant', content: finalText })
+    caretFading.value = false
+    resetStream()
+    scrollToBottom()
+  }, CARET_FADE_MS)
+}
+
+/** 取消进行中的淡出（会话切换/清空/卸载时调用），不提交滞留内容 */
+function cancelFade() {
+  if (fadeTimer) {
+    clearTimeout(fadeTimer)
+    fadeTimer = null
+  }
+  caretFading.value = false
+  resetStream()
+}
 
 const modelOptions = computed(() => models.value.map((m) => ({ label: m.modelName, value: m.modelName })))
 
@@ -206,6 +253,7 @@ async function loadSessions() {
 }
 
 async function selectSession(session: ChatSession) {
+  cancelFade()
   currentSession.value = session
   messages.value = []
   try {
@@ -254,8 +302,15 @@ async function clearMessages() {
     confirmText: '确定清空',
     danger: true
   })
-  if (ok) messages.value = []
+  if (ok) {
+    cancelFade()
+    messages.value = []
+  }
 }
+
+onBeforeUnmount(() => {
+  if (fadeTimer) clearTimeout(fadeTimer)
+})
 
 function onInputKeydown(e: KeyboardEvent) {
   // Enter 发送，Shift+Enter 换行；中文输入法组合期间不触发
@@ -268,6 +323,17 @@ function onInputKeydown(e: KeyboardEvent) {
 async function handleSend() {
   const content = inputText.value.trim()
   if (!content || streaming.value || !currentSession.value) return
+
+  noAnimateIdx.value = -1 // 新一轮默认全部播放入场；仅下方「立即收尾」分支会标记跳过
+  // 若上一条仍在淡出，立即收尾（提交其内容）再开始新一轮，避免丢失。
+  // 该条已作为流式气泡可见，标记为不播放入场（用户消息索引随后递增，仍正常播放）。
+  if (caretFading.value && streamText.value) {
+    if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null }
+    noAnimateIdx.value = messages.value.length
+    messages.value.push({ role: 'assistant', content: streamText.value })
+    caretFading.value = false
+    resetStream()
+  }
 
   inputText.value = ''
   messages.value.push({ role: 'user', content })
@@ -285,20 +351,17 @@ async function handleSend() {
       scheduleScroll()
     },
     () => {
-      // 流结束后将累积内容写入消息列表，流式态与历史态分离，避免双重渲染
+      // 流结束：先定稿快照，再交给 finalizeStream 走光标淡出 + 提交
       flushStream()
-      if (streamText.value) {
-        messages.value.push({ role: 'assistant', content: streamText.value })
-      }
+      const finalText = streamText.value
       streaming.value = false
-      resetStream()
       streamController = null
-      scrollToBottom()
+      finalizeStream(finalText)
     },
     (err) => {
       streaming.value = false
-      resetStream()
       streamController = null
+      cancelFade()
       toast.error('发送失败：' + err)
     },
     streamController.signal

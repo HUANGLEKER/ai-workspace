@@ -68,6 +68,8 @@ Go 后端结构（`internal/`）：
 - `router/router.go` —— 路由分层：`public`（无 JWT）→ `auth`（需登录）→ `admin`（需登录 + ADMIN 角色）
 - `middleware/` —— JWT（`CtxUserID`/`CtxRoles` 注入 gin.Context）、CORS、RequestLogger、Recovery、AdminRequired
 - `config/` —— Viper 配置加载，全局 `config.Global`
+- `scheduler/` —— 动态 cron 调度器（`manager.go` 管理 `robfig/cron/v3` 实例，`handler.go` 注册 JobHandler）
+- `common/` —— 标准响应包装（`result.go`）
 - `pkg/` —— 基础设施客户端：`database/`（GORM）、`redis/`、`minio/`、`logger/`（zap + lumberjack）、`fastapi/`（FastAPI HTTP 客户端）
 
 ### FastAPI AI 服务
@@ -95,7 +97,7 @@ FastAPI 使用 Redis DB 1；Go 后端使用 DB 0。切换嵌入模型后必须�
 
 ### 数据库
 
-初始化 SQL 文件已从仓库移除（历史位于 `ai-workspace/sql/init.sql`，已删）。`docker-compose.infra.yml` 中仍有挂载该路径的配置，首次启动前需提供该文件或手动建表。
+`docker-compose.infra.yml` 将 `ai-workspace/sql/init.sql` 挂载为 MySQL 初始化脚本，但该文件当前为空（0 字节）。首次启动前需自行填入建表 SQL，或在服务起来后手动建表，否则数据库为空。
 
 ### 本地基础设施（全部 Docker 化）
 
@@ -129,8 +131,10 @@ docker-compose -f docker-compose.infra.yml up -d
 
 **前端（`ai-workspace-web/src`）：**
 
-- `api/` —— 各功能的 Axios HTTP 客户端模块
+- `api/` —— 各功能的 Axios HTTP 客户端模块（`sse.ts` 为共用 SSE 工具）
 - `views/` —— 页面组件
+- `components/ui/` —— 统一组件库（AppButton/AppInput/AppDialog… 经 `index.ts` 出口）
+- `composables/` —— 可复用组合式函数
 - `stores/` —— Pinia 状态管理
 - `router/` —— Vue Router 配置
 - `layout/` —— 外壳/布局组件

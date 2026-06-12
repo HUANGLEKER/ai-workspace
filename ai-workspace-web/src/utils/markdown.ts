@@ -10,7 +10,23 @@ import DOMPurify from 'dompurify'
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true })
 
-/** 渲染 Markdown 字符串为经过净化的安全 HTML */
-export function renderMarkdown(content: string): string {
-  return DOMPurify.sanitize(md.render(content || ''))
+/**
+ * 私有区占位符：流式渲染时先把它拼到原文末尾参与 Markdown 解析，
+ * 这样它会落在「最后一个文本节点」内部（段落/列表项/代码块末尾），
+ * 渲染后再替换为光标 HTML —— 光标便能内联跟随内容末尾，而非另起一行。
+ */
+const CARET_SENTINEL = '' //''
+
+/**
+ * 渲染 Markdown 字符串为经过净化的安全 HTML。
+ *
+ * @param content  原始 Markdown 文本
+ * @param caretHtml 可选的光标 HTML 片段；流式输出时传入，会被内联拼接到内容末尾。
+ *                  注意：光标 HTML 在 DOMPurify 之后注入，属可信片段，不参与净化。
+ */
+export function renderMarkdown(content: string, caretHtml = ''): string {
+  const source = content || ''
+  if (!caretHtml) return DOMPurify.sanitize(md.render(source))
+  const html = DOMPurify.sanitize(md.render(source + CARET_SENTINEL))
+  return html.replace(CARET_SENTINEL, caretHtml)
 }

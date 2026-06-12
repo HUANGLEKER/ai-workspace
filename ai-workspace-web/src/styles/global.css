@@ -22,6 +22,35 @@ html.dark {
   color-scheme: dark;
 }
 
+/* 流式输出光标（ChatGPT 风格）：内联跟随内容末尾，currentColor 自动适配亮/暗色 */
+.streaming-caret {
+  display: inline-block;
+  margin-left: 1px;
+  color: currentColor;
+  font-weight: 600;
+  line-height: 1;
+  transform: translateY(0.06em);
+}
+/* 闪烁：step-end 让光标呈现硬切的「显/隐」节奏，而非平滑脉冲 */
+.streaming-caret--blink {
+  animation: streaming-caret-blink 1.05s step-end infinite;
+}
+/* 淡出：流结束时由 --blink 切到 --fade，opacity 1→0 平滑过渡 300ms */
+.streaming-caret--fade {
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+}
+@keyframes streaming-caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

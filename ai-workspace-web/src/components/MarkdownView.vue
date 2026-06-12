@@ -13,6 +13,23 @@
 import { computed } from 'vue'
 import { renderMarkdown } from '@/utils/markdown'
 
-const props = defineProps<{ content: string }>()
-const html = computed(() => renderMarkdown(props.content))
+/**
+ * caret：流式输出光标状态
+ * - 'blink'：闪烁，表示正在流式输出
+ * - 'fade' ：停止闪烁并以 300ms 透明度过渡淡出（流结束时）
+ * - 'none'（默认）：不渲染光标（历史定稿消息）
+ *
+ * 光标作为内联元素跟随内容末尾，在 DOMPurify 之后注入，属可信片段。
+ */
+const props = withDefaults(defineProps<{ content: string; caret?: 'blink' | 'fade' | 'none' }>(), {
+  caret: 'none'
+})
+
+const caretHtml = computed(() => {
+  if (props.caret === 'none') return ''
+  const modifier = props.caret === 'fade' ? 'streaming-caret--fade' : 'streaming-caret--blink'
+  return `<span class="streaming-caret ${modifier}" aria-hidden="true">|</span>`
+})
+
+const html = computed(() => renderMarkdown(props.content, caretHtml.value))
 </script>
