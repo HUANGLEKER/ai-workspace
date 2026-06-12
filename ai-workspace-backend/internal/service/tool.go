@@ -5,28 +5,36 @@ import (
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
-	"github.com/aiworkspace/backend/pkg/database"
+	"gorm.io/gorm"
 )
 
 // ToolSvc 是工具服务全局单例
-var ToolSvc = &toolService{}
+var ToolSvc *ToolService
 
-type toolService struct{}
+// ToolService 依赖经构造函数注入（P1-1）
+type ToolService struct {
+	db *gorm.DB
+}
+
+// NewToolService 构造服务
+func NewToolService(db *gorm.DB) *ToolService {
+	return &ToolService{db: db}
+}
 
 // ListByUser 查询当前用户注册的所有工具
-func (s *toolService) ListByUser(userID int64) ([]model.Tool, error) {
+func (s *ToolService) ListByUser(userID int64) ([]model.Tool, error) {
 	var tools []model.Tool
-	err := database.DB.Scopes(ownedScope[model.Tool](userID)).Order("create_time DESC").Find(&tools).Error
+	err := s.db.Scopes(ownedScope[model.Tool](userID)).Order("create_time DESC").Find(&tools).Error
 	return tools, err
 }
 
 // GetOwned 查询并校验工具归属，防止 IDOR
-func (s *toolService) GetOwned(id, userID int64) (*model.Tool, error) {
-	return getOwnedResource[model.Tool](database.DB, id, userID, "工具")
+func (s *ToolService) GetOwned(id, userID int64) (*model.Tool, error) {
+	return getOwnedResource[model.Tool](s.db, id, userID, "工具")
 }
 
 // Create 新建工具，强制 CreateBy 为当前用户
-func (s *toolService) Create(t *model.Tool, userID int64) error {
+func (s *ToolService) Create(t *model.Tool, userID int64) error {
 	if t.Name == "" {
 		return common.NewBizError(common.CodeBadRequest, "工具名称不能为空")
 	}
@@ -35,11 +43,11 @@ func (s *toolService) Create(t *model.Tool, userID int64) error {
 	if t.Enabled == 0 {
 		t.Enabled = 1
 	}
-	return database.DB.Create(t).Error
+	return s.db.Create(t).Error
 }
 
 // Update 更新工具，回填 CreateBy 防止归属被篡改
-func (s *toolService) Update(t *model.Tool, userID int64) error {
+func (s *ToolService) Update(t *model.Tool, userID int64) error {
 	existing, err := s.GetOwned(t.ID, userID)
 	if err != nil {
 		return err
@@ -47,20 +55,20 @@ func (s *toolService) Update(t *model.Tool, userID int64) error {
 	t.CreateBy = existing.CreateBy
 	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
 	t.CreatedAt = existing.CreatedAt
-	return database.DB.Save(t).Error
+	return s.db.Save(t).Error
 }
 
 // Delete 校验归属后删除工具
-func (s *toolService) Delete(id, userID int64) error {
+func (s *ToolService) Delete(id, userID int64) error {
 	if _, err := s.GetOwned(id, userID); err != nil {
 		return err
 	}
-	return database.DB.Delete(&model.Tool{}, id).Error
+	return s.db.Delete(&model.Tool{}, id).Error
 }
 
 // ResolveForAgent 按工具名列表（JSON 数组字符串）解析用户名下已启用的完整工具规格
 // 返回结构供 FastAPI /agent/run 使用。仅加载 tool_type=http 的工具（builtin 由 FastAPI 自注册）
-func (s *toolService) ResolveForAgent(userID int64, toolNamesJSON string) ([]map[string]any, error) {
+func (s *ToolService) ResolveForAgent(userID int64, toolNamesJSON string) ([]map[string]any, error) {
 	var names []string
 	if toolNamesJSON != "" && toolNamesJSON != "[]" {
 		if err := json.Unmarshal([]byte(toolNamesJSON), &names); err != nil {
@@ -72,7 +80,7 @@ func (s *toolService) ResolveForAgent(userID int64, toolNamesJSON string) ([]map
 	}
 
 	var tools []model.Tool
-	err := database.DB.Scopes(ownedScope[model.Tool](userID)).Where("name IN ? AND enabled = 1", names).Find(&tools).Error
+	err := s.db.Scopes(ownedScope[model.Tool](userID)).Where("name IN ? AND enabled = 1", names).Find(&tools).Error
 	if err != nil {
 		return nil, err
 	}

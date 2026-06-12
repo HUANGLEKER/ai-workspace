@@ -9,26 +9,33 @@ import (
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
-	"github.com/aiworkspace/backend/pkg/database"
-	"github.com/aiworkspace/backend/pkg/fastapi"
 )
 
 // WorkflowSvc 是工作流服务全局单例
-var WorkflowSvc = &workflowService{}
+var WorkflowSvc *WorkflowService
 
-type workflowService struct{}
+// WorkflowService 依赖经构造函数注入（P1-1）
+type WorkflowService struct {
+	db *gorm.DB
+	ai RunCaller
+}
+
+// NewWorkflowService 构造服务
+func NewWorkflowService(db *gorm.DB, ai RunCaller) *WorkflowService {
+	return &WorkflowService{db: db, ai: ai}
+}
 
 // ListByUser 查询当前用户拥有的所有工作流
-func (s *workflowService) ListByUser(userID int64) ([]model.Workflow, error) {
+func (s *WorkflowService) ListByUser(userID int64) ([]model.Workflow, error) {
 	var workflows []model.Workflow
-	err := database.DB.Scopes(ownedScope[model.Workflow](userID)).Order("create_time DESC").Find(&workflows).Error
+	err := s.db.Scopes(ownedScope[model.Workflow](userID)).Order("create_time DESC").Find(&workflows).Error
 	return workflows, err
 }
 
 // GetByID 按 ID 查询工作流
-func (s *workflowService) GetByID(id int64) (*model.Workflow, error) {
+func (s *WorkflowService) GetByID(id int64) (*model.Workflow, error) {
 	var w model.Workflow
-	if err := database.DB.First(&w, id).Error; err != nil {
+	if err := s.db.First(&w, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.ErrNotFound("工作流")
 		}
@@ -38,7 +45,7 @@ func (s *workflowService) GetByID(id int64) (*model.Workflow, error) {
 }
 
 // Create 新建工作流，强制 CreateBy 为当前用户
-func (s *workflowService) Create(w *model.Workflow, userID int64) error {
+func (s *WorkflowService) Create(w *model.Workflow, userID int64) error {
 	if w.Name == "" {
 		return common.NewBizError(common.CodeBadRequest, "工作流名称不能为空")
 	}
@@ -47,11 +54,11 @@ func (s *workflowService) Create(w *model.Workflow, userID int64) error {
 	if w.Enabled == 0 {
 		w.Enabled = 1
 	}
-	return database.DB.Create(w).Error
+	return s.db.Create(w).Error
 }
 
 // Update 更新工作流，回填 CreateBy 防止归属被篡改
-func (s *workflowService) Update(w *model.Workflow, userID int64) error {
+func (s *WorkflowService) Update(w *model.Workflow, userID int64) error {
 	existing, err := s.GetOwned(w.ID, userID)
 	if err != nil {
 		return err
@@ -59,24 +66,24 @@ func (s *workflowService) Update(w *model.Workflow, userID int64) error {
 	w.CreateBy = existing.CreateBy
 	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
 	w.CreatedAt = existing.CreatedAt
-	return database.DB.Save(w).Error
+	return s.db.Save(w).Error
 }
 
 // Delete 校验归属后删除工作流
-func (s *workflowService) Delete(id, userID int64) error {
+func (s *WorkflowService) Delete(id, userID int64) error {
 	if _, err := s.GetOwned(id, userID); err != nil {
 		return err
 	}
-	return database.DB.Delete(&model.Workflow{}, id).Error
+	return s.db.Delete(&model.Workflow{}, id).Error
 }
 
 // GetOwned 校验工作流归属，防止 IDOR
-func (s *workflowService) GetOwned(id, userID int64) (*model.Workflow, error) {
-	return getOwnedResource[model.Workflow](database.DB, id, userID, "工作流")
+func (s *WorkflowService) GetOwned(id, userID int64) (*model.Workflow, error) {
+	return getOwnedResource[model.Workflow](s.db, id, userID, "工作流")
 }
 
 // Run 执行工作流：校验归属后将 definition 与输入 POST 给 FastAPI /workflow/run
-func (s *workflowService) Run(ctx context.Context, workflowID, userID int64, input string) (any, error) {
+func (s *WorkflowService) Run(ctx context.Context, workflowID, userID int64, input string) (any, error) {
 	wf, err := s.GetOwned(workflowID, userID)
 	if err != nil {
 		return nil, err
@@ -90,7 +97,7 @@ func (s *workflowService) Run(ctx context.Context, workflowID, userID int64, inp
 		"model":       wf.Model,
 		"definition":  wf.Definition,
 	}
-	data, err := fastapi.Client.PostForData(ctx, "/workflow/run", body)
+	data, err := s.ai.PostForData(ctx, "/workflow/run", body)
 	if err != nil {
 		return nil, err
 	}

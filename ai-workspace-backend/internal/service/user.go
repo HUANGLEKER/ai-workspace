@@ -8,19 +8,26 @@ import (
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
-	"github.com/aiworkspace/backend/pkg/database"
 )
 
 // UserSvc 是用户服务全局单例
-var UserSvc = &userService{}
+var UserSvc *UserService
 
-type userService struct{}
+// UserService 依赖经构造函数注入（P1-1）
+type UserService struct {
+	db *gorm.DB
+}
+
+// NewUserService 构造服务
+func NewUserService(db *gorm.DB) *UserService {
+	return &UserService{db: db}
+}
 
 // PageUsers 分页查询用户列表，密码字段置空后返回，防止哈希泄露
-func (s *userService) PageUsers(pageNum, pageSize int, username string) (common.PageResult[model.SysUser], error) {
+func (s *UserService) PageUsers(pageNum, pageSize int, username string) (common.PageResult[model.SysUser], error) {
 	var users []model.SysUser
 	var total int64
-	q := database.DB.Model(&model.SysUser{})
+	q := s.db.Model(&model.SysUser{})
 	if username != "" {
 		q = q.Where("username LIKE ?", "%"+username+"%")
 	}
@@ -39,9 +46,9 @@ func (s *userService) PageUsers(pageNum, pageSize int, username string) (common.
 }
 
 // AddUser 新建用户，对用户名唯一性和密码强制 BCrypt 编码进行校验
-func (s *userService) AddUser(user *model.SysUser) error {
+func (s *UserService) AddUser(user *model.SysUser) error {
 	var count int64
-	database.DB.Model(&model.SysUser{}).Where("username = ?", user.Username).Count(&count)
+	s.db.Model(&model.SysUser{}).Where("username = ?", user.Username).Count(&count)
 	if count > 0 {
 		return common.NewBizError(common.CodeBadRequest, "用户名已存在")
 	}
@@ -57,16 +64,16 @@ func (s *userService) AddUser(user *model.SysUser) error {
 	if user.Status == 0 {
 		user.Status = 1
 	}
-	return database.DB.Create(user).Error
+	return s.db.Create(user).Error
 }
 
 // UpdateUser 更新用户信息，保护用户名不可变，仅当传入新密码时才重新哈希
-func (s *userService) UpdateUser(user *model.SysUser) error {
+func (s *UserService) UpdateUser(user *model.SysUser) error {
 	if user.ID == 0 {
 		return common.NewBizError(common.CodeBadRequest, "用户ID不能为空")
 	}
 	var existing model.SysUser
-	if err := database.DB.First(&existing, user.ID).Error; err != nil {
+	if err := s.db.First(&existing, user.ID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return common.ErrNotFound("用户")
 		}
@@ -88,23 +95,23 @@ func (s *userService) UpdateUser(user *model.SysUser) error {
 	} else {
 		user.Password = existing.Password
 	}
-	return database.DB.Save(user).Error
+	return s.db.Save(user).Error
 }
 
 // DeleteUser 按 ID 软删除用户
-func (s *userService) DeleteUser(id int64) error {
-	return database.DB.Delete(&model.SysUser{}, id).Error
+func (s *UserService) DeleteUser(id int64) error {
+	return s.db.Delete(&model.SysUser{}, id).Error
 }
 
 // UpdateStatus 启用/禁用用户账号
-func (s *userService) UpdateStatus(id int64, status int8) error {
-	return database.DB.Model(&model.SysUser{}).Where("id = ?", id).Update("status", status).Error
+func (s *UserService) UpdateStatus(id int64, status int8) error {
+	return s.db.Model(&model.SysUser{}).Where("id = ?", id).Update("status", status).Error
 }
 
 // GetByID 按 ID 查询用户，不返回密码字段
-func (s *userService) GetByID(id int64) (*model.SysUser, error) {
+func (s *UserService) GetByID(id int64) (*model.SysUser, error) {
 	var user model.SysUser
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := s.db.First(&user, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.ErrNotFound("用户")
 		}
@@ -115,9 +122,9 @@ func (s *userService) GetByID(id int64) (*model.SysUser, error) {
 }
 
 // UpdatePassword 允许用户修改自己的密码
-func (s *userService) UpdatePassword(userID int64, oldPassword, newPassword string) error {
+func (s *UserService) UpdatePassword(userID int64, oldPassword, newPassword string) error {
 	var user model.SysUser
-	if err := database.DB.First(&user, userID).Error; err != nil {
+	if err := s.db.First(&user, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return common.ErrNotFound("用户")
 		}
@@ -133,13 +140,13 @@ func (s *userService) UpdatePassword(userID int64, oldPassword, newPassword stri
 		return err
 	}
 
-	return database.DB.Model(&user).Update("password", string(hash)).Error
+	return s.db.Model(&user).Update("password", string(hash)).Error
 }
 
 // GetRoles 查询用户的角色码列表，用于 JWT 生成和权限校验
-func (s *userService) GetRoles(userID int64) []string {
+func (s *UserService) GetRoles(userID int64) []string {
 	var roles []string
-	database.DB.Model(&model.SysRole{}).
+	s.db.Model(&model.SysRole{}).
 		Joins("JOIN sys_user_role ur ON ur.role_id = sys_role.id").
 		Where("ur.user_id = ?", userID).
 		Pluck("role_code", &roles)

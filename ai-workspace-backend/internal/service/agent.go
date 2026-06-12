@@ -8,26 +8,33 @@ import (
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
-	"github.com/aiworkspace/backend/pkg/database"
-	"github.com/aiworkspace/backend/pkg/fastapi"
 )
 
 // AgentSvc 是 Agent 服务全局单例
-var AgentSvc = &agentService{}
+var AgentSvc *AgentService
 
-type agentService struct{}
+// AgentService 依赖经构造函数注入（P1-1）
+type AgentService struct {
+	db *gorm.DB
+	ai RunCaller
+}
+
+// NewAgentService 构造服务
+func NewAgentService(db *gorm.DB, ai RunCaller) *AgentService {
+	return &AgentService{db: db, ai: ai}
+}
 
 // ListByUser 查询当前用户拥有的所有 Agent
-func (s *agentService) ListByUser(userID int64) ([]model.Agent, error) {
+func (s *AgentService) ListByUser(userID int64) ([]model.Agent, error) {
 	var agents []model.Agent
-	err := database.DB.Scopes(ownedScope[model.Agent](userID)).Order("create_time DESC").Find(&agents).Error
+	err := s.db.Scopes(ownedScope[model.Agent](userID)).Order("create_time DESC").Find(&agents).Error
 	return agents, err
 }
 
 // GetByID 按 ID 查询 Agent（不校验归属，用于展示）
-func (s *agentService) GetByID(id int64) (*model.Agent, error) {
+func (s *AgentService) GetByID(id int64) (*model.Agent, error) {
 	var a model.Agent
-	if err := database.DB.First(&a, id).Error; err != nil {
+	if err := s.db.First(&a, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.ErrNotFound("Agent")
 		}
@@ -37,7 +44,7 @@ func (s *agentService) GetByID(id int64) (*model.Agent, error) {
 }
 
 // Create 新建 Agent，强制 CreateBy 为当前用户
-func (s *agentService) Create(a *model.Agent, userID int64) error {
+func (s *AgentService) Create(a *model.Agent, userID int64) error {
 	if a.Name == "" {
 		return common.NewBizError(common.CodeBadRequest, "Agent 名称不能为空")
 	}
@@ -46,11 +53,11 @@ func (s *agentService) Create(a *model.Agent, userID int64) error {
 	if a.Enabled == 0 {
 		a.Enabled = 1
 	}
-	return database.DB.Create(a).Error
+	return s.db.Create(a).Error
 }
 
 // Update 更新 Agent，回填 CreateBy 防止归属被篡改
-func (s *agentService) Update(a *model.Agent, userID int64) error {
+func (s *AgentService) Update(a *model.Agent, userID int64) error {
 	existing, err := s.GetOwned(a.ID, userID)
 	if err != nil {
 		return err
@@ -58,24 +65,24 @@ func (s *agentService) Update(a *model.Agent, userID int64) error {
 	a.CreateBy = existing.CreateBy
 	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
 	a.CreatedAt = existing.CreatedAt
-	return database.DB.Save(a).Error
+	return s.db.Save(a).Error
 }
 
 // Delete 校验归属后删除 Agent
-func (s *agentService) Delete(id, userID int64) error {
+func (s *AgentService) Delete(id, userID int64) error {
 	if _, err := s.GetOwned(id, userID); err != nil {
 		return err
 	}
-	return database.DB.Delete(&model.Agent{}, id).Error
+	return s.db.Delete(&model.Agent{}, id).Error
 }
 
 // GetOwned 校验 Agent 归属，防止 IDOR
-func (s *agentService) GetOwned(id, userID int64) (*model.Agent, error) {
-	return getOwnedResource[model.Agent](database.DB, id, userID, "Agent")
+func (s *AgentService) GetOwned(id, userID int64) (*model.Agent, error) {
+	return getOwnedResource[model.Agent](s.db, id, userID, "Agent")
 }
 
 // Run 解析 Agent 引用的工具与 MCP 服务器，组装完整规格后 POST 给 FastAPI 执行工具调用循环
-func (s *agentService) Run(ctx context.Context, agentID, userID int64, input, sessionID string) (any, error) {
+func (s *AgentService) Run(ctx context.Context, agentID, userID int64, input, sessionID string) (any, error) {
 	agent, err := s.GetOwned(agentID, userID)
 	if err != nil {
 		return nil, err
@@ -106,7 +113,7 @@ func (s *agentService) Run(ctx context.Context, agentID, userID int64, input, se
 		"mcp_servers":   mcpServers,
 	}
 
-	data, err := fastapi.Client.PostForData(ctx, "/agent/run", body)
+	data, err := s.ai.PostForData(ctx, "/agent/run", body)
 	if err != nil {
 		return nil, err
 	}

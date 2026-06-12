@@ -12,14 +12,22 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 
 	"github.com/aiworkspace/backend/internal/config"
-	"github.com/aiworkspace/backend/pkg/fastapi"
-	redisPkg "github.com/aiworkspace/backend/pkg/redis"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 // MonitorSvc 是系统监控服务全局单例
-var MonitorSvc = &monitorService{}
+var MonitorSvc *MonitorService
 
-type monitorService struct{}
+// MonitorService 依赖经构造函数注入（P1-1）
+type MonitorService struct {
+	aiBaseURL string
+	redis     *goredis.Client
+}
+
+// NewMonitorService 构造服务
+func NewMonitorService(aiBaseURL string, redisClient *goredis.Client) *MonitorService {
+	return &MonitorService{aiBaseURL: aiBaseURL, redis: redisClient}
+}
 
 // ServerInfo 服务器运行时指标快照，对应 Spring Boot ServerInfoVO
 type ServerInfo struct {
@@ -73,7 +81,7 @@ type ServiceHealth struct {
 }
 
 // GetServerInfo 采集服务器运行时指标，通过 gopsutil 跨平台获取系统级数据
-func (s *monitorService) GetServerInfo() ServerInfo {
+func (s *MonitorService) GetServerInfo() ServerInfo {
 	info := ServerInfo{}
 
 	if percents, err := cpu.Percent(time.Second, false); err == nil && len(percents) > 0 {
@@ -119,19 +127,19 @@ func (s *monitorService) GetServerInfo() ServerInfo {
 }
 
 // GetServiceHealth 探测 Redis、FastAPI、MinIO 的连通性与延迟
-func (s *monitorService) GetServiceHealth() []ServiceHealth {
+func (s *MonitorService) GetServiceHealth() []ServiceHealth {
 	cfg := config.Global
 	return []ServiceHealth{
-		checkRedis(),
-		checkHTTP("FastAPI", fastapi.Client.BaseURL()+"/health"),
+		s.checkRedis(),
+		checkHTTP("FastAPI", s.aiBaseURL+"/health"),
 		checkHTTP("MinIO", fmt.Sprintf("http://%s/minio/health/live", cfg.MinIO.Endpoint)),
 	}
 }
 
 // checkRedis 用 PING 命令探测 Redis 健康状态
-func checkRedis() ServiceHealth {
+func (s *MonitorService) checkRedis() ServiceHealth {
 	start := time.Now()
-	err := redisPkg.Client.Ping(context.Background()).Err()
+	err := s.redis.Ping(context.Background()).Err()
 	latency := time.Since(start).Milliseconds()
 	if err != nil {
 		return ServiceHealth{Name: "Redis", Target: config.Global.Redis.Addr, Status: "DOWN", Latency: latency, Message: err.Error()}

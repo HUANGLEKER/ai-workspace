@@ -8,28 +8,36 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
-	"github.com/aiworkspace/backend/pkg/database"
-	minioPkg "github.com/aiworkspace/backend/pkg/minio"
 )
 
 // FileSvc 是文件服务全局单例
-var FileSvc = &fileService{}
+var FileSvc *FileService
 
-type fileService struct{}
+// FileService 依赖经构造函数注入（P1-1）
+type FileService struct {
+	db    *gorm.DB
+	store ObjectStore
+}
+
+// NewFileService 构造服务
+func NewFileService(db *gorm.DB, store ObjectStore) *FileService {
+	return &FileService{db: db, store: store}
+}
 
 // Upload 上传文件至 MinIO 并在 file_info 表中记录元数据
 // 对象路径格式：files/{userID}/{timestamp}.{ext}，按用户分目录存储
-func (s *fileService) Upload(ctx context.Context, userID int64, fileName string, data []byte, contentType string) (*model.FileInfo, error) {
+func (s *FileService) Upload(ctx context.Context, userID int64, fileName string, data []byte, contentType string) (*model.FileInfo, error) {
 	ext := filepath.Ext(fileName)
 	if ext == "" {
 		ext = guessExt(contentType)
 	}
 	objectName := fmt.Sprintf("files/%d/%d%s", userID, time.Now().UnixNano(), ext)
 
-	if err := minioPkg.Upload(ctx, objectName, strings.NewReader(string(data)), int64(len(data)), contentType); err != nil {
+	if err := s.store.Upload(ctx, objectName, strings.NewReader(string(data)), int64(len(data)), contentType); err != nil {
 		return nil, err
 	}
 
@@ -40,9 +48,9 @@ func (s *fileService) Upload(ctx context.Context, userID int64, fileName string,
 		FileType: contentType,
 		UploadBy: userID,
 	}
-	if err := database.DB.Create(info).Error; err != nil {
+	if err := s.db.Create(info).Error; err != nil {
 		// DB 写入失败时尝试回滚 MinIO 对象，失败则仅记录日志（幂等清理）
-		if delErr := minioPkg.Delete(ctx, objectName); delErr != nil {
+		if delErr := s.store.Delete(ctx, objectName); delErr != nil {
 			zap.L().Warn("回滚 MinIO 对象失败", zap.String("path", objectName), zap.Error(delErr))
 		}
 		return nil, err
@@ -52,32 +60,32 @@ func (s *fileService) Upload(ctx context.Context, userID int64, fileName string,
 
 // Delete 校验 uploadBy 归属后删除文件（MinIO 对象 + DB 记录）
 // 注意归属列为 upload_by，区别于 KB 的 create_by，混用会导致越权或 IDOR
-func (s *fileService) Delete(ctx context.Context, id, userID int64) error {
+func (s *FileService) Delete(ctx context.Context, id, userID int64) error {
 	info, err := s.getOwned(id, userID)
 	if err != nil {
 		return err
 	}
-	if err = minioPkg.Delete(ctx, info.FilePath); err != nil {
+	if err = s.store.Delete(ctx, info.FilePath); err != nil {
 		zap.L().Warn("删除 MinIO 对象失败", zap.String("path", info.FilePath), zap.Error(err))
 	}
-	return database.DB.Delete(&model.FileInfo{}, id).Error
+	return s.db.Delete(&model.FileInfo{}, id).Error
 }
 
 // GetPresignedURL 生成临时预签名下载 URL（有效期 1 小时）
 // 校验 upload_by + file_path 双重条件，防止通过构造 filePath 枚举他人文件
-func (s *fileService) GetPresignedURL(ctx context.Context, fileID, userID int64) (string, error) {
+func (s *FileService) GetPresignedURL(ctx context.Context, fileID, userID int64) (string, error) {
 	info, err := s.getOwned(fileID, userID)
 	if err != nil {
 		return "", err
 	}
-	return minioPkg.PresignedURL(ctx, info.FilePath, time.Hour)
+	return s.store.PresignedURL(ctx, info.FilePath, time.Hour)
 }
 
 // PageList 分页查询当前用户的文件列表，按 upload_by 隔离
-func (s *fileService) PageList(userID int64, pageNum, pageSize int, fileName string) (common.PageResult[model.FileInfo], error) {
+func (s *FileService) PageList(userID int64, pageNum, pageSize int, fileName string) (common.PageResult[model.FileInfo], error) {
 	var files []model.FileInfo
 	var total int64
-	q := database.DB.Model(&model.FileInfo{}).Scopes(ownedScope[model.FileInfo](userID))
+	q := s.db.Model(&model.FileInfo{}).Scopes(ownedScope[model.FileInfo](userID))
 	if fileName != "" {
 		q = q.Where("file_name LIKE ?", "%"+fileName+"%")
 	}
@@ -93,8 +101,8 @@ func (s *fileService) PageList(userID int64, pageNum, pageSize int, fileName str
 }
 
 // getOwned 按 upload_by 校验文件归属，防止 IDOR
-func (s *fileService) getOwned(id, userID int64) (*model.FileInfo, error) {
-	return getOwnedResource[model.FileInfo](database.DB, id, userID, "文件")
+func (s *FileService) getOwned(id, userID int64) (*model.FileInfo, error) {
+	return getOwnedResource[model.FileInfo](s.db, id, userID, "文件")
 }
 
 // guessExt 根据 MIME 类型猜测文件扩展名（兜底逻辑）

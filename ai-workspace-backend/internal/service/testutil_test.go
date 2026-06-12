@@ -74,6 +74,10 @@ func (f *fakeStore) Delete(_ context.Context, name string) error {
 	return nil
 }
 
+func (f *fakeStore) PresignedURL(_ context.Context, name string, _ time.Duration) (string, error) {
+	return "https://fake/" + name, nil
+}
+
 // assertBizCode 断言错误是携带指定 code 的 BusinessError
 func assertBizCode(t *testing.T, err error, wantCode int) {
 	t.Helper()
