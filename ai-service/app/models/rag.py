@@ -2,6 +2,8 @@
 from pydantic import BaseModel
 from typing import Optional
 
+from app.models.chat import LlmConfig
+
 
 class RagChatRequest(BaseModel):
     """RAG 问答请求体。"""
@@ -12,6 +14,7 @@ class RagChatRequest(BaseModel):
     stream: bool = True
     temperature: float = 0.3  # 问答温度偏低以提升答案稳定性
     model: Optional[str] = None
+    llm_config: Optional[LlmConfig] = None  # 按请求覆盖提供方（多模型路由）
 
 
 class SourceDocument(BaseModel):

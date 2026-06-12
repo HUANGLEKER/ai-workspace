@@ -18,7 +18,13 @@ def _to_lc_message(msg: Message):
 
 async def stream_chat(req: ChatRequest) -> AsyncIterator[str]:
     """流式生成对话回复，逐 token 产出 SSE 数据帧，结尾以 [DONE] 哨兵收尾。"""
-    llm = get_chat_llm(model=req.model, temperature=req.temperature)
+    cfg = req.llm_config
+    llm = get_chat_llm(
+        model=req.model,
+        temperature=req.temperature,
+        api_key=cfg.api_key if cfg else None,
+        api_base=cfg.api_base if cfg else None,
+    )
     lc_messages = [_to_lc_message(m) for m in req.messages]
 
     # stream_usage=True：让 OpenAI 兼容端在流尾返回 token 用量（usage_metadata）。

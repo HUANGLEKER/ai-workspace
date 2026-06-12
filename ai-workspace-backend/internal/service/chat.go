@@ -149,6 +149,29 @@ func (s *chatService) ListModels() ([]model.ChatModel, error) {
 	return models, err
 }
 
+// GetModelConfigByName 按模型名查启用的模型配置，用于多模型路由：
+// 把 chat_model 表配置的 api_url/api_key 随请求透传给 FastAPI（llm_config），
+// 不同会话即可走不同提供方。未配置或未启用时返回 nil（FastAPI 回退 .env 默认配置）。
+func (s *chatService) GetModelConfigByName(modelName string) *model.ChatModel {
+	if modelName == "" {
+		return nil
+	}
+	var m model.ChatModel
+	if err := database.DB.Where("model_name = ? AND enabled = 1", modelName).First(&m).Error; err != nil {
+		return nil
+	}
+	return &m
+}
+
+// LlmConfigBody 把模型配置转为 FastAPI llm_config 字段；api_url/api_key 均为空时
+// 返回 nil（没有可覆盖项，让 FastAPI 直接走默认配置）。密钥仅在服务间内网流转。
+func LlmConfigBody(m *model.ChatModel) map[string]string {
+	if m == nil || (m.ApiUrl == "" && m.ApiKey == "") {
+		return nil
+	}
+	return map[string]string{"api_base": m.ApiUrl, "api_key": m.ApiKey}
+}
+
 // PageModels 分页查询全部模型配置（含禁用），供管理员模型管理页使用
 func (s *chatService) PageModels(pageNum, pageSize int, modelName string) (common.PageResult[model.ChatModel], error) {
 	var models []model.ChatModel

@@ -140,6 +140,7 @@ func RAGChat(c *gin.Context) {
 		Question  string `json:"question"  binding:"required"`
 		SessionID string `json:"sessionId"`
 		TopK      int    `json:"topK"`
+		Model     string `json:"model"` // 可选；指定则按 chat_model 配置做多模型路由
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.BadRequest(c, err.Error())
@@ -166,6 +167,12 @@ func RAGChat(c *gin.Context) {
 		"session_id": req.SessionID,
 		"top_k":      req.TopK,
 		"stream":     true,
+	}
+	if req.Model != "" {
+		body["model"] = req.Model
+		if cfg := service.LlmConfigBody(service.ChatSvc.GetModelConfigByName(req.Model)); cfg != nil {
+			body["llm_config"] = cfg
+		}
 	}
 
 	c.Header("Content-Type", "text/event-stream")

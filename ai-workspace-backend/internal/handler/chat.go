@@ -155,6 +155,11 @@ func ChatSend(c *gin.Context) {
 		"model":      req.Model,
 		"stream":     true,
 	}
+	// 多模型路由：模型在 chat_model 表配了 api_url/api_key 则随请求透传，
+	// 让 FastAPI 按请求构建客户端；未配置则 FastAPI 回退 .env 默认提供方
+	if cfg := service.LlmConfigBody(service.ChatSvc.GetModelConfigByName(req.Model)); cfg != nil {
+		body["llm_config"] = cfg
+	}
 
 	// 设置 SSE 响应头
 	c.Header("Content-Type", "text/event-stream")

@@ -65,7 +65,13 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
     yield f"data: {sources_data}\n\n"
 
     # 5) 基于上下文流式生成答案，逐 token 以 type=token 帧下发
-    llm = get_chat_llm(model=req.model, temperature=req.temperature)
+    cfg = req.llm_config
+    llm = get_chat_llm(
+        model=req.model,
+        temperature=req.temperature,
+        api_key=cfg.api_key if cfg else None,
+        api_base=cfg.api_base if cfg else None,
+    )
     async for chunk in llm.astream([system_msg, human_msg]):
         token = chunk.content
         if token:
