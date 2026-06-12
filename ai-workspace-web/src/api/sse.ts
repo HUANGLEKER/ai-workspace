@@ -26,6 +26,12 @@ export interface StreamSSEOptions {
    * `(d) => { const j = JSON.parse(d); return j.type === 'token' ? j.token : undefined }`
    */
   extract?: (data: string) => string | undefined
+  /**
+   * 非展示文本帧（extract 返回 undefined 的帧，如 token 统计、元数据）的旁路回调。
+   * 用于 SSE 中夹带的结构化信息（例如 {"type":"usage",...}），与正文 token 解耦，
+   * 不进入 onChunk，因此不会阻塞/污染 Markdown 渲染。
+   */
+  onMeta?: (data: string) => void
 }
 
 const defaultExtract = (data: string): string | undefined => {
@@ -43,7 +49,7 @@ const defaultExtract = (data: string): string | undefined => {
  * 流结束时 Promise resolve；不会 reject，错误通过 onError 回调传递。
  */
 export async function streamSSE(url: string, body: unknown, opts: StreamSSEOptions): Promise<void> {
-  const { onChunk, onDone, onError, signal, extract = defaultExtract } = opts
+  const { onChunk, onDone, onError, signal, extract = defaultExtract, onMeta } = opts
   const token = localStorage.getItem('token')
   let finished = false
   const finish = () => {
@@ -82,6 +88,7 @@ export async function streamSSE(url: string, body: unknown, opts: StreamSSEOptio
       if (data === '[DONE]') return true
       const text = extract(data)
       if (text) onChunk(text)
+      else onMeta?.(data)
       return false
     }
 

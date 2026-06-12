@@ -73,6 +73,13 @@ export interface ChatMessage {
   createTime?: string
 }
 
+/** Token 用量统计（由 chat SSE 的 {"type":"usage"} 帧携带，通常在流尾到达） */
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
 // 知识库相关
 export interface KnowledgeBase {
   id: number

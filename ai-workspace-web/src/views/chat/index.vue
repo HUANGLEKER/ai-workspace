@@ -67,8 +67,10 @@
           <AppButton variant="ghost" size="sm" :icon="Trash2" @click="clearMessages">清空</AppButton>
         </div>
 
-        <!-- 消息列表（外层为滚动容器，保持为原生 div 以便 useChatScroll 直接操作 scrollTop） -->
-        <div ref="containerRef" class="flex flex-1 flex-col gap-5 overflow-y-auto p-5">
+        <!-- 消息区：relative 容器承载滚动区 + 浮动「回到底部」按钮 -->
+        <div class="relative flex flex-1 overflow-hidden">
+        <!-- 消息列表（滚动容器，保持原生 div 以便 useChatScroll 直接操作 scrollTop；@scroll 驱动智能跟随判定） -->
+        <div ref="containerRef" class="flex flex-1 flex-col gap-5 overflow-y-auto p-5" @scroll.passive="onScroll">
           <!--
             TransitionGroup 承载列表语义；逐条消息的入场动画由 VueUse Motion 的 v-motion 指令
             在各自挂载时独立驱动，互不影响 → 新消息插入既不会重播已有消息，也不会引起整列重排
@@ -79,16 +81,43 @@
               v-for="(msg, idx) in messages"
               :key="msg.id ?? `local-${idx}`"
               v-motion="messageMotion(msg.role, idx === noAnimateIdx)"
-              class="flex items-start gap-3"
+              class="group flex items-start gap-3"
               :class="msg.role === 'user' ? 'flex-row-reverse' : ''"
             >
               <AppAvatar :icon="msg.role === 'user' ? User : Bot" :variant="msg.role === 'user' ? 'light' : 'dark'" />
-              <div
-                class="max-w-[72%] break-words rounded-2xl px-4 py-3 text-sm leading-relaxed"
-                :class="msg.role === 'user' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100/50 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'"
-              >
-                <MarkdownView v-if="msg.role === 'assistant'" :content="msg.content" />
-                <span v-else>{{ msg.content }}</span>
+              <div class="flex max-w-[72%] flex-col gap-1" :class="msg.role === 'user' ? 'items-end' : 'items-start'">
+                <div
+                  class="break-words rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                  :class="msg.role === 'user' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100/50 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'"
+                >
+                  <MarkdownView v-if="msg.role === 'assistant'" :content="msg.content" />
+                  <span v-else class="whitespace-pre-wrap">{{ msg.content }}</span>
+                </div>
+                <!-- 消息操作栏：默认隐藏，悬停整条消息时淡入（Radix Tooltip 提示） -->
+                <div
+                  class="flex items-center gap-0.5 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 focus-within:opacity-100"
+                  :class="msg.role === 'user' ? 'flex-row-reverse' : ''"
+                >
+                  <AppTooltip content="复制">
+                    <button class="rounded-lg p-1.5 text-zinc-400 transition-colors duration-200 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200" @click="copyMessage(msg)">
+                      <Copy class="h-3.5 w-3.5" />
+                    </button>
+                  </AppTooltip>
+                  <AppTooltip v-if="msg.role === 'assistant'" content="重新生成">
+                    <button
+                      class="rounded-lg p-1.5 text-zinc-400 transition-colors duration-200 hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                      :disabled="streaming || caretFading"
+                      @click="regenerateMessage(idx)"
+                    >
+                      <RefreshCw class="h-3.5 w-3.5" />
+                    </button>
+                  </AppTooltip>
+                  <AppTooltip content="删除">
+                    <button class="rounded-lg p-1.5 text-zinc-400 transition-colors duration-200 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400" @click="deleteMessage(idx)">
+                      <Trash2 class="h-3.5 w-3.5" />
+                    </button>
+                  </AppTooltip>
+                </div>
               </div>
             </div>
           </TransitionGroup>
@@ -105,6 +134,28 @@
             <MessageSquare class="h-10 w-10 text-zinc-200 dark:text-zinc-700" />
             <p class="text-sm">发送消息开始对话</p>
           </div>
+        </div>
+
+          <!-- 浮动「回到底部」按钮：仅当用户上滚脱离底部时出现，点击恢复自动跟随 -->
+          <Transition name="msg">
+            <button
+              v-if="!pinned"
+              class="absolute bottom-4 left-1/2 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-zinc-200/80 bg-white text-zinc-600 shadow-md transition-all duration-200 ease-out hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-white"
+              @click="scrollToBottom()"
+            >
+              <ArrowDown class="h-4 w-4" />
+            </button>
+          </Transition>
+        </div>
+
+        <!-- Token 用量统计条：AI 回答过程中实时显示（估算），流尾切换为精确值 -->
+        <div
+          v-if="displayUsage"
+          class="flex items-center gap-3 border-t border-zinc-200/80 px-5 py-1.5 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500"
+        >
+          <span>Prompt: <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ displayUsage.promptTokens }}</span></span>
+          <span>Completion: <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ usageEstimating ? '~' : '' }}{{ displayUsage.completionTokens }}</span></span>
+          <span>Total: <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ usageEstimating ? '~' : displayUsage.totalTokens }}</span></span>
         </div>
 
         <!-- 输入区域 -->
@@ -161,8 +212,8 @@
  * 流结束后将 streamingContent 写入 messages，保持消息列表与流式态分离。
  * 流式期间通过 requestAnimationFrame 节流自动触底。
  */
-import { Plus, Trash2, Bot, User, Send, CircleStop, MessageSquare, PanelLeft } from 'lucide-vue-next'
-import type { ChatSession, ChatMessage, ChatModel } from '@/types'
+import { Plus, Trash2, Bot, User, Send, CircleStop, MessageSquare, PanelLeft, Copy, RefreshCw, ArrowDown } from 'lucide-vue-next'
+import type { ChatSession, ChatMessage, ChatModel, TokenUsage } from '@/types'
 import { listModels, listSessions, createSession, deleteSession, listMessages, sendMessageStream } from '@/api/chat'
 import { toast, confirm, AppTooltip } from '@/components/ui'
 import { useChatScroll } from '@/composables/useChatScroll'
@@ -183,7 +234,9 @@ const collapsed = ref(false)
 // 流式气泡定稿后提交进 messages 的那条消息索引：该消息此前已可见，故跳过入场动画避免淡入重影
 const noAnimateIdx = ref(-1)
 
-const { containerRef, scrollToBottom, scheduleScroll } = useChatScroll()
+const { containerRef, pinned, scrollToBottom, scheduleScroll, onScroll } = useChatScroll()
+// 实时 token 用量（流尾由 usage 帧填充；流式期间 completion 用估算值给出即时反馈）
+const usage = ref<TokenUsage | null>(null)
 // 流式态与历史态分离：流式期间 token 累加到 streamMd，结束后将 text 提交进 messages
 const { text: streamText, display: streamDisplay, append: appendStream, flush: flushStream, reset: resetStream } = useStreamingMarkdown()
 let streamController: AbortController | null = null
@@ -221,9 +274,26 @@ function cancelFade() {
   }
   caretFading.value = false
   resetStream()
+  usage.value = null
 }
 
 const modelOptions = computed(() => models.value.map((m) => ({ label: m.modelName, value: m.modelName })))
+
+/**
+ * 展示用 token 用量：
+ * - 流式期间 usage 帧通常尚未到达，用「字符数 / 4」粗估 completion，给出实时跳动反馈；
+ * - usage 帧到达后（流尾）切换为精确值，prompt 同时可见。
+ * 估算仅用于即时观感，不参与任何计费/持久化逻辑。
+ */
+const displayUsage = computed<TokenUsage | null>(() => {
+  if (usage.value) return usage.value
+  if (streaming.value) {
+    return { promptTokens: 0, completionTokens: Math.ceil(streamText.value.length / 4), totalTokens: 0 }
+  }
+  return null
+})
+/** 流式中且精确 usage 未到达时为估算态，UI 上以「~」前缀标注 */
+const usageEstimating = computed(() => !usage.value && streaming.value)
 
 async function loadModels() {
   try {
@@ -338,8 +408,17 @@ async function handleSend() {
   inputText.value = ''
   messages.value.push({ role: 'user', content })
   await scrollToBottom()
+  streamReply(content)
+}
 
+/**
+ * 启动一轮流式回复（发送新消息与「重新生成」共用）。
+ * 不负责推入用户消息：调用方按需先行处理（发送时推入；重新生成时复用既有用户消息）。
+ */
+function streamReply(content: string) {
+  if (!currentSession.value) return
   streaming.value = true
+  usage.value = null
   resetStream()
   streamController = new AbortController()
 
@@ -364,11 +443,52 @@ async function handleSend() {
       cancelFade()
       toast.error('发送失败：' + err)
     },
-    streamController.signal
+    streamController.signal,
+    (u) => {
+      usage.value = u // token 统计帧（流尾到达），不阻塞渲染
+    }
   )
 }
 
 function handleStop() {
   streamController?.abort()
+}
+
+// ─── 消息操作栏：复制 / 重新生成 / 删除 ──────────────────────────────
+
+/** 复制单条消息正文到剪贴板 */
+async function copyMessage(msg: ChatMessage) {
+  try {
+    await navigator.clipboard.writeText(msg.content)
+    toast.success('已复制')
+  } catch {
+    toast.error('复制失败')
+  }
+}
+
+/**
+ * 重新生成某条助手消息：移除它及其之后的消息，复用其前一条用户消息重新流式。
+ * 注：当前后端无专用 regenerate 端点，会按常规流程再次落库；前端只做本轮重发。
+ */
+function regenerateMessage(idx: number) {
+  if (streaming.value || caretFading.value) return
+  const target = messages.value[idx]
+  if (!target || target.role !== 'assistant') return
+  // 向上找最近的用户消息作为重新生成的输入
+  let userIdx = idx - 1
+  while (userIdx >= 0 && messages.value[userIdx].role !== 'user') userIdx--
+  if (userIdx < 0) return
+  const prompt = messages.value[userIdx].content
+  // 截断到该用户消息之后（移除旧的助手回复），再重新流式
+  messages.value = messages.value.slice(0, userIdx + 1)
+  noAnimateIdx.value = -1
+  scrollToBottom()
+  streamReply(prompt)
+}
+
+/** 删除单条消息（本地移除；后端暂无单条消息删除端点） */
+function deleteMessage(idx: number) {
+  messages.value.splice(idx, 1)
+  toast.success('已删除')
 }
 </script>

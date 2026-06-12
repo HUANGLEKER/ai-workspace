@@ -21,12 +21,29 @@ async def stream_chat(req: ChatRequest) -> AsyncIterator[str]:
     llm = get_chat_llm(model=req.model, temperature=req.temperature)
     lc_messages = [_to_lc_message(m) for m in req.messages]
 
-    # 逐块消费 LLM 流式输出，将每个 token 包装为 SSE 帧
-    async for chunk in llm.astream(lc_messages):
+    # stream_usage=True：让 OpenAI 兼容端在流尾返回 token 用量（usage_metadata）。
+    # 逐块消费 LLM 流式输出，将每个 token 包装为 SSE 帧；用量帧以独立 type=usage 帧夹带。
+    async for chunk in llm.astream(lc_messages, stream_usage=True):
         token = chunk.content
         if token:
             data = json.dumps({"session_id": req.session_id, "token": token}, ensure_ascii=False)
             yield f"data: {data}\n\n"
+
+        # 用量元数据通常仅在最后一个 chunk 上出现；与正文 token 解耦为独立帧，
+        # 前端经 onMeta 旁路消费，不污染 Markdown 渲染。
+        usage = getattr(chunk, "usage_metadata", None)
+        if usage:
+            usage_frame = json.dumps(
+                {
+                    "type": "usage",
+                    "session_id": req.session_id,
+                    "prompt_tokens": usage.get("input_tokens", 0),
+                    "completion_tokens": usage.get("output_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                },
+                ensure_ascii=False,
+            )
+            yield f"data: {usage_frame}\n\n"
 
     # 结束哨兵，通知前端流式完成
     yield "data: [DONE]\n\n"

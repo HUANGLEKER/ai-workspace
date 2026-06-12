@@ -51,6 +51,80 @@ html.dark {
   }
 }
 
+/* ─── Markdown 代码块工具栏（语言标签 + 复制按钮，支持 Dark Mode） ─── */
+/* 容器接管圆角与边框；覆盖 prose 默认 pre 的外边距/圆角/底色，使工具栏与代码无缝拼接 */
+.prose .code-block {
+  margin: 1.25em 0;
+  overflow: hidden;
+  border: 1px solid theme(--color-zinc-200);
+  border-radius: theme(--radius-xl);
+  background: theme(--color-zinc-50);
+}
+.dark .prose .code-block {
+  border-color: theme(--color-zinc-700);
+  background: theme(--color-zinc-900);
+}
+.prose .code-block__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+  border-bottom: 1px solid theme(--color-zinc-200);
+  background: theme(--color-zinc-100);
+}
+.dark .prose .code-block__toolbar {
+  border-bottom-color: theme(--color-zinc-700);
+  background: theme(--color-zinc-800);
+}
+.prose .code-block__lang {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: theme(--color-zinc-500);
+}
+.dark .prose .code-block__lang {
+  color: theme(--color-zinc-400);
+}
+.prose .code-block__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: theme(--radius-lg);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: theme(--color-zinc-500);
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+.prose .code-block__copy:hover {
+  background: theme(--color-zinc-200);
+  color: theme(--color-zinc-800);
+}
+.dark .prose .code-block__copy {
+  color: theme(--color-zinc-400);
+}
+.dark .prose .code-block__copy:hover {
+  background: theme(--color-zinc-700);
+  color: theme(--color-zinc-100);
+}
+/* 复制成功态：品牌强调色，给出明确反馈 */
+.prose .code-block__copy--done {
+  color: theme(--color-emerald-600);
+}
+.dark .prose .code-block__copy--done {
+  color: theme(--color-emerald-400);
+}
+/* pre 嵌在容器内，去掉自身边框/圆角/外边距，避免与容器重叠 */
+.prose .code-block pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

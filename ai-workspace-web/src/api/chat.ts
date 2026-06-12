@@ -10,7 +10,7 @@
  */
 import request from './request'
 import { streamSSE } from './sse'
-import type { ChatSession, ChatMessage, ChatModel, PageResult } from '@/types'
+import type { ChatSession, ChatMessage, ChatModel, PageResult, TokenUsage } from '@/types'
 
 export const listModels = () =>
   request.get<unknown, ChatModel[]>('/chat/model/list')
@@ -49,5 +49,33 @@ export const sendMessageStream = (
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (err: string) => void,
-  signal?: AbortSignal
-) => streamSSE('/api/chat/send', { sessionId, content }, { onChunk, onDone, onError, signal })
+  signal?: AbortSignal,
+  onUsage?: (usage: TokenUsage) => void
+) =>
+  streamSSE(
+    '/api/chat/send',
+    { sessionId, content },
+    {
+      onChunk,
+      onDone,
+      onError,
+      signal,
+      // token 统计帧不进入正文渲染，经 onMeta 旁路解析后回调 onUsage
+      onMeta: onUsage
+        ? (data) => {
+            try {
+              const j = JSON.parse(data)
+              if (j.type === 'usage') {
+                onUsage({
+                  promptTokens: j.prompt_tokens ?? 0,
+                  completionTokens: j.completion_tokens ?? 0,
+                  totalTokens: j.total_tokens ?? 0
+                })
+              }
+            } catch {
+              /* 非 JSON 元数据帧，忽略 */
+            }
+          }
+        : undefined
+    }
+  )
