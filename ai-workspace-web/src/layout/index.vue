@@ -3,8 +3,11 @@
     <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
     <div class="flex flex-1 flex-col overflow-hidden">
       <Header />
-      <main class="flex-1 overflow-y-auto scroll-smooth bg-zinc-50 p-6 dark:bg-zinc-950">
-        <router-view v-slot="{ Component, route }">
+      <router-view v-slot="{ Component, route }">
+        <main
+          class="flex flex-1 flex-col overflow-hidden scroll-smooth"
+          :class="route.meta.fullPage ? 'bg-white dark:bg-zinc-900' : 'overflow-y-auto bg-zinc-50 p-6 dark:bg-zinc-950'"
+        >
           <transition
             mode="out-in"
             enter-active-class="transition-all duration-200 ease-out"
@@ -14,8 +17,8 @@
           >
             <component :is="Component" :key="route.path" />
           </transition>
-        </router-view>
-      </main>
+        </main>
+      </router-view>
     </div>
   </div>
 </template>

@@ -29,7 +29,7 @@
           class="mb-0.5 flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all duration-200 ease-out"
           :class="[
             isActive(item.path)
-              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+              ? 'bg-zinc-200/80 text-zinc-900 font-medium dark:bg-zinc-800 dark:text-zinc-100'
               : 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
             collapsed ? 'justify-center px-0' : ''
           ]"

@@ -86,17 +86,15 @@ html.dark {
   }
 }
 
-/* ─── highlight.js 语法高亮（主题感知，避免引入外部主题 CSS 与暗色冲突） ─── */
+/* ─── highlight.js 语法高亮 ─── */
+/* 适配明/暗模式，明色下采用深色字体，暗色下采用浅色字体。 */
 .hljs {
   color: theme(--color-zinc-800);
   background: transparent;
 }
-.dark .hljs {
-  color: theme(--color-zinc-200);
-}
 .hljs-comment,
 .hljs-quote {
-  color: theme(--color-zinc-400);
+  color: theme(--color-zinc-500);
   font-style: italic;
 }
 .hljs-keyword,
@@ -105,13 +103,6 @@ html.dark {
 .hljs-name,
 .hljs-tag {
   color: theme(--color-violet-600);
-}
-.dark .hljs-keyword,
-.dark .hljs-selector-tag,
-.dark .hljs-built_in,
-.dark .hljs-name,
-.dark .hljs-tag {
-  color: theme(--color-violet-400);
 }
 .hljs-string,
 .hljs-title,
@@ -124,14 +115,6 @@ html.dark {
 .hljs-addition {
   color: theme(--color-emerald-600);
 }
-.dark .hljs-string,
-.dark .hljs-title,
-.dark .hljs-section,
-.dark .hljs-attribute,
-.dark .hljs-literal,
-.dark .hljs-type {
-  color: theme(--color-emerald-400);
-}
 .hljs-number,
 .hljs-symbol,
 .hljs-bullet,
@@ -139,24 +122,53 @@ html.dark {
 .hljs-link {
   color: theme(--color-amber-600);
 }
-.dark .hljs-number,
-.dark .hljs-symbol,
-.dark .hljs-meta {
-  color: theme(--color-amber-400);
-}
 .hljs-variable,
 .hljs-params {
   color: theme(--color-sky-600);
-}
-.dark .hljs-variable,
-.dark .hljs-params {
-  color: theme(--color-sky-400);
 }
 .hljs-emphasis {
   font-style: italic;
 }
 .hljs-strong {
   font-weight: 600;
+}
+
+/* 暗色模式高亮覆盖 */
+.dark .hljs {
+  color: theme(--color-zinc-100);
+}
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: theme(--color-zinc-400);
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-built_in,
+.dark .hljs-name,
+.dark .hljs-tag {
+  color: theme(--color-violet-300);
+}
+.dark .hljs-string,
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-template-tag,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-addition {
+  color: theme(--color-emerald-300);
+}
+.dark .hljs-number,
+.dark .hljs-symbol,
+.dark .hljs-bullet,
+.dark .hljs-meta,
+.dark .hljs-link {
+  color: theme(--color-amber-300);
+}
+.dark .hljs-variable,
+.dark .hljs-params {
+  color: theme(--color-sky-300);
 }
 
 /* ─── vue-virtual-scroller 基础样式（包内 CSS 在 main.ts 引入；此处仅补滚动容器尺寸） ─── */
@@ -176,10 +188,6 @@ html.dark {
   border-radius: theme(--radius-xl);
   background: theme(--color-zinc-50);
 }
-.dark .prose .code-block {
-  border-color: theme(--color-zinc-700);
-  background: theme(--color-zinc-900);
-}
 .prose .code-block__toolbar {
   display: flex;
   align-items: center;
@@ -188,10 +196,6 @@ html.dark {
   border-bottom: 1px solid theme(--color-zinc-200);
   background: theme(--color-zinc-100);
 }
-.dark .prose .code-block__toolbar {
-  border-bottom-color: theme(--color-zinc-700);
-  background: theme(--color-zinc-800);
-}
 .prose .code-block__lang {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.72rem;
@@ -199,9 +203,6 @@ html.dark {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: theme(--color-zinc-500);
-}
-.dark .prose .code-block__lang {
-  color: theme(--color-zinc-400);
 }
 .prose .code-block__copy {
   display: inline-flex;
@@ -218,6 +219,19 @@ html.dark {
 .prose .code-block__copy:hover {
   background: theme(--color-zinc-200);
   color: theme(--color-zinc-800);
+}
+
+/* 暗色模式代码块框架 */
+.dark .prose .code-block {
+  border-color: theme(--color-zinc-800);
+  background: theme(--color-zinc-900);
+}
+.dark .prose .code-block__toolbar {
+  border-color: theme(--color-zinc-800);
+  background: theme(--color-zinc-800);
+}
+.dark .prose .code-block__lang {
+  color: theme(--color-zinc-400);
 }
 .dark .prose .code-block__copy {
   color: theme(--color-zinc-400);
@@ -239,6 +253,13 @@ html.dark {
   border: 0;
   border-radius: 0;
   background: transparent;
+  color: theme(--color-zinc-800);
+}
+.prose .code-block pre code {
+  color: inherit;
+}
+.dark .prose .code-block pre {
+  color: theme(--color-zinc-100);
 }
 
 ::-webkit-scrollbar {

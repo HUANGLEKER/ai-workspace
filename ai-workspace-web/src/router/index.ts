@@ -35,7 +35,7 @@ const router = createRouter({
           path: 'chat',
           name: 'Chat',
           component: () => import('@/views/chat/index.vue'),
-          meta: { title: 'AI 对话', icon: 'ChatDotRound' }
+          meta: { title: 'AI 对话', icon: 'ChatDotRound', fullPage: true }
         },
         {
           path: 'knowledge/base',
@@ -53,7 +53,7 @@ const router = createRouter({
           path: 'knowledge/rag',
           name: 'KnowledgeRag',
           component: () => import('@/views/knowledge/rag/index.vue'),
-          meta: { title: '知识库问答', icon: 'Search' }
+          meta: { title: '知识库问答', icon: 'Search', fullPage: true }
         },
         {
           path: 'file',

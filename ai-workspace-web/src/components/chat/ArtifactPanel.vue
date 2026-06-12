@@ -76,7 +76,7 @@
       </div>
 
       <!-- SQL / JSON / 长代码 / 源码视图：高亮 pre -->
-      <pre v-else class="m-0 overflow-auto p-4 text-[13px] leading-relaxed"><code ref="codeEl" :class="`hljs language-${hlLang}`" /></pre>
+      <pre v-else class="m-0 h-full overflow-auto bg-zinc-900 p-4 text-[13px] leading-relaxed"><code ref="codeEl" :class="`hljs language-${hlLang}`" /></pre>
     </div>
   </div>
 </template>

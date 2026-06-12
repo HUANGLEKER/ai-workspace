@@ -7,7 +7,7 @@
         class="relative break-words rounded-2xl px-4 py-3 text-sm leading-relaxed"
         :class="[
           msg.role === 'user'
-            ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+            ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
             : 'bg-zinc-100/50 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100',
           collapsible && collapsed ? 'max-h-[460px] overflow-hidden' : ''
         ]"
@@ -20,7 +20,7 @@
           v-if="collapsible && collapsed"
           class="pointer-events-none absolute inset-x-0 bottom-0 h-16 rounded-b-2xl"
           :class="msg.role === 'user'
-            ? 'bg-gradient-to-t from-zinc-900 to-transparent dark:from-zinc-100'
+            ? 'bg-gradient-to-t from-zinc-100 to-transparent dark:from-zinc-700'
             : 'bg-gradient-to-t from-zinc-100/90 to-transparent dark:from-zinc-800'"
         />
       </div>

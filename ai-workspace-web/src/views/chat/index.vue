@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-[calc(100vh-104px)] overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900">
+  <div class="flex flex-1 overflow-hidden bg-white dark:bg-zinc-900">
     <!-- 会话列表侧边栏 -->
     <div
       class="relative flex shrink-0 flex-col border-r border-zinc-200/80 bg-zinc-50 transition-all duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-900"
@@ -17,7 +17,7 @@
           class="group mb-0.5 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ease-out"
           :class="[
             currentSession?.id === session.id
-              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+              ? 'bg-zinc-200/80 text-zinc-900 font-medium dark:bg-zinc-800 dark:text-zinc-100'
               : 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
             collapsed ? 'justify-center px-0' : ''
           ]"

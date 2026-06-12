@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-[calc(100vh-104px)] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900">
+  <div class="flex flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-900">
     <!-- 顶部：知识库选择 -->
     <div class="flex h-14 shrink-0 items-center gap-3.5 border-b border-zinc-200/80 px-5 dark:border-zinc-800">
       <div class="mr-auto flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
@@ -33,7 +33,7 @@
         <!-- 问题 -->
         <div class="flex flex-row-reverse items-start gap-3">
           <AppAvatar :icon="User" />
-          <div class="max-w-[72%] break-words rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm leading-relaxed text-white dark:bg-zinc-100 dark:text-zinc-900">
+          <div class="max-w-[72%] break-words rounded-2xl bg-zinc-100 px-4 py-2.5 text-sm leading-relaxed text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100">
             {{ turn.question }}
           </div>
         </div>
