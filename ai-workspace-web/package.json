@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@vueuse/motion": "^2.2.6",
@@ -27,11 +29,14 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.10.5",
     "@vitejs/plugin-vue": "^5.2.1",
+    "happy-dom": "^20.10.2",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "unplugin-auto-import": "^21.0.0",
     "unplugin-vue-components": "^32.1.0",
     "vite": "^6.0.5",
+    "vitest": "^4.1.8",
     "vue-tsc": "^2.2.0"
   }
 }

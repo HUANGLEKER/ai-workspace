@@ -201,8 +201,10 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'radix-vue'
 import { Plus, Trash2, Pencil, Send, CircleStop, MessageSquare, PanelLeft, ArrowDown, LayoutPanelLeft } from 'lucide-vue-next'
-import type { ChatSession, ChatMessage, ChatModel, TokenUsage } from '@/types'
-import { listModels, listSessions, createSession, renameSession, deleteSession, listMessages, sendMessageStream } from '@/api/chat'
+import { storeToRefs } from 'pinia'
+import type { ChatSession, ChatMessage, TokenUsage } from '@/types'
+import { sendMessageStream } from '@/api/chat'
+import { useChatStore } from '@/stores/chat'
 import { AppButton, AppEmpty, AppLoading, AppSelect, AppTextarea, AppTooltip, toast, confirm } from '@/components/ui'
 import ChatMessageList from '@/components/chat/ChatMessageList.vue'
 import ArtifactPanel from '@/components/chat/ArtifactPanel.vue'
@@ -210,15 +212,12 @@ import { useStreamingMarkdown } from '@/composables/useStreamingMarkdown'
 import { useThinkingPhases } from '@/composables/useThinkingPhases'
 import { useArtifactPanel } from '@/composables/useArtifactPanel'
 
-const sessionsLoading = ref(false)
-const sessions = ref<ChatSession[]>([])
-const currentSession = ref<ChatSession | null>(null)
-const messages = ref<ChatMessage[]>([])
+// 数据状态收敛在 chat store；本组件只保留流式管线与交互状态
+const chatStore = useChatStore()
+const { sessions, sessionsLoading, currentSession, messages, selectedModel, modelOptions } = storeToRefs(chatStore)
 const inputText = ref('')
 const streaming = ref(false)
 const caretFading = ref(false)
-const models = ref<ChatModel[]>([])
-const selectedModel = ref('')
 const collapsed = ref(false)
 const noAnimateIdx = ref(-1)
 
@@ -276,8 +275,6 @@ function cancelFade() {
   usage.value = null
 }
 
-const modelOptions = computed(() => models.value.map((m) => ({ label: m.modelName, value: m.modelName })))
-
 const displayUsage = computed<TokenUsage | null>(() => {
   if (usage.value) return usage.value
   if (streaming.value) {
@@ -287,50 +284,21 @@ const displayUsage = computed<TokenUsage | null>(() => {
 })
 const usageEstimating = computed(() => !usage.value && streaming.value)
 
-async function loadModels() {
-  try {
-    models.value = await listModels()
-    if (models.value.length && !selectedModel.value) {
-      selectedModel.value = models.value[0].modelName
-    }
-  } catch {
-    models.value = []
-  }
-}
-
 onMounted(() => {
-  loadModels()
-  loadSessions()
+  chatStore.loadModels()
+  chatStore.loadSessions()
 })
-
-async function loadSessions() {
-  sessionsLoading.value = true
-  try {
-    sessions.value = await listSessions()
-  } catch {
-    sessions.value = []
-  } finally {
-    sessionsLoading.value = false
-  }
-}
 
 async function selectSession(session: ChatSession) {
   cancelFade()
   artifact.close()
-  currentSession.value = session
-  messages.value = []
-  try {
-    messages.value = await listMessages(session.id)
-  } catch {
-    messages.value = []
-  }
+  await chatStore.selectSession(session)
   scrollToBottom()
 }
 
 async function handleCreateSession() {
   try {
-    const session = await createSession({ title: '新对话', modelName: selectedModel.value })
-    sessions.value.unshift(session)
+    const session = await chatStore.createSession()
     selectSession(session)
   } catch {
     toast.error('创建对话失败')
@@ -357,14 +325,9 @@ async function commitRename(session: ChatSession) {
   const title = renameText.value.trim()
   renamingId.value = null
   if (!title || title === session.title) return
-  const prev = session.title
-  session.title = title // 乐观更新
-  if (currentSession.value?.id === session.id) currentSession.value.title = title
   try {
-    await renameSession(session.id, title)
+    await chatStore.renameSessionTitle(session, title) // 乐观更新，失败自动回滚
   } catch {
-    session.title = prev
-    if (currentSession.value?.id === session.id) currentSession.value.title = prev
     toast.error('重命名失败')
   }
 }
@@ -373,12 +336,7 @@ async function handleDeleteSession(id: number) {
   const ok = await confirm({ title: '删除确认', message: '确定删除该对话吗？', confirmText: '确定删除', danger: true })
   if (!ok) return
   try {
-    await deleteSession(id)
-    sessions.value = sessions.value.filter((s) => s.id !== id)
-    if (currentSession.value?.id === id) {
-      currentSession.value = null
-      messages.value = []
-    }
+    await chatStore.removeSession(id)
     toast.success('删除成功')
   } catch {
     toast.error('删除失败')
@@ -390,7 +348,7 @@ async function clearMessages() {
   if (ok) {
     cancelFade()
     artifact.close()
-    messages.value = []
+    chatStore.clearMessages()
   }
 }
 
@@ -467,9 +425,7 @@ function streamReply(content: string) {
     },
     (title) => {
       // 后端用首条消息自动生成了标题：同步更新侧边栏与标题栏
-      if (currentSession.value) currentSession.value.title = title
-      const s = sessions.value.find((x) => x.id === currentSession.value?.id)
-      if (s) s.title = title
+      if (currentSession.value) chatStore.setSessionTitle(currentSession.value.id, title)
     }
   )
 }
