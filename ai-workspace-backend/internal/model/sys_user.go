@@ -2,7 +2,9 @@ package model
 
 type SysUser struct {
 	BaseModel
-	Username string `gorm:"column:username;uniqueIndex;size:64" json:"username"`
+	// 唯一性由 DB 复合索引 uk_username(username, deleted) 保证（见 init.sql），
+	// 软删后可重建同名用户；schema 由 SQL 管理，此处不加 uniqueIndex 标签
+	Username string `gorm:"column:username;size:64"            json:"username"`
 	Password string `gorm:"column:password;size:128"           json:"-"`
 	Nickname string `gorm:"column:nickname;size:64"            json:"nickname"`
 	Email    string `gorm:"column:email;size:128"              json:"email"`
