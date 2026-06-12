@@ -65,6 +65,9 @@ func main() {
 	fastapi.Init(config.Global.FastAPI)
 	zap.L().Info("FastAPI 客户端已初始化", zap.String("baseURL", config.Global.FastAPI.BaseURL))
 
+	// ── 6.2 组装注入化的 service 单例（依赖 MySQL/FastAPI/MinIO 均已就绪）──
+	service.Init()
+
 	// ── 6.5 重置上次进程退出时中断的嵌入任务（RUNNING→FAILED）────────
 	// 嵌入是裸 goroutine，重启即丢；不重置会留下永久 RUNNING 的僵尸记录
 	if err := service.KBSvc.RecoverInterruptedTasks(); err != nil {
