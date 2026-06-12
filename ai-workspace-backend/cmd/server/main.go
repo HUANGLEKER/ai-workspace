@@ -65,6 +65,12 @@ func main() {
 	fastapi.Init(config.Global.FastAPI)
 	zap.L().Info("FastAPI 客户端已初始化", zap.String("baseURL", config.Global.FastAPI.BaseURL))
 
+	// ── 6.5 重置上次进程退出时中断的嵌入任务（RUNNING→FAILED）────────
+	// 嵌入是裸 goroutine，重启即丢；不重置会留下永久 RUNNING 的僵尸记录
+	if err := service.KBSvc.RecoverInterruptedTasks(); err != nil {
+		zap.L().Warn("重置中断嵌入任务失败", zap.Error(err))
+	}
+
 	// ── 7. 注册 JobHandler 并启动调度器 ──────────────────────────────
 	scheduler.Registry.Register("sampleJob", &scheduler.SampleJobHandler{})
 	// 注入日志回调，解耦调度器与服务层（避免循环导入）

@@ -173,6 +173,29 @@ func (s *kbService) RebuildKB(kbID, userID int64) error {
 	return nil
 }
 
+// RecoverInterruptedTasks 启动时调用：把上次进程退出时遗留的 RUNNING 任务与
+// PROCESSING 文档统一置为 FAILED。嵌入是裸 goroutine 异步执行，进程重启即丢失，
+// 不重置的话这些记录会永久卡在进行中状态；置 FAILED 后用户可通过"重建"入口自助重跑。
+func (s *kbService) RecoverInterruptedTasks() error {
+	res := database.DB.Model(&model.KbChunkTask{}).
+		Where("task_status = ?", model.TaskStatusRunning).
+		Updates(map[string]any{"task_status": model.TaskStatusFailed, "error_msg": "服务重启，任务中断"})
+	if res.Error != nil {
+		return res.Error
+	}
+	docRes := database.DB.Model(&model.KbDocument{}).
+		Where("status = ?", model.DocStatusProcessing).
+		Update("status", model.DocStatusFailed)
+	if docRes.Error != nil {
+		return docRes.Error
+	}
+	if res.RowsAffected > 0 || docRes.RowsAffected > 0 {
+		zap.L().Warn("已重置上次中断的嵌入任务",
+			zap.Int64("tasks", res.RowsAffected), zap.Int64("docs", docRes.RowsAffected))
+	}
+	return nil
+}
+
 // buildEmbedding 执行单文档嵌入流程：写任务审计记录 → 置 PROCESSING → POST FastAPI → 更新状态
 // 对应 Spring Boot EmbeddingServiceImpl.buildAsync()，此处以 goroutine 调用实现等价的异步行为
 func (s *kbService) buildEmbedding(doc *model.KbDocument) {
@@ -181,6 +204,17 @@ func (s *kbService) buildEmbedding(doc *model.KbDocument) {
 		TaskStatus: model.TaskStatusRunning,
 	}
 	database.DB.Create(task)
+
+	// goroutine 内 panic 会击穿 Gin 的 Recovery 直接杀死进程，且任务会卡死在 RUNNING；
+	// 此处兜底落 FAILED，与嵌入失败走同一条状态收敛路径
+	defer func() {
+		if r := recover(); r != nil {
+			zap.L().Error("嵌入 goroutine panic", zap.Int64("docId", doc.ID), zap.Any("panic", r))
+			database.DB.Model(&model.KbDocument{}).Where("id = ?", doc.ID).Update("status", model.DocStatusFailed)
+			database.DB.Model(&model.KbChunkTask{}).Where("id = ?", task.ID).
+				Updates(map[string]any{"task_status": model.TaskStatusFailed, "error_msg": fmt.Sprintf("内部错误: %v", r)})
+		}
+	}()
 
 	database.DB.Model(&model.KbDocument{}).Where("id = ?", doc.ID).Update("status", model.DocStatusProcessing)
 
