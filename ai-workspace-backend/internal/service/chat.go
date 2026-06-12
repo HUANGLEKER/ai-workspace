@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -47,6 +48,42 @@ func (s *chatService) DeleteSession(id, userID int64) error {
 		}
 		return tx.Delete(&model.ChatSession{}, id).Error
 	})
+}
+
+// defaultSessionTitles 视为「未命名」的标题集合，命中则首条消息可自动生成标题
+var defaultSessionTitles = map[string]bool{"": true, "新对话": true, "新会话": true}
+
+// AutoTitleFromFirstMessage 若会话仍是默认标题，用首条用户消息内容生成标题。
+// title 取内容首行并截断到 30 个字符；非默认标题（用户已手动命名）则不覆盖。
+// 返回最终标题（未变更时返回原标题），便于上层透传给前端。
+func (s *chatService) AutoTitleFromFirstMessage(sess *model.ChatSession, content string) string {
+	if !defaultSessionTitles[sess.Title] {
+		return sess.Title
+	}
+	title := strings.TrimSpace(content)
+	if idx := strings.IndexByte(title, '\n'); idx >= 0 {
+		title = strings.TrimSpace(title[:idx])
+	}
+	r := []rune(title)
+	if len(r) > 30 {
+		title = string(r[:30]) + "…"
+	}
+	if title == "" {
+		return sess.Title
+	}
+	if err := database.DB.Model(&model.ChatSession{}).Where("id = ?", sess.ID).Update("title", title).Error; err != nil {
+		return sess.Title
+	}
+	sess.Title = title
+	return title
+}
+
+// RenameSession 重命名会话，先校验归属再更新标题（防 IDOR）
+func (s *chatService) RenameSession(id, userID int64, title string) error {
+	if err := s.getOwned(id, userID); err != nil {
+		return err
+	}
+	return database.DB.Model(&model.ChatSession{}).Where("id = ?", id).Update("title", title).Error
 }
 
 // GetOwnedSession 校验会话归属，用于消息读写前的权限检查（防 IDOR）

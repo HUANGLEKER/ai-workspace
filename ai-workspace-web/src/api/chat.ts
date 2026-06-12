@@ -37,6 +37,9 @@ export const listSessions = () =>
 export const createSession = (data: { title?: string; modelName?: string }) =>
   request.post<unknown, ChatSession>('/chat/session/add', data)
 
+export const renameSession = (id: number, title: string) =>
+  request.put<unknown, void>(`/chat/session/${id}`, { title })
+
 export const deleteSession = (id: number) =>
   request.delete<unknown, void>(`/chat/session/${id}`)
 
@@ -50,7 +53,8 @@ export const sendMessageStream = (
   onDone: () => void,
   onError: (err: string) => void,
   signal?: AbortSignal,
-  onUsage?: (usage: TokenUsage) => void
+  onUsage?: (usage: TokenUsage) => void,
+  onTitle?: (title: string) => void
 ) =>
   streamSSE(
     '/api/chat/send',
@@ -60,22 +64,25 @@ export const sendMessageStream = (
       onDone,
       onError,
       signal,
-      // token 统计帧不进入正文渲染，经 onMeta 旁路解析后回调 onUsage
-      onMeta: onUsage
-        ? (data) => {
-            try {
-              const j = JSON.parse(data)
-              if (j.type === 'usage') {
-                onUsage({
-                  promptTokens: j.prompt_tokens ?? 0,
-                  completionTokens: j.completion_tokens ?? 0,
-                  totalTokens: j.total_tokens ?? 0
-                })
+      // token 统计帧 / 自动标题帧不进入正文渲染，经 onMeta 旁路解析后分发
+      onMeta:
+        onUsage || onTitle
+          ? (data) => {
+              try {
+                const j = JSON.parse(data)
+                if (j.type === 'usage' && onUsage) {
+                  onUsage({
+                    promptTokens: j.prompt_tokens ?? 0,
+                    completionTokens: j.completion_tokens ?? 0,
+                    totalTokens: j.total_tokens ?? 0
+                  })
+                } else if (j.type === 'title' && onTitle && j.title) {
+                  onTitle(j.title)
+                }
+              } catch {
+                /* 非 JSON 元数据帧，忽略 */
               }
-            } catch {
-              /* 非 JSON 元数据帧，忽略 */
             }
-          }
-        : undefined
+          : undefined
     }
   )

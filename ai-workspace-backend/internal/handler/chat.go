@@ -42,6 +42,26 @@ func AddSession(c *gin.Context) {
 	common.OK(c, sess)
 }
 
+// RenameSession PUT /api/chat/session/:id — 重命名会话
+func RenameSession(c *gin.Context) {
+	id, err := parseID(c)
+	if err != nil {
+		return
+	}
+	var req struct {
+		Title string `json:"title" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.BadRequest(c, err.Error())
+		return
+	}
+	if err := service.ChatSvc.RenameSession(id, middleware.CurrentUserID(c), req.Title); err != nil {
+		handleBizError(c, err)
+		return
+	}
+	common.OKMsg(c, "重命名成功")
+}
+
 // DeleteSession DELETE /api/chat/session/:id — 删除会话（级联删除消息）
 func DeleteSession(c *gin.Context) {
 	id, err := parseID(c)
@@ -113,6 +133,11 @@ func ChatSend(c *gin.Context) {
 		return
 	}
 
+	// 默认标题的会话用首条消息自动生成标题，置于发送 SSE 头之前以便用普通 JSON 错误响应兜底
+	oldTitle := sess.Title
+	autoTitle := service.ChatSvc.AutoTitleFromFirstMessage(sess, req.Content)
+	titleChanged := autoTitle != oldTitle
+
 	// 构建有界上下文
 	history, err := service.ChatSvc.ListRecentMessages(req.SessionID)
 	if err != nil {
@@ -139,6 +164,16 @@ func ChatSend(c *gin.Context) {
 
 	w := c.Writer
 	flusher, canFlush := w.(http.Flusher)
+
+	// 标题已自动生成：先推一帧 title 元数据，前端据此实时更新侧边栏会话名
+	if titleChanged {
+		if titleFrame, mErr := json.Marshal(map[string]string{"type": "title", "title": autoTitle}); mErr == nil {
+			fmt.Fprintf(w, "data: %s\n\n", titleFrame)
+			if canFlush {
+				flusher.Flush()
+			}
+		}
+	}
 
 	var assistantReply strings.Builder
 	ctx := c.Request.Context()

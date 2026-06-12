@@ -22,21 +22,42 @@
             collapsed ? 'justify-center px-0' : ''
           ]"
           @click="selectSession(session)"
+          @dblclick="!collapsed && startRename(session)"
         >
           <AppTooltip v-if="collapsed" :content="session.title" side="right">
             <MessageSquare class="h-4 w-4 shrink-0" />
           </AppTooltip>
           <MessageSquare v-else class="h-4 w-4 shrink-0" />
 
-          <span v-if="!collapsed" class="flex-1 truncate">{{ session.title }}</span>
-          <button
-            v-if="!collapsed"
-            class="shrink-0 rounded-lg p-0.5 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100"
-            :class="currentSession?.id === session.id ? 'hover:bg-zinc-700 dark:hover:bg-zinc-300' : 'hover:bg-zinc-200 dark:hover:bg-zinc-700'"
-            @click.stop="handleDeleteSession(session.id)"
-          >
-            <Trash2 class="h-3.5 w-3.5" />
-          </button>
+          <!-- 重命名输入态 -->
+          <input
+            v-if="!collapsed && renamingId === session.id"
+            ref="renameInputRef"
+            v-model="renameText"
+            class="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-1.5 py-0.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+            @click.stop
+            @keydown.enter.prevent="commitRename(session)"
+            @keydown.esc.prevent="cancelRename"
+            @blur="commitRename(session)"
+          />
+          <span v-else-if="!collapsed" class="flex-1 truncate">{{ session.title }}</span>
+
+          <template v-if="!collapsed && renamingId !== session.id">
+            <button
+              class="shrink-0 rounded-lg p-0.5 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100"
+              :class="currentSession?.id === session.id ? 'hover:bg-zinc-700 dark:hover:bg-zinc-300' : 'hover:bg-zinc-200 dark:hover:bg-zinc-700'"
+              @click.stop="startRename(session)"
+            >
+              <Pencil class="h-3.5 w-3.5" />
+            </button>
+            <button
+              class="shrink-0 rounded-lg p-0.5 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100"
+              :class="currentSession?.id === session.id ? 'hover:bg-zinc-700 dark:hover:bg-zinc-300' : 'hover:bg-zinc-200 dark:hover:bg-zinc-700'"
+              @click.stop="handleDeleteSession(session.id)"
+            >
+              <Trash2 class="h-3.5 w-3.5" />
+            </button>
+          </template>
         </div>
 
         <AppEmpty v-if="!sessionsLoading && sessions.length === 0 && !collapsed" description="暂无对话" />
@@ -177,11 +198,11 @@
  * 3. 消息折叠（ChatMessageItem）：超过 300 行自动 Show More / Show Less。
  * 4. 会话性能（ChatMessageList）：消息超 1000 条启用虚拟滚动，保持 SSE 与自动滚动。
  */
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'radix-vue'
-import { Plus, Trash2, Send, CircleStop, MessageSquare, PanelLeft, ArrowDown, LayoutPanelLeft } from 'lucide-vue-next'
+import { Plus, Trash2, Pencil, Send, CircleStop, MessageSquare, PanelLeft, ArrowDown, LayoutPanelLeft } from 'lucide-vue-next'
 import type { ChatSession, ChatMessage, ChatModel, TokenUsage } from '@/types'
-import { listModels, listSessions, createSession, deleteSession, listMessages, sendMessageStream } from '@/api/chat'
+import { listModels, listSessions, createSession, renameSession, deleteSession, listMessages, sendMessageStream } from '@/api/chat'
 import { AppButton, AppEmpty, AppLoading, AppSelect, AppTextarea, AppTooltip, toast, confirm } from '@/components/ui'
 import ChatMessageList from '@/components/chat/ChatMessageList.vue'
 import ArtifactPanel from '@/components/chat/ArtifactPanel.vue'
@@ -200,6 +221,11 @@ const models = ref<ChatModel[]>([])
 const selectedModel = ref('')
 const collapsed = ref(false)
 const noAnimateIdx = ref(-1)
+
+// 会话重命名内联编辑态
+const renamingId = ref<number | null>(null)
+const renameText = ref('')
+const renameInputRef = ref<HTMLInputElement | HTMLInputElement[] | null>(null)
 
 const listRef = ref<InstanceType<typeof ChatMessageList> | null>(null)
 const thinkingState = useThinkingPhases()
@@ -311,6 +337,38 @@ async function handleCreateSession() {
   }
 }
 
+function startRename(session: ChatSession) {
+  renamingId.value = session.id
+  renameText.value = session.title
+  nextTick(() => {
+    const el = Array.isArray(renameInputRef.value) ? renameInputRef.value[0] : renameInputRef.value
+    el?.focus()
+    el?.select()
+  })
+}
+
+function cancelRename() {
+  renamingId.value = null
+  renameText.value = ''
+}
+
+async function commitRename(session: ChatSession) {
+  if (renamingId.value !== session.id) return
+  const title = renameText.value.trim()
+  renamingId.value = null
+  if (!title || title === session.title) return
+  const prev = session.title
+  session.title = title // 乐观更新
+  if (currentSession.value?.id === session.id) currentSession.value.title = title
+  try {
+    await renameSession(session.id, title)
+  } catch {
+    session.title = prev
+    if (currentSession.value?.id === session.id) currentSession.value.title = prev
+    toast.error('重命名失败')
+  }
+}
+
 async function handleDeleteSession(id: number) {
   const ok = await confirm({ title: '删除确认', message: '确定删除该对话吗？', confirmText: '确定删除', danger: true })
   if (!ok) return
@@ -406,6 +464,12 @@ function streamReply(content: string) {
     streamController.signal,
     (u) => {
       usage.value = u
+    },
+    (title) => {
+      // 后端用首条消息自动生成了标题：同步更新侧边栏与标题栏
+      if (currentSession.value) currentSession.value.title = title
+      const s = sessions.value.find((x) => x.id === currentSession.value?.id)
+      if (s) s.title = title
     }
   )
 }
