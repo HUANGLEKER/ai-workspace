@@ -59,7 +59,7 @@ gofmt -l -w .                           # 格式化所有 Go 文件
 ```
 
 配置文件：`ai-workspace-backend/config.yaml`（服务端口、DSN、Redis、JWT、FastAPI、MinIO、日志）。  
-默认凭证：MySQL `root / 123456`，管理员账号 `admin / admin123`。
+默认凭证：MySQL `root / 123456`，管理员账号 `admin / 123456`。
 
 Go 后端结构（`internal/`）：
 - `handler/` —— Gin handler，对应各业务模块（auth/chat/kb/file/agent/workflow/job/prompt/tool/mcp/user/monitor/dashboard）
