@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -73,9 +74,41 @@ func Login(c *gin.Context) {
 	})
 }
 
-// Logout POST /api/auth/logout — 无状态 JWT，客户端丢弃 Token 即可
+// Logout POST /api/auth/logout — 将当前 token 加入 Redis 黑名单（jti，TTL=剩余有效期）。
+// 路由保持公开：即使带的是已失效 token 也应能"成功登出"，前端无需处理失败分支。
 func Logout(c *gin.Context) {
+	auth := c.GetHeader("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		if claims, err := middleware.ParseToken(strings.TrimPrefix(auth, "Bearer ")); err == nil {
+			middleware.RevokeToken(claims)
+		}
+	}
 	common.OKMsg(c, "退出成功")
+}
+
+// RefreshToken POST /api/auth/refresh — 用仍有效的 token 换取新 token（轮换：旧 token 立即吊销）。
+// 挂在 JWTAuth 之后，已过期/已吊销的 token 在中间件层即被拒绝。
+func RefreshToken(c *gin.Context) {
+	v, _ := c.Get(middleware.CtxClaims)
+	claims, ok := v.(*middleware.Claims)
+	if !ok {
+		common.Unauthorized(c)
+		return
+	}
+	// 角色实时重查：刷新窗口内被改权限/禁用的用户不应延续旧角色
+	user, err := service.UserSvc.GetByID(claims.UserID)
+	if err != nil || user.Status == 0 {
+		common.Unauthorized(c)
+		return
+	}
+	roles := service.UserSvc.GetRoles(claims.UserID)
+	token, err := middleware.GenerateToken(claims.UserID, claims.Username, roles)
+	if err != nil {
+		common.ServerError(c, "生成 Token 失败")
+		return
+	}
+	middleware.RevokeToken(claims)
+	common.OK(c, gin.H{"token": token})
 }
 
 type authInfoResp struct {
