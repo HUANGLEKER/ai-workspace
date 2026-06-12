@@ -205,7 +205,7 @@ FastAPI 健康检查：`GET http://localhost:8001/health`
 
 ## Sprint 路线图
 
-1. Sprint 1 ✓ —— Spring Boot 初始化、JWT 认证、RBAC
+1. Sprint 1 ✓ —— Spring Boot 初始化、JWT 认证、RBAC（Spring Boot 已废弃，见 Sprint 10）
 2. Sprint 2 ✓ —— 带 SSE 流式与 Markdown 渲染的 Chat
 3. Sprint 3 ✓ —— 文件中心（MinIO）+ 知识库 CRUD + 文档管理
 4. Sprint 4 ✓ —— RAG 管道：异步嵌入管道；到 FastAPI 的 SSE 代理
@@ -213,5 +213,5 @@ FastAPI 健康检查：`GET http://localhost:8001/health`
 6. Sprint 6 ✓ —— 系统监控；Agent + Workflow 模块（CRUD + 运行代理到 FastAPI）；动态 cron 调度器
 7. Sprint 7 ✓ —— 提示词中心、工具中心、MCP 服务器注册表；MCP 连通性检测
 8. Sprint 8 ✓ —— Agent 运行时工具使用：真实 HTTP 工具执行 + SSE MCP 工具加载，贯通 Go → FastAPI 工具调用循环；agent UI 选择工具/MCP 服务器并展示执行轨迹
-9. Sprint 9 ✓ —— 架构优化：统一 FastApiClient、SSE/嵌入线程池隔离、聊天上下文有界化与断连保存、CORS/LLM 超时重试修复；前端统一 streamSSE 流式工具、新增 RAG 流式问答页、Element Plus 按需引入 + 路由级拆包
+9. Sprint 9 ✓ —— 架构优化：统一 FastApiClient、SSE/嵌入线程池隔离、聊天上下文有界化与断连保存、CORS/LLM 超时重试修复；前端统一 streamSSE 流式工具、新增 RAG 流式问答页、Element Plus 按需引入 + 路由级拆包（Element Plus 已废弃，UI 栈已迁移至 TailwindCSS 4 + Radix Vue）
 10. Sprint 10 ✓ —— 后端迁移至 Go（Gin + GORM），替换 Spring Boot 多模块架构

@@ -34,8 +34,13 @@ declare module 'vue' {
     AppToaster: typeof import('./../components/ui/AppToaster.vue')['default']
     AppTooltip: typeof import('./../components/ui/AppTooltip.vue')['default']
     AppUpload: typeof import('./../components/ui/AppUpload.vue')['default']
+    ArtifactPanel: typeof import('./../components/chat/ArtifactPanel.vue')['default']
+    ChatMessageItem: typeof import('./../components/chat/ChatMessageItem.vue')['default']
+    ChatMessageList: typeof import('./../components/chat/ChatMessageList.vue')['default']
     MarkdownView: typeof import('./../components/MarkdownView.vue')['default']
+    MermaidView: typeof import('./../components/chat/MermaidView.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ThinkingIndicator: typeof import('./../components/chat/ThinkingIndicator.vue')['default']
   }
 }

@@ -51,6 +51,122 @@ html.dark {
   }
 }
 
+/* Thinking... 标题微光扫过效果（仅进行中时） */
+.thinking-shimmer {
+  background: linear-gradient(
+    90deg,
+    theme(--color-zinc-400) 0%,
+    theme(--color-zinc-900) 50%,
+    theme(--color-zinc-400) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-shimmer 1.6s linear infinite;
+}
+.dark .thinking-shimmer {
+  background: linear-gradient(
+    90deg,
+    theme(--color-zinc-500) 0%,
+    theme(--color-zinc-100) 50%,
+    theme(--color-zinc-500) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+@keyframes thinking-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ─── highlight.js 语法高亮（主题感知，避免引入外部主题 CSS 与暗色冲突） ─── */
+.hljs {
+  color: theme(--color-zinc-800);
+  background: transparent;
+}
+.dark .hljs {
+  color: theme(--color-zinc-200);
+}
+.hljs-comment,
+.hljs-quote {
+  color: theme(--color-zinc-400);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: theme(--color-violet-600);
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-built_in,
+.dark .hljs-name,
+.dark .hljs-tag {
+  color: theme(--color-violet-400);
+}
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: theme(--color-emerald-600);
+}
+.dark .hljs-string,
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-type {
+  color: theme(--color-emerald-400);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-meta,
+.hljs-link {
+  color: theme(--color-amber-600);
+}
+.dark .hljs-number,
+.dark .hljs-symbol,
+.dark .hljs-meta {
+  color: theme(--color-amber-400);
+}
+.hljs-variable,
+.hljs-params {
+  color: theme(--color-sky-600);
+}
+.dark .hljs-variable,
+.dark .hljs-params {
+  color: theme(--color-sky-400);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* ─── vue-virtual-scroller 基础样式（包内 CSS 在 main.ts 引入；此处仅补滚动容器尺寸） ─── */
+.chat-virtual-scroller {
+  height: 100%;
+}
+.chat-virtual-scroller .vue-recycle-scroller__item-wrapper {
+  width: 100%;
+}
+
 /* ─── Markdown 代码块工具栏（语言标签 + 复制按钮，支持 Dark Mode） ─── */
 /* 容器接管圆角与边框；覆盖 prose 默认 pre 的外边距/圆角/底色，使工具栏与代码无缝拼接 */
 .prose .code-block {

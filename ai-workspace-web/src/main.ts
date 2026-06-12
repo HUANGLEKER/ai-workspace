@@ -4,6 +4,7 @@ import { MotionPlugin } from '@vueuse/motion'
 import App from './App.vue'
 import router from './router'
 import { useThemeStore } from './stores/theme'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 import './styles/global.css'
 
 const app = createApp(App)
