@@ -1,10 +1,6 @@
 package service
 
 import (
-	"errors"
-
-	"gorm.io/gorm"
-
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
 	"github.com/aiworkspace/backend/pkg/database"
@@ -18,7 +14,7 @@ type promptService struct{}
 // ListByUser 查询当前用户的提示词列表，支持标题关键字与分类过滤
 func (s *promptService) ListByUser(userID int64, keyword, category string) ([]model.Prompt, error) {
 	var prompts []model.Prompt
-	q := database.DB.Where("create_by = ?", userID)
+	q := database.DB.Scopes(ownedScope[model.Prompt](userID))
 	if keyword != "" {
 		q = q.Where("title LIKE ?", "%"+keyword+"%")
 	}
@@ -31,18 +27,7 @@ func (s *promptService) ListByUser(userID int64, keyword, category string) ([]mo
 
 // GetOwned 查询并校验提示词归属，防止 IDOR
 func (s *promptService) GetOwned(id, userID int64) (*model.Prompt, error) {
-	var p model.Prompt
-	err := database.DB.First(&p, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("提示词")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if p.CreateBy != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &p, nil
+	return getOwnedResource[model.Prompt](database.DB, id, userID, "提示词")
 }
 
 // Create 新建提示词，强制 CreateBy 为当前用户

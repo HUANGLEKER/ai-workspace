@@ -20,7 +20,7 @@ type agentService struct{}
 // ListByUser 查询当前用户拥有的所有 Agent
 func (s *agentService) ListByUser(userID int64) ([]model.Agent, error) {
 	var agents []model.Agent
-	err := database.DB.Where("create_by = ?", userID).Order("create_time DESC").Find(&agents).Error
+	err := database.DB.Scopes(ownedScope[model.Agent](userID)).Order("create_time DESC").Find(&agents).Error
 	return agents, err
 }
 
@@ -71,18 +71,7 @@ func (s *agentService) Delete(id, userID int64) error {
 
 // GetOwned 校验 Agent 归属，防止 IDOR
 func (s *agentService) GetOwned(id, userID int64) (*model.Agent, error) {
-	var a model.Agent
-	err := database.DB.First(&a, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("Agent")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if a.CreateBy != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &a, nil
+	return getOwnedResource[model.Agent](database.DB, id, userID, "Agent")
 }
 
 // Run 解析 Agent 引用的工具与 MCP 服务器，组装完整规格后 POST 给 FastAPI 执行工具调用循环

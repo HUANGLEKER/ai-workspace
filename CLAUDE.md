@@ -162,7 +162,7 @@ Chat 流式（`POST /api/chat/send`）用原生 `fetch()` 实现，而非 Axios�
 - Chat 会话/消息：`user_id`
 - 文件：`upload_by`
 
-新增过滤前先确认正确的列；此前曾因 list/presign 路径未按 `upload_by` 隔离而出现 IDOR 漏洞。
+归属过滤的强制入口是 `internal/service/owned.go` 的泛型 helper：单条记录校验用 `getOwnedResource[T]`（404/403 三态语义），列表/统计过滤用 `db.Scopes(ownedScope[T](userID))`。列名由模型实现 `model.Owned` 接口声明（`internal/model/owned.go`），新模块嵌入 `UserOwnedModel` 即自动获得 `create_by` 归属。**禁止在 service 层手写 `Where("create_by = ?")` 等字面量归属条件**——此前曾因 list/presign 路径未按 `upload_by` 隔离而出现 IDOR 漏洞。
 
 ## RBAC / 鉴权
 

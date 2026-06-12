@@ -2,14 +2,12 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
@@ -79,7 +77,7 @@ func (s *fileService) GetPresignedURL(ctx context.Context, fileID, userID int64)
 func (s *fileService) PageList(userID int64, pageNum, pageSize int, fileName string) (common.PageResult[model.FileInfo], error) {
 	var files []model.FileInfo
 	var total int64
-	q := database.DB.Model(&model.FileInfo{}).Where("upload_by = ?", userID)
+	q := database.DB.Model(&model.FileInfo{}).Scopes(ownedScope[model.FileInfo](userID))
 	if fileName != "" {
 		q = q.Where("file_name LIKE ?", "%"+fileName+"%")
 	}
@@ -96,18 +94,7 @@ func (s *fileService) PageList(userID int64, pageNum, pageSize int, fileName str
 
 // getOwned 按 upload_by 校验文件归属，防止 IDOR
 func (s *fileService) getOwned(id, userID int64) (*model.FileInfo, error) {
-	var info model.FileInfo
-	err := database.DB.First(&info, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("文件")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if info.UploadBy != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &info, nil
+	return getOwnedResource[model.FileInfo](database.DB, id, userID, "文件")
 }
 
 // guessExt 根据 MIME 类型猜测文件扩展名（兜底逻辑）

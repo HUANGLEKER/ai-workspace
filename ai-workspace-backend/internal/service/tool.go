@@ -2,9 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"errors"
-
-	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
@@ -19,24 +16,13 @@ type toolService struct{}
 // ListByUser 查询当前用户注册的所有工具
 func (s *toolService) ListByUser(userID int64) ([]model.Tool, error) {
 	var tools []model.Tool
-	err := database.DB.Where("create_by = ?", userID).Order("create_time DESC").Find(&tools).Error
+	err := database.DB.Scopes(ownedScope[model.Tool](userID)).Order("create_time DESC").Find(&tools).Error
 	return tools, err
 }
 
 // GetOwned 查询并校验工具归属，防止 IDOR
 func (s *toolService) GetOwned(id, userID int64) (*model.Tool, error) {
-	var t model.Tool
-	err := database.DB.First(&t, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("工具")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if t.CreateBy != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &t, nil
+	return getOwnedResource[model.Tool](database.DB, id, userID, "工具")
 }
 
 // Create 新建工具，强制 CreateBy 为当前用户
@@ -86,7 +72,7 @@ func (s *toolService) ResolveForAgent(userID int64, toolNamesJSON string) ([]map
 	}
 
 	var tools []model.Tool
-	err := database.DB.Where("create_by = ? AND name IN ? AND enabled = 1", userID, names).Find(&tools).Error
+	err := database.DB.Scopes(ownedScope[model.Tool](userID)).Where("name IN ? AND enabled = 1", names).Find(&tools).Error
 	if err != nil {
 		return nil, err
 	}

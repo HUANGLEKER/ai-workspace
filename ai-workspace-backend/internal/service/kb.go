@@ -35,7 +35,7 @@ func NewKBService(db *gorm.DB, ai EmbeddingCaller, store ObjectStore) *KBService
 // ListByUser 查询当前用户拥有的所有知识库
 func (s *KBService) ListByUser(userID int64) ([]model.KbKnowledgeBase, error) {
 	var kbs []model.KbKnowledgeBase
-	err := s.db.Where("create_by = ?", userID).Order("create_time DESC").Find(&kbs).Error
+	err := s.db.Scopes(ownedScope[model.KbKnowledgeBase](userID)).Order("create_time DESC").Find(&kbs).Error
 	return kbs, err
 }
 
@@ -71,18 +71,7 @@ func (s *KBService) Delete(id, userID int64) error {
 
 // GetOwned 校验知识库归属，防止 IDOR 越权
 func (s *KBService) GetOwned(id, userID int64) (*model.KbKnowledgeBase, error) {
-	var kb model.KbKnowledgeBase
-	err := s.db.First(&kb, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("知识库")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if kb.CreateBy != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &kb, nil
+	return getOwnedResource[model.KbKnowledgeBase](s.db, id, userID, "知识库")
 }
 
 // PageDocuments 分页查询知识库下的文档，先验证调用者对该知识库的归属权

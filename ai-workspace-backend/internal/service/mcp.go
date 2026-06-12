@@ -2,12 +2,9 @@ package service
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
-
-	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
@@ -22,24 +19,13 @@ type mcpService struct{}
 // ListByUser 查询当前用户注册的所有 MCP 服务器
 func (s *mcpService) ListByUser(userID int64) ([]model.McpServer, error) {
 	var servers []model.McpServer
-	err := database.DB.Where("create_by = ?", userID).Order("create_time DESC").Find(&servers).Error
+	err := database.DB.Scopes(ownedScope[model.McpServer](userID)).Order("create_time DESC").Find(&servers).Error
 	return servers, err
 }
 
 // GetOwned 查询并校验 MCP 服务器归属，防止 IDOR
 func (s *mcpService) GetOwned(id, userID int64) (*model.McpServer, error) {
-	var srv model.McpServer
-	err := database.DB.First(&srv, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("MCP服务器")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if srv.CreateBy != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &srv, nil
+	return getOwnedResource[model.McpServer](database.DB, id, userID, "MCP服务器")
 }
 
 // Create 新建 MCP 服务器，强制 CreateBy 为当前用户
@@ -118,7 +104,7 @@ func (s *mcpService) ResolveForAgent(userID int64, serverNamesJSON string) ([]ma
 	}
 
 	var servers []model.McpServer
-	err := database.DB.Where("create_by = ? AND name IN ? AND transport = 'sse' AND enabled = 1", userID, names).Find(&servers).Error
+	err := database.DB.Scopes(ownedScope[model.McpServer](userID)).Where("name IN ? AND transport = 'sse' AND enabled = 1", names).Find(&servers).Error
 	if err != nil {
 		return nil, err
 	}

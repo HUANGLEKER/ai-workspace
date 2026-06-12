@@ -21,7 +21,7 @@ type workflowService struct{}
 // ListByUser 查询当前用户拥有的所有工作流
 func (s *workflowService) ListByUser(userID int64) ([]model.Workflow, error) {
 	var workflows []model.Workflow
-	err := database.DB.Where("create_by = ?", userID).Order("create_time DESC").Find(&workflows).Error
+	err := database.DB.Scopes(ownedScope[model.Workflow](userID)).Order("create_time DESC").Find(&workflows).Error
 	return workflows, err
 }
 
@@ -72,18 +72,7 @@ func (s *workflowService) Delete(id, userID int64) error {
 
 // GetOwned 校验工作流归属，防止 IDOR
 func (s *workflowService) GetOwned(id, userID int64) (*model.Workflow, error) {
-	var w model.Workflow
-	err := database.DB.First(&w, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("工作流")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if w.CreateBy != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &w, nil
+	return getOwnedResource[model.Workflow](database.DB, id, userID, "工作流")
 }
 
 // Run 执行工作流：校验归属后将 definition 与输入 POST 给 FastAPI /workflow/run

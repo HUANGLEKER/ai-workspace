@@ -20,8 +20,7 @@ type DashboardStats struct {
 	FileCount     int64 `json:"fileCount"`     // 文件总数
 }
 
-// GetStats 聚合当前用户的仪表盘统计数据
-// 注意各表归属列不同：chat 用 user_id，KB/文档用 create_by，文件用 upload_by
+// GetStats 聚合当前用户的仪表盘统计数据；归属过滤统一走 ownedScope（列名由模型声明）
 func (s *dashboardService) GetStats(userID int64) DashboardStats {
 	// Truncate(24h) 按 UTC 取整，UTC+8 时区会偏 8 小时；改用本地零点
 	now := time.Now()
@@ -29,26 +28,26 @@ func (s *dashboardService) GetStats(userID int64) DashboardStats {
 
 	var todaySessions, kbCount, fileCount int64
 	database.DB.Model(&model.ChatSession{}).
-		Where("user_id = ? AND create_time >= ?", userID, startOfToday).
+		Scopes(ownedScope[model.ChatSession](userID)).
+		Where("create_time >= ?", startOfToday).
 		Count(&todaySessions)
 
 	database.DB.Model(&model.KbKnowledgeBase{}).
-		Where("create_by = ?", userID).
+		Scopes(ownedScope[model.KbKnowledgeBase](userID)).
 		Count(&kbCount)
 
 	// 文档不直接挂用户，经由用户名下的知识库 ID 集合间接统计
 	var kbIDs []int64
 	database.DB.Model(&model.KbKnowledgeBase{}).
-		Where("create_by = ?", userID).
+		Scopes(ownedScope[model.KbKnowledgeBase](userID)).
 		Pluck("id", &kbIDs)
 	var docCount int64
 	if len(kbIDs) > 0 {
 		database.DB.Model(&model.KbDocument{}).Where("kb_id IN ?", kbIDs).Count(&docCount)
 	}
 
-	// 文件归属列为 upload_by，区别于 KB 的 create_by
 	database.DB.Model(&model.FileInfo{}).
-		Where("upload_by = ?", userID).
+		Scopes(ownedScope[model.FileInfo](userID)).
 		Count(&fileCount)
 
 	return DashboardStats{

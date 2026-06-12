@@ -29,7 +29,7 @@ func NewChatService(db *gorm.DB) *ChatService {
 // ListSessions 查询当前用户的所有会话，按创建时间倒序
 func (s *ChatService) ListSessions(userID int64) ([]model.ChatSession, error) {
 	var sessions []model.ChatSession
-	err := s.db.Where("user_id = ?", userID).Order("create_time DESC").Find(&sessions).Error
+	err := s.db.Scopes(ownedScope[model.ChatSession](userID)).Order("create_time DESC").Find(&sessions).Error
 	return sessions, err
 }
 
@@ -95,18 +95,7 @@ func (s *ChatService) RenameSession(id, userID int64, title string) error {
 
 // GetOwnedSession 校验会话归属，用于消息读写前的权限检查（防 IDOR）
 func (s *ChatService) GetOwnedSession(id, userID int64) (*model.ChatSession, error) {
-	var sess model.ChatSession
-	err := s.db.First(&sess, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, common.ErrNotFound("会话")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if sess.UserID != userID {
-		return nil, common.ErrForbidden()
-	}
-	return &sess, nil
+	return getOwnedResource[model.ChatSession](s.db, id, userID, "会话")
 }
 
 func (s *ChatService) getOwned(id, userID int64) error {

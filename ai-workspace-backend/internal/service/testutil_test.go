@@ -27,6 +27,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(
 		&model.ChatSession{}, &model.ChatMessage{}, &model.ChatModel{},
 		&model.KbKnowledgeBase{}, &model.KbDocument{}, &model.KbChunkTask{},
+		&model.FileInfo{}, &model.Agent{},
 	); err != nil {
 		t.Fatalf("迁移测试表失败: %v", err)
 	}
