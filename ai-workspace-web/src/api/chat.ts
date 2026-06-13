@@ -57,19 +57,20 @@ export const sendMessageStream = (
   onError: (err: string) => void,
   signal?: AbortSignal,
   onUsage?: (usage: TokenUsage) => void,
-  onTitle?: (title: string) => void
+  onTitle?: (title: string) => void,
+  opts?: { webSearch?: boolean; onStatus?: (status: string) => void }
 ) =>
   streamSSE(
     '/api/chat/send',
-    { sessionId, content },
+    { sessionId, content, webSearch: opts?.webSearch ?? false },
     {
       onChunk,
       onDone,
       onError,
       signal,
-      // token 统计帧 / 自动标题帧不进入正文渲染，经 onMeta 旁路解析后分发
+      // token 统计帧 / 自动标题帧 / 联网搜索状态帧不进入正文渲染，经 onMeta 旁路解析后分发
       onMeta:
-        onUsage || onTitle
+        onUsage || onTitle || opts?.onStatus
           ? (data) => {
               try {
                 const j = JSON.parse(data)
@@ -81,6 +82,8 @@ export const sendMessageStream = (
                   })
                 } else if (j.type === 'title' && onTitle && j.title) {
                   onTitle(j.title)
+                } else if (j.type === 'status' && opts?.onStatus && j.status) {
+                  opts.onStatus(j.status)
                 }
               } catch {
                 /* 非 JSON 元数据帧，忽略 */

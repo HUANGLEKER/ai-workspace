@@ -66,12 +66,28 @@ export function useThinkingPhases() {
     )
   }
 
-  /** 首个正文 token 到达：确保前两阶段已完成并点亮「Generating」 */
+  /**
+   * 插入/更新一个由外部事件驱动的动态阶段（如「联网搜索中」），点亮为 active。
+   * 已存在同 key 则原地激活，避免重复插入；置于「Generating」之前以符合时序直觉。
+   */
+  function addPhase(key: string, label: string) {
+    const existing = phases.value.find((p) => p.key === key)
+    if (existing) {
+      existing.status = 'active'
+      return
+    }
+    const genIdx = phases.value.findIndex((p) => p.key === 'generate')
+    const phase: ThinkingPhase = { key, label, status: 'active' }
+    if (genIdx >= 0) phases.value.splice(genIdx, 0, phase)
+    else phases.value.push(phase)
+  }
+
+  /** 首个正文 token 到达：除「Generating」外的所有阶段标记完成，点亮 Generating（兼容动态插入的阶段） */
   function markGenerating() {
     clearTimers()
-    set(0, 'done')
-    set(1, 'done')
-    set(2, 'active')
+    phases.value.forEach((p) => {
+      p.status = p.key === 'generate' ? 'active' : 'done'
+    })
   }
 
   /** 流结束：标记全部完成（调用方通常随后将整块收起，让位给最终消息） */
@@ -92,5 +108,5 @@ export function useThinkingPhases() {
 
   onBeforeUnmount(clearTimers)
 
-  return { phases, thinking, inProgress, start, markGenerating, finish, reset }
+  return { phases, thinking, inProgress, start, addPhase, markGenerating, finish, reset }
 }

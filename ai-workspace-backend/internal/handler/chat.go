@@ -130,6 +130,7 @@ func ChatSend(c *gin.Context) {
 		SessionID int64  `json:"sessionId" binding:"required"`
 		Content   string `json:"content"   binding:"required"`
 		Model     string `json:"model"`
+		WebSearch bool   `json:"webSearch"` // 可选；开启后 FastAPI 经 LLM tool-calling 联网搜索
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.BadRequest(c, err.Error())
@@ -180,10 +181,11 @@ func ChatSend(c *gin.Context) {
 	}
 
 	body := map[string]any{
-		"session_id": fmt.Sprintf("%d", req.SessionID),
-		"messages":   messages,
-		"model":      req.Model,
-		"stream":     true,
+		"session_id":        fmt.Sprintf("%d", req.SessionID),
+		"messages":          messages,
+		"model":             req.Model,
+		"stream":            true,
+		"enable_web_search": req.WebSearch,
 	}
 	// 多模型路由：模型在 chat_model 表配了 api_url/api_key 则随请求透传，
 	// 让 FastAPI 按请求构建客户端；未配置则 FastAPI 回退 .env 默认提供方

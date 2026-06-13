@@ -83,6 +83,7 @@ async def stream_chat(req: ChatRequest) -> AsyncIterator[str]:
 async def _stream_tokens(llm_runnable, lc_messages, req: ChatRequest, timer: LlmCallTimer):
     """逐 token 产出 SSE 帧；usage 帧夹带下发并喂给计时器。支持处理工具调用（如联网搜索）。"""
     from langchain_core.messages import ToolMessage
+    from app.utils.safety import fence, sanitize_tool_output
     max_turns = 3 if getattr(req, "enable_web_search", False) else 1
 
     for turn in range(max_turns):
@@ -121,13 +122,20 @@ async def _stream_tokens(llm_runnable, lc_messages, req: ChatRequest, timer: Llm
             from app.utils.web_search import web_search
             for tc in full_message.tool_calls:
                 if tc["name"] == "web_search":
-                    # 发送正在搜索的状态帧
-                    yield f"data: {{\"type\": \"status\", \"session_id\": \"{req.session_id}\", \"content\": \"正在联网搜索...\"}}\n\n"
+                    # 状态帧：字段用 status（而非 content/token），避免被前端 defaultExtract 当正文渲染进答案
+                    status = json.dumps(
+                        {"type": "status", "session_id": req.session_id, "status": "正在联网搜索..."},
+                        ensure_ascii=False,
+                    )
+                    yield f"data: {status}\n\n"
                     try:
                         result = await web_search.ainvoke(tc["args"])
                     except Exception as e:
                         result = f"搜索失败: {e}"
-                    lc_messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
+                    # 搜索结果是不可信外部内容：清洗（截断 + 剥离伪造分隔标记）后用数据栅栏包裹回填，
+                    # 防网页里夹带的「忽略指令」类注入生效（与 Agent 侧工具回填一致）
+                    safe = sanitize_tool_output(str(result))
+                    lc_messages.append(ToolMessage(content=fence(safe), tool_call_id=tc["id"]))
             # 进入下一轮循环，将搜索结果发给 LLM 生成最终回答
         else:
             break  # 无工具调用或已完成回答，退出循环

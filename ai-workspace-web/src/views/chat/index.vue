@@ -149,7 +149,22 @@
             <div class="relative shrink-0 border-t border-zinc-200/80 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
               <PromptPicker ref="pickerRef" :open="pickerOpen" :query="pickerQuery" @use="handlePromptUse" />
               <div class="mb-2 flex items-center justify-between">
-                <AppSelect v-model="selectedModel" :options="modelOptions" placeholder="选择模型" class="!w-44 max-w-44" />
+                <div class="flex items-center gap-2">
+                  <AppSelect v-model="selectedModel" :options="modelOptions" placeholder="选择模型" class="!w-44 max-w-44" />
+                  <button
+                    type="button"
+                    :disabled="streaming"
+                    class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all duration-200 ease-out disabled:opacity-50"
+                    :class="webSearch
+                      ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+                      : 'border-zinc-200/80 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800'"
+                    :title="webSearch ? '联网搜索已开启' : '联网搜索已关闭'"
+                    @click="webSearch = !webSearch"
+                  >
+                    <Globe class="h-3.5 w-3.5" />
+                    联网
+                  </button>
+                </div>
                 <span class="text-xs text-zinc-400 dark:text-zinc-500">Enter 发送 · Shift + Enter 换行 · / 提示词</span>
               </div>
               <div class="flex items-end gap-2.5">
@@ -212,7 +227,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'radix-vue'
-import { Plus, Trash2, Pencil, Send, CircleStop, MessageSquare, PanelLeft, ArrowDown, LayoutPanelLeft, Sparkles, X } from 'lucide-vue-next'
+import { Plus, Trash2, Pencil, Send, CircleStop, MessageSquare, PanelLeft, ArrowDown, LayoutPanelLeft, Sparkles, X, Globe } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import type { ChatSession, ChatMessage, TokenUsage } from '@/types'
 import { sendMessageStream, updateSessionPrompt } from '@/api/chat'
@@ -230,6 +245,7 @@ const chatStore = useChatStore()
 const { sessions, sessionsLoading, currentSession, messages, selectedModel, modelOptions } = storeToRefs(chatStore)
 const inputText = ref('')
 const streaming = ref(false)
+const webSearch = ref(false)
 const caretFading = ref(false)
 const collapsed = ref(false)
 const noAnimateIdx = ref(-1)
@@ -489,6 +505,11 @@ function streamReply(content: string) {
     (title) => {
       // 后端用首条消息自动生成了标题：同步更新侧边栏与标题栏
       if (currentSession.value) chatStore.setSessionTitle(currentSession.value.id, title)
+    },
+    {
+      webSearch: webSearch.value,
+      // 联网搜索状态帧：点亮 thinking 指示器的「联网搜索中」阶段（不进入答案正文）
+      onStatus: () => thinkingState.addPhase('websearch', '联网搜索中')
     }
   )
 }
