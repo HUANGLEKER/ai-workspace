@@ -47,14 +47,20 @@
         <AppInput v-model="form.description" placeholder="用途说明" />
       </AppFormItem>
       <AppFormItem label="传输方式">
-        <AppRadioGroup v-model="form.transport" :options="[{ label: 'SSE', value: 'sse' }, { label: 'stdio', value: 'stdio' }]" />
+        <AppRadioGroup v-model="form.transport" :options="transportOptions" />
+        <p v-if="!isAdmin" class="mt-1 text-xs text-zinc-400">stdio 类型会在服务主机执行命令，仅管理员可注册。</p>
       </AppFormItem>
       <AppFormItem v-if="form.transport === 'sse'" label="服务地址">
         <AppInput v-model="form.url" placeholder="https://host/sse" />
       </AppFormItem>
-      <AppFormItem v-else label="启动命令">
-        <AppInput v-model="form.command" placeholder="如：npx -y @modelcontextprotocol/server-xxx" />
-      </AppFormItem>
+      <template v-else>
+        <AppFormItem label="启动命令">
+          <AppInput v-model="form.command" placeholder="如：npx" />
+        </AppFormItem>
+        <div class="rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
+          ⚠ stdio 将在 AI 服务主机以该命令启动子进程，等同任意命令执行，请仅注册可信服务器。参数与环境变量写入下方「配置」的 <code>args</code>/<code>env</code>。
+        </div>
+      </template>
       <AppFormItem label="配置">
         <AppTextarea v-model="form.config" :rows="4" placeholder="可选：JSON 配置（headers/env/args）" />
       </AppFormItem>
@@ -76,8 +82,10 @@
  * MCP 服务器注册表页：Card Layout 展示，CRUD（sse/stdio 两种传输方式），
  * 连通性测试（仅 sse 类型可与 Agent 集成）。
  */
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { Plus, Plug, Zap, Pencil, Trash2 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 import {
   listMcpServers, addMcpServer, updateMcpServer, deleteMcpServer, testMcpServer, type McpServer
 } from '@/api/mcp'
@@ -92,6 +100,14 @@ const testingId = ref<number | null>(null)
 const servers = ref<McpServer[]>([])
 const dialogVisible = ref(false)
 const editing = ref<McpServer | null>(null)
+
+const { isAdmin } = storeToRefs(useAuthStore())
+// stdio 仅管理员可见可选（后端亦有 403 兜底）
+const transportOptions = computed(() => {
+  const opts = [{ label: 'SSE', value: 'sse' }]
+  if (isAdmin.value) opts.push({ label: 'stdio', value: 'stdio' })
+  return opts
+})
 
 const form = reactive<McpServer>({ name: '', description: '', transport: 'sse', url: '', command: '', config: '', enabled: 1 })
 

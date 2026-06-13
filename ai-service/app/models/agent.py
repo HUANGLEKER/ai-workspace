@@ -13,11 +13,16 @@ class HttpToolSpec(BaseModel):
 
 
 class McpServerSpec(BaseModel):
-    """运行时加载其工具的 SSE MCP 服务器规格。"""
+    """运行时加载其工具的 MCP 服务器规格（sse / stdio）。"""
     name: str
-    url: str
     transport: str = "sse"
+    # sse 字段
+    url: str = ""
     headers: dict[str, str] = {}
+    # stdio 字段（仅管理员注册，由 Go 侧 gate）：command 启动命令，args 参数，env 环境变量
+    command: str = ""
+    args: list[str] = []
+    env: dict[str, str] = {}
 
 
 class AgentRunRequest(BaseModel):

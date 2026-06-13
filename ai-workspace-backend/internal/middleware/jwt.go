@@ -153,3 +153,13 @@ func CurrentUserID(c *gin.Context) int64 {
 	id, _ := c.Get(CtxUserID)
 	return id.(int64)
 }
+
+// IsAdmin 判断当前请求用户是否具备 ROLE_ADMIN，供需要管理员才能执行的非 admin-only 路由内联判断
+func IsAdmin(c *gin.Context) bool {
+	for _, r := range c.GetStringSlice(CtxRoles) {
+		if r == "ROLE_ADMIN" {
+			return true
+		}
+	}
+	return false
+}

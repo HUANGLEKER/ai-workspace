@@ -93,7 +93,7 @@ func RunAgent(c *gin.Context) {
 		common.BadRequest(c, err.Error())
 		return
 	}
-	result, err := service.AgentSvc.Run(c.Request.Context(), id, middleware.CurrentUserID(c), req.Input, req.SessionID)
+	result, err := service.AgentSvc.Run(c.Request.Context(), id, middleware.CurrentUserID(c), req.Input, req.SessionID, middleware.IsAdmin(c))
 	if err != nil {
 		handleBizError(c, err)
 		return
@@ -118,7 +118,7 @@ func RunAgentStream(c *gin.Context) {
 	}
 
 	// 归属校验 + 工具解析在发送 SSE 头之前完成，越权/错误用普通 JSON 响应兜底
-	body, err := service.AgentSvc.BuildRunBody(id, middleware.CurrentUserID(c), req.Input, req.SessionID)
+	body, err := service.AgentSvc.BuildRunBody(id, middleware.CurrentUserID(c), req.Input, req.SessionID, middleware.IsAdmin(c))
 	if err != nil {
 		handleBizError(c, err)
 		return

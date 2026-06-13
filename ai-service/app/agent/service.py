@@ -81,13 +81,18 @@ async def _load_mcp_tools(servers: list[McpServerSpec], steps: list[dict]) -> li
         steps.append({"type": "warning", "content": "langchain-mcp-adapters 未安装，已跳过 MCP 工具"})
         return []
 
-    # 仅处理 sse 传输且配置了 url 的服务器
+    # 装配 sse / stdio 连接（stdio 仅管理员注册，Go 侧已 gate）
     connections: dict[str, Any] = {}
     for s in servers:
         if s.transport == "sse" and s.url:
             conn: dict[str, Any] = {"url": s.url, "transport": "sse"}
             if s.headers:
                 conn["headers"] = s.headers
+            connections[s.name] = conn
+        elif s.transport == "stdio" and s.command:
+            conn = {"transport": "stdio", "command": s.command, "args": s.args or []}
+            if s.env:
+                conn["env"] = s.env
             connections[s.name] = conn
     if not connections:
         return []

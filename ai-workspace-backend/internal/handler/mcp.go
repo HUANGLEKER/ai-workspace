@@ -40,7 +40,7 @@ func AddMCP(c *gin.Context) {
 		common.BadRequest(c, err.Error())
 		return
 	}
-	if err := service.MCPSvc.Create(&srv, middleware.CurrentUserID(c)); err != nil {
+	if err := service.MCPSvc.Create(&srv, middleware.CurrentUserID(c), middleware.IsAdmin(c)); err != nil {
 		handleBizError(c, err)
 		return
 	}
@@ -54,7 +54,7 @@ func UpdateMCP(c *gin.Context) {
 		common.BadRequest(c, err.Error())
 		return
 	}
-	if err := service.MCPSvc.Update(&srv, middleware.CurrentUserID(c)); err != nil {
+	if err := service.MCPSvc.Update(&srv, middleware.CurrentUserID(c), middleware.IsAdmin(c)); err != nil {
 		handleBizError(c, err)
 		return
 	}

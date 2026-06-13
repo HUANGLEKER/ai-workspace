@@ -37,9 +37,12 @@ func (s *MCPService) GetOwned(id, userID int64) (*model.McpServer, error) {
 }
 
 // Create 新建 MCP 服务器，强制 CreateBy 为当前用户
-func (s *MCPService) Create(srv *model.McpServer, userID int64) error {
+func (s *MCPService) Create(srv *model.McpServer, userID int64, isAdmin bool) error {
 	if srv.Name == "" {
 		return common.NewBizError(common.CodeBadRequest, "MCP服务器名称不能为空")
+	}
+	if err := guardStdio(srv, isAdmin); err != nil {
+		return err
 	}
 	srv.ID = 0
 	srv.CreateBy = userID
@@ -49,10 +52,28 @@ func (s *MCPService) Create(srv *model.McpServer, userID int64) error {
 	return s.db.Create(srv).Error
 }
 
+// guardStdio 拦截非管理员注册 stdio 类型 MCP——stdio 等于在 AI 服务主机执行任意命令，
+// 仅管理员可注册（P3-5 安全约束）。同时校验 stdio 必须配 command。
+func guardStdio(srv *model.McpServer, isAdmin bool) error {
+	if srv.Transport != "stdio" {
+		return nil
+	}
+	if !isAdmin {
+		return common.NewBizError(common.CodeForbidden, "stdio 类型 MCP 服务器仅管理员可注册（将在服务主机执行命令）")
+	}
+	if srv.Command == "" {
+		return common.NewBizError(common.CodeBadRequest, "stdio 类型必须填写启动命令")
+	}
+	return nil
+}
+
 // Update 更新 MCP 服务器，回填 CreateBy 防止归属被篡改
-func (s *MCPService) Update(srv *model.McpServer, userID int64) error {
+func (s *MCPService) Update(srv *model.McpServer, userID int64, isAdmin bool) error {
 	existing, err := s.GetOwned(srv.ID, userID)
 	if err != nil {
+		return err
+	}
+	if err := guardStdio(srv, isAdmin); err != nil {
 		return err
 	}
 	srv.CreateBy = existing.CreateBy
@@ -98,9 +119,10 @@ func (s *MCPService) TestConnectivity(id, userID int64) (bool, int64, string) {
 	return false, latency, fmt.Sprintf("HTTP %d", resp.StatusCode)
 }
 
-// ResolveForAgent 按服务器名列表（JSON 数组字符串）解析用户名下已启用的 SSE MCP 服务器配置
-// 仅返回 transport=sse 且 enabled=1 的服务器，供 FastAPI /agent/run 使用
-func (s *MCPService) ResolveForAgent(userID int64, serverNamesJSON string) ([]map[string]any, error) {
+// ResolveForAgent 按服务器名列表（JSON 数组字符串）解析用户名下已启用的 MCP 服务器配置，
+// 供 FastAPI /agent/run 使用。sse 始终可用；stdio 仅在 isAdmin 时纳入（防御：注册已限管理员，
+// 此处再次 gate，避免用户被降权后仍触发已注册的 stdio 命令执行）。
+func (s *MCPService) ResolveForAgent(userID int64, serverNamesJSON string, isAdmin bool) ([]map[string]any, error) {
 	var names []string
 	if serverNamesJSON != "" && serverNamesJSON != "[]" {
 		if err := json.Unmarshal([]byte(serverNamesJSON), &names); err != nil {
@@ -112,31 +134,49 @@ func (s *MCPService) ResolveForAgent(userID int64, serverNamesJSON string) ([]ma
 	}
 
 	var servers []model.McpServer
-	err := s.db.Scopes(ownedScope[model.McpServer](userID)).Where("name IN ? AND transport = 'sse' AND enabled = 1", names).Find(&servers).Error
+	err := s.db.Scopes(ownedScope[model.McpServer](userID)).
+		Where("name IN ? AND enabled = 1", names).Find(&servers).Error
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]map[string]any, 0, len(servers))
 	for _, srv := range servers {
-		// FastAPI McpServerSpec 需要 transport 与 headers 字典；
-		// headers 存在扩展配置 JSON（{"headers":{...},...}）中，须解析提取
-		headers := map[string]string{}
+		// config 扩展字段：headers（sse）/ args、env（stdio）
+		var cfg struct {
+			Headers map[string]string `json:"headers"`
+			Args    []string          `json:"args"`
+			Env     map[string]string `json:"env"`
+		}
 		if srv.Config != "" {
-			var cfg struct {
-				Headers map[string]string `json:"headers"`
-			}
-			if err := json.Unmarshal([]byte(srv.Config), &cfg); err == nil && cfg.Headers != nil {
-				headers = cfg.Headers
-			}
+			_ = json.Unmarshal([]byte(srv.Config), &cfg)
 		}
-		spec := map[string]any{
-			"name":      srv.Name,
-			"url":       srv.URL,
-			"transport": srv.Transport,
-			"headers":   headers,
+
+		switch srv.Transport {
+		case "sse":
+			headers := cfg.Headers
+			if headers == nil {
+				headers = map[string]string{}
+			}
+			result = append(result, map[string]any{
+				"name": srv.Name, "url": srv.URL, "transport": "sse", "headers": headers,
+			})
+		case "stdio":
+			if !isAdmin || srv.Command == "" {
+				continue // stdio 仅管理员可运行；缺命令跳过
+			}
+			args := cfg.Args
+			if args == nil {
+				args = []string{}
+			}
+			env := cfg.Env
+			if env == nil {
+				env = map[string]string{}
+			}
+			result = append(result, map[string]any{
+				"name": srv.Name, "transport": "stdio", "command": srv.Command, "args": args, "env": env,
+			})
 		}
-		result = append(result, spec)
 	}
 	return result, nil
 }

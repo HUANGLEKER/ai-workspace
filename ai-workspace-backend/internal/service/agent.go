@@ -83,7 +83,7 @@ func (s *AgentService) GetOwned(id, userID int64) (*model.Agent, error) {
 
 // BuildRunBody 校验归属、解析工具与 MCP 服务器，组装发给 FastAPI 的请求体。
 // 一次性运行（Run）与流式运行（handler 直连 FastAPI Stream）共用此方法，保证规格一致。
-func (s *AgentService) BuildRunBody(agentID, userID int64, input, sessionID string) (map[string]any, error) {
+func (s *AgentService) BuildRunBody(agentID, userID int64, input, sessionID string, isAdmin bool) (map[string]any, error) {
 	agent, err := s.GetOwned(agentID, userID)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (s *AgentService) BuildRunBody(agentID, userID int64, input, sessionID stri
 		return nil, err
 	}
 
-	mcpServers, err := MCPSvc.ResolveForAgent(userID, agent.McpServers)
+	mcpServers, err := MCPSvc.ResolveForAgent(userID, agent.McpServers, isAdmin)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +116,8 @@ func (s *AgentService) BuildRunBody(agentID, userID int64, input, sessionID stri
 }
 
 // Run 解析 Agent 引用的工具与 MCP 服务器，组装完整规格后 POST 给 FastAPI 执行工具调用循环
-func (s *AgentService) Run(ctx context.Context, agentID, userID int64, input, sessionID string) (any, error) {
-	body, err := s.BuildRunBody(agentID, userID, input, sessionID)
+func (s *AgentService) Run(ctx context.Context, agentID, userID int64, input, sessionID string, isAdmin bool) (any, error) {
+	body, err := s.BuildRunBody(agentID, userID, input, sessionID, isAdmin)
 	if err != nil {
 		return nil, err
 	}
