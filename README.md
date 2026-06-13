@@ -1,289 +1,434 @@
 # AI Workspace
 
-AI Workspace 是一个集成了聊天、知识库、RAG（检索增强生成）、提示词中心、工作流、Agent、MCP、工具中心、文件中心以及仪表盘于一体的个人 AI 工作平台。该项目旨在打造一个强大的个人 AI 中枢，以替代 ChatGPT + Dify + OpenWebUI + 部分 Notion AI 的组合。
+> 个人 AI 中枢平台 —— 集成 Chat、知识库、RAG、提示词中心、工作流、Agent、MCP、工具中心、文件中心与仪表盘，目标是以单一自托管平台替代 **ChatGPT + Dify + OpenWebUI + Notion AI** 的组合。
 
-## 🌟 核心特性
+![version](https://img.shields.io/badge/version-1.0-blue) ![go](https://img.shields.io/badge/Go-1.23-00ADD8) ![vue](https://img.shields.io/badge/Vue-3-42b883) ![python](https://img.shields.io/badge/FastAPI-0.115-009688) ![license](https://img.shields.io/badge/license-private-lightgrey)
 
-- **AI Chat**: 支持多模型对话，提供流式输出体验。
-- **知识库 (Knowledge Base) & RAG**: 基于私有数据的检索增强生成引擎，支持上传文档并进行智能问答；内置独立的**流式问答页**，回答逐字输出并以可折叠面板展示引用来源与相关度。
-- **文件中心 (File Center)**: 基于 MinIO 的文件集中管理系统。
-- **Agent (智能体)**: 可配置系统提示词与模型；运行时真实调用工具中心的 HTTP 工具，并通过 SSE 加载 MCP 服务器工具，返回完整执行轨迹。
-- **工作流 (Workflow)**: 基于 LangGraph/LangChain 的工作流编排与运行。
-- **工具中心 (Tool Center)**: HTTP / 内置工具注册表，供 Agent 运行时按需调用。
-- **MCP 服务器**: MCP（Model Context Protocol）服务器注册表，支持 SSE 连通性检测与运行时工具加载。
-- **提示词中心 (Prompt Center)**: 系统化的提示词模板管理，支持分类检索与一键复制。
-- **定时任务 (Scheduled Jobs)**: 管理员可视化的动态 Cron 调度器，支持可插拔任务处理器与执行日志（管理员）。
-- **系统监控 (Monitor)**: 服务器运行时指标（CPU/内存/磁盘/JVM）与依赖服务（Redis/FastAPI/MinIO）健康检查（管理员）。
-- **仪表盘 (Dashboard)**: 可视化统计会话、知识库、文档与文件等概览。
+---
 
-## 🛠️ 技术栈
+## 1. 项目介绍
 
-该项目采用主流的“前端 + Java后端 + Python AI 服务”三层架构：
+**AI Workspace** 是一个面向个人/小团队的一体化 AI 工作平台。它将分散在多个 SaaS 工具中的 AI 能力收敛到一套自托管系统内，统一鉴权、统一数据归属、统一对接 LLM。
 
-| 层级 | 技术与框架 | 
-| --- | --- |
-| **前端 (Frontend)** | Vue3, TypeScript, Element Plus（按需引入）, Pinia, Vite |
-| **后端 (Backend)** | Spring Boot 3.5.x, JDK 25, MyBatis Plus, JJWT, Spring Security |
-| **AI 服务 (AI Service)** | FastAPI 0.115, LangGraph, LangChain, OpenAI API |
-| **关系型数据库** | MySQL 8 |
-| **向量数据库** | ChromaDB (用于RAG向量存储) |
-| **缓存机制** | Redis 5 |
-| **对象存储** | MinIO (用于文件中心) |
+### 业务目标
 
-## 📐 系统架构
+| 目标 | 说明 |
+|---|---|
+| **统一 AI 入口** | 一个账号体系（RBAC）下完成对话、检索、内容生成、自动化等全部 AI 任务 |
+| **私有知识库 + RAG** | 上传文档自动向量化，问答时检索增强，答案可溯源（来源引用） |
+| **可编排自动化** | 通过 Agent（工具调用循环）、Workflow（LangGraph 画布）、Cron Job 实现任务自动化 |
+| **可扩展工具生态** | 内置工具中心 + MCP（Model Context Protocol）服务器注册表，按需为 Agent 装配能力 |
+| **数据自主可控** | 全部数据（MySQL/Redis/MinIO/ChromaDB）本地持久化，密钥加密落库，多用户资源严格隔离 |
+| **多模型路由** | 任意 OpenAI 兼容提供商可即插即用；按会话/请求动态选择模型 |
 
-```text
-┌──────────────────────────┐
-│     Vue3 (Port: 3000)    │
-└────────────┬─────────────┘
-             │ HTTP (Axios/SSE)
-             ▼
-┌──────────────────────────┐
-│ Spring Boot (Port: 8080) │
-├──────────────────────────┤
-│ Auth & RBAC              │
-│ Chat / KB / File         │
-│ Agent / Workflow         │
-│ Prompt / Tool / MCP      │
-│ Job & Monitor (admin)    │
-└────────────┬─────────────┘
-             │ HTTP Proxy
-             ▼
-┌──────────────────────────┐
-│   FastAPI (Port: 8001)   │
-├──────────────────────────┤
-│ Chat / Streaming Engine  │
-│ Embedding & RAG Engine   │
-│ Agent (Tools + MCP)      │
-│ Workflow Engine          │
-└────────────┬─────────────┘
-             │
- ┌───────────┼───────────┐
- ▼           ▼           ▼
-Redis      ChromaDB     MinIO
-             │
-             ▼
-            LLM
+### 核心模块
+
+`Chat（SSE 流式）` · `知识库 & RAG` · `提示词中心` · `Agent` · `Workflow` · `MCP` · `工具中心` · `文件中心` · `定时任务` · `仪表盘 & 系统监控`
+
+---
+
+## 2. 技术架构
+
+三层架构：**Vue3 前端 → Go/Gin 后端（REST + RBAC + 业务逻辑）→ FastAPI AI 服务（全部 LLM 交互）**。Go 层永不直接调用 LLM；FastAPI 永不直接读 MySQL。两者通过内网 HTTP 通信。
+
+### 架构图
+
+```mermaid
+graph TB
+    subgraph Client["客户端"]
+        U[浏览器]
+    end
+
+    subgraph Frontend["前端 :3000"]
+        WEB[Vue3 + TS + Tailwind4 + Radix Vue<br/>nginx 反代 /api · SSE 透传]
+    end
+
+    subgraph Backend["Go 后端 :8080 (Gin + GORM)"]
+        MW[中间件: JWT / RBAC / CORS / 限流 / 日志]
+        SVC[业务层: auth/chat/kb/file/agent<br/>workflow/job/prompt/tool/mcp/monitor]
+        SCH[Cron 调度器 robfig/cron]
+    end
+
+    subgraph AI["FastAPI AI 服务 :8001 (LangGraph + LangChain)"]
+        CHAT[chat 流式]
+        RAG[rag 检索+生成]
+        EMB[embedding 嵌入管道]
+        AG[agent 工具调用循环]
+        WF[workflow 引擎]
+    end
+
+    subgraph Infra["基础设施 (Docker)"]
+        MYSQL[(MySQL 8)]
+        REDIS[(Redis 7)]
+        MINIO[(MinIO S3)]
+        CHROMA[(ChromaDB)]
+    end
+
+    LLM[/外部 LLM / Embedding / Rerank<br/>OpenAI 兼容/]
+
+    U --> WEB --> MW --> SVC
+    SVC --> SCH
+    SVC -->|HTTP 内网| CHAT
+    SVC -->|HTTP 内网| RAG
+    SVC -->|HTTP 内网| EMB
+    SVC -->|HTTP 内网| AG
+    SVC -->|HTTP 内网| WF
+    SVC --> MYSQL
+    SVC --> REDIS
+    SVC --> MINIO
+    CHAT --> LLM
+    RAG --> CHROMA
+    RAG --> LLM
+    EMB --> CHROMA
+    EMB --> MINIO
+    EMB --> LLM
+    AG --> LLM
+    WF --> LLM
+    CHAT --> REDIS
 ```
 
-**稳定性与性能要点**：
+### 请求流转（以 RAG 问答为例）
 
-- **统一 AI 服务客户端**：Spring Boot 调用 FastAPI 的所有请求（Chat/RAG/Agent/Workflow/Embedding）收敛到单一 `FastApiClient`（基于 JDK `HttpClient`、连接池复用、集中超时），不再各处裸用 `HttpURLConnection`。
-- **线程池隔离**：SSE 流式代理使用独立 `streamExecutor`，与嵌入管道的 `taskExecutor` 分离，避免长连接占满线程池互相饥饿；两者均配 `CallerRunsPolicy` 与优雅关闭。
-- **上下文有界 & 断连保存**：聊天仅回放最近 N 条消息给 LLM；客户端中途断开时已生成的部分回复仍会落库。
-- **前端按需与拆包**：Element Plus 按需引入（组件/指令/样式/图标自动导入），`manualChunks` 按路由拆分，首屏仅加载所需组件。
+```mermaid
+sequenceDiagram
+    participant B as 浏览器
+    participant G as Go 后端 :8080
+    participant F as FastAPI :8001
+    participant C as ChromaDB
+    participant L as LLM
 
-## 📁 目录结构
-
-```text
-ai-workspace/
-├── ai-workspace-web/     # Vue3 前端项目
-├── ai-workspace/         # Spring Boot 后端项目 (Maven 多模块)
-│   ├── workspace-admin      # 主程序入口
-│   ├── workspace-common     # 公共核心类
-│   ├── workspace-framework  # 框架配置 (Security, Redis等)
-│   ├── workspace-system     # RBAC 系统
-│   ├── workspace-chat       # 会话管理
-│   ├── workspace-kb         # 知识库
-│   ├── workspace-file       # 文件中心
-│   ├── workspace-agent      # Agent (CRUD + 运行时工具/MCP 调用)
-│   ├── workspace-workflow   # 工作流
-│   ├── workspace-prompt     # 提示词中心
-│   ├── workspace-tool       # 工具中心
-│   ├── workspace-mcp        # MCP 服务器注册表
-│   ├── workspace-job        # 定时任务调度 (管理员)
-│   └── workspace-monitor    # 仪表盘统计 + 系统监控
-└── ai-service/           # FastAPI AI 服务
-    ├── app/chat             # 聊天核心逻辑
-    ├── app/rag              # RAG 检索生成
-    ├── app/embedding        # 向量化处理
-    ├── app/agent            # 工具调用 Agent (HTTP 工具 + MCP)
-    └── app/workflow         # 工作流引擎
+    B->>G: POST /api/rag/chat (JWT, fetch SSE)
+    G->>G: 鉴权 + 资源归属校验 + 限流
+    G->>F: POST /rag/chat (透传 llm_config)
+    F->>C: 向量检索 (可选 rerank 精排)
+    C-->>F: Top-K 文档片段
+    F->>L: prompt + 上下文 → 流式生成
+    L-->>F: token 流
+    F-->>G: SSE (sources 帧 + content 帧)
+    G-->>B: SSE 透传 (proxy_buffering off)
 ```
 
-## 💻 环境要求 (Prerequisites)
+---
 
-为了在本地完整运行并开发这套 AI Workspace 系统，您需要准备以下环境：
+## 3. 技术栈
 
-- **Node.js**: v18 及以上版本 (前端运行环境)
-- **JDK**: Java 25 (后端运行环境，需配置环境变量)
-- **Python**: 3.10 及以上版本 (AI 服务运行环境，含 `pip`)
-- **Docker Desktop**: 所有基础设施（MySQL、Redis、ChromaDB、MinIO）均通过 Docker 统一管理
-- **Git**: (可选) 用于代码版本控制
+| 层级 | 技术 |
+|---|---|
+| **前端** | Vue 3.5 · TypeScript 5.7 · Vite 6 · TailwindCSS 4（`@tailwindcss/vite` + typography）· Radix Vue（headless 组件）· lucide-vue-next（图标）· Pinia · Vue Router 4 · Vue Flow（工作流画布）· markdown-it + highlight.js + mermaid · DOMPurify · Vitest |
+| **后端** | Go 1.23 · Gin · GORM（+ soft_delete 插件）· JWT · robfig/cron v3（动态调度）· zap + lumberjack（日志）· gopsutil（监控）· Viper（配置）· Swagger/swag |
+| **AI 服务** | Python · FastAPI 0.115 · LangGraph · LangChain · OpenAI SDK · langchain-mcp-adapters（MCP 工具）· httpx · uv（依赖管理） |
+| **数据库** | MySQL 8（19+ 张表，utf8mb4，软删除）|
+| **缓存** | Redis 7（后端 DB 0 / AI 服务 DB 1，AOF 持久化）|
+| **向量库** | ChromaDB（HTTP 客户端模式）|
+| **对象存储** | MinIO（S3 兼容）|
+| **DevOps** | Docker Compose（基础设施 + 应用双栈）· nginx（前端反代 + SSE 透传）· GitHub Actions CI |
 
-*💡 所有基础设施通过项目根目录的 `docker-compose.infra.yml` 一键启动，无需本地安装 MySQL 或 Redis。*
+---
 
-## 🚀 快速启动
+## 4. 项目结构
 
-### 1. 启动基础设施（Docker）
-
-所有基础设施通过 `docker-compose.infra.yml` 一键启动：
-
-```powershell
-docker compose -f docker-compose.infra.yml up -d
-docker compose -f docker-compose.infra.yml ps
+```
+AI Workspace/
+├── ai-workspace-web/              # 前端（Vue3 + TS + Tailwind4 + Radix Vue）
+│   └── src/
+│       ├── api/                   # Axios HTTP 客户端模块（sse.ts 为共用 SSE 工具）
+│       ├── views/                 # 页面组件（chat / knowledge / agent / workflow ...）
+│       ├── components/ui/         # 统一组件库（AppButton/AppInput/AppDialog… 经 index.ts 出口）
+│       ├── components/workflow/   # Vue Flow 工作流画布
+│       ├── composables/           # 可复用组合式函数
+│       ├── stores/                # Pinia 状态管理
+│       ├── router/                # Vue Router + 路由守卫（按角色控制菜单）
+│       ├── layout/                # 外壳 / 布局组件
+│       └── types/                 # TypeScript 类型定义
+│
+├── ai-workspace-backend/          # Go 后端（Gin + GORM）
+│   ├── cmd/server/                # 程序入口（main.go）
+│   ├── internal/
+│   │   ├── handler/               # Gin handler（各业务模块）
+│   │   ├── service/               # 业务逻辑层（owned.go 统一资源归属过滤）
+│   │   ├── model/                 # GORM 模型（软删除 / Owned 接口）
+│   │   ├── router/router.go       # 路由分层 public → auth → admin
+│   │   ├── middleware/            # JWT / CORS / 限流 / 日志 / Recovery / AdminRequired
+│   │   ├── config/                # Viper 配置加载（config.Global）
+│   │   ├── scheduler/             # 动态 cron 调度器
+│   │   └── common/                # 标准响应包装 + 上传校验
+│   ├── pkg/                       # 基础设施客户端：database/redis/minio/logger/fastapi/crypto
+│   ├── config.yaml                # 本地开发配置
+│   ├── config.docker.yaml         # 容器内配置（主机名为 compose 服务名）
+│   └── Makefile                   # run / build / swag / tidy
+│
+├── ai-service/                    # FastAPI AI 服务（LangGraph + LangChain）
+│   └── app/
+│       ├── chat/                  # LLM 调用 + SSE 流式
+│       ├── rag/                   # 向量检索 + rerank + 答案生成
+│       ├── embedding/             # 文档切片 + 嵌入 + 写入 ChromaDB
+│       ├── agent/                 # 工具调用 agent（HTTP 工具 + MCP 工具）
+│       ├── workflow/              # LangGraph 工作流引擎（engine.py 拓扑执行）
+│       ├── llm/provider.py        # LLM 提供方抽象（LRU 缓存多模型客户端）
+│       ├── vectorstore/           # ChromaDB HTTP 客户端
+│       └── config/settings.py     # Pydantic BaseSettings（从 .env 加载）
+│
+├── ai-workspace/sql/init.sql      # 全部表 DDL + 种子数据（MySQL 首次启动自动执行）
+├── docker-compose.infra.yml       # 基础设施：MySQL / Redis / MinIO / ChromaDB
+├── docker-compose.app.yml         # 应用：backend / ai-service / web（nginx）
+└── .github/workflows/ci.yml       # CI：Go vet+test+build / 前端 tsc+vitest+build / AI 导入冒烟
 ```
 
-包含服务：
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| MySQL 8.0 | 3306 | 首次启动自动执行 `init.sql` 初始化表结构 |
-| Redis 7 | 6379 | AOF 持久化 |
-| MinIO | 9000 / 9011 控制台 | 对象存储 |
-| ChromaDB | 8000 | 向量数据库 |
+---
 
-*默认凭证*：
-- MySQL：`root / 123456`
-- 平台管理员：`admin / admin123`
-- MinIO：`minioadmin / minioadmin`
+## 5. 快速开始
 
-文件中心需要名为 `ai-workspace` 的存储桶，首次启动后创建：
+### 5.1 环境安装
 
-```powershell
-docker run --rm --network host minio/mc sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/ai-workspace"
+| 运行时 | 版本 | 用途 |
+|---|---|---|
+| **Go** | 1.23+ | 后端编译运行 |
+| **Node.js** | 22+ | 前端构建（CI 锁定 Node 22）|
+| **Python + uv** | uv 管理（astral-sh/uv）| AI 服务依赖与运行 |
+| **Docker + Compose** | 最新 | 一键拉起全部基础设施 |
+| **JDK** | 不需要 | ⚠️ 后端已由 Spring Boot 全面迁移至 Go，**无需 JDK**（历史 Sprint 1/10 遗留说明）|
+
+> 说明：项目早期（Sprint 1）后端为 Spring Boot（需 JDK），自 Sprint 10 起已完整迁移到 Go。当前代码库**不含任何 Java 模块**，无需安装 JDK。
+
+### 5.2 启动顺序（本地开发）
+
+推荐启动顺序：**基础设施（MySQL/Redis/MinIO/ChromaDB） → Go 后端 → FastAPI AI 服务 → 前端**。
+
+```mermaid
+flowchart LR
+    A[1. Docker 基础设施<br/>MySQL · Redis · MinIO · ChromaDB] --> B[2. Go 后端 :8080]
+    B --> C[3. FastAPI AI 服务 :8001]
+    C --> D[4. 前端 :3000]
+    D --> E[访问 http://localhost:3000]
 ```
 
-或打开 http://localhost:9011 用 `minioadmin / minioadmin` 登录后手动新建桶 `ai-workspace`。
+#### ① 基础设施（MySQL / Redis / MinIO / ChromaDB）
 
-### 2. 启动前端项目 (Vue3)
+```bash
+docker-compose -f docker-compose.infra.yml up -d
+```
+
+- MySQL 8（3306）：首次启动自动执行 `init.sql`，建表 + 种子数据（admin/123456）
+- Redis 7（6379，AOF 持久化）
+- MinIO（9000 S3 API / 9011 控制台，minioadmin/minioadmin）
+- ChromaDB（8000）
+
+#### ② Go 后端（:8080）
+
+```bash
+cd ai-workspace-backend
+go mod tidy
+make run            # = go run ./cmd/server -config config.yaml
+# 其他：make build / make swag / go vet ./... / gofmt -l -w .
+```
+
+#### ③ FastAPI AI 服务（:8001）
+
+```bash
+cd ai-service
+cp .env.example .env     # 填入 LLM_API_KEY 等（首次必做）
+uv sync                  # 按 uv.lock 安装依赖
+uv run python main.py    # uvicorn :8001，开发自动重载
+```
+
+#### ④ 前端（:3000）
+
 ```bash
 cd ai-workspace-web
 npm install
-npm run dev
-# 默认运行在 http://localhost:3000
+npm run dev              # Vite :3000，代理 /api → localhost:8080
+# 生产构建：npm run build （先 vue-tsc 再 vite build）
 ```
 
-### 3. 启动后端项目 (Spring Boot)
+打开 **http://localhost:3000**，使用 `admin / 123456` 登录（首次登录强制改密）。
+
+### 5.3 一键容器化整栈（可选）
+
 ```bash
-cd ai-workspace
-# 编译并安装所有模块到本地仓库
-./mvnw.cmd clean install -DskipTests
-# 从入口模块 workspace-admin 启动服务
-./mvnw.cmd -pl workspace-admin spring-boot:run
-# 默认运行在 http://localhost:8080
+docker-compose -f docker-compose.infra.yml up -d
+docker-compose -f docker-compose.app.yml up -d --build
+# 入口 http://localhost:3000
 ```
-> ⚠️ `spring-boot:run` 必须指定入口模块 `-pl workspace-admin`：根 `pom` 是聚合模块、无主类，直接在根目录运行会报 "Unable to find a suitable main class"。需先执行 `install` 让各子模块进入本地仓库。
 
-*(配置文件位置：`workspace-admin/src/main/resources/application-dev.yml`)*
+> ⚠️ 应用容器与本机开发进程端口冲突（3000/8080/8001），二者择一运行。
 
-### 4. 启动 AI 服务 (FastAPI)
+---
+
+## 6. 配置中心说明
+
+### 6.1 后端 `config.yaml`（Viper 加载，全局 `config.Global`）
+
+| 配置段 | 关键项 | 说明 |
+|---|---|---|
+| `server` | `port: 8080` · `mode: debug/release` | 服务端口与运行模式 |
+| `database` | `dsn` · 连接池 | MySQL DSN（默认 `root/123456`），连接池上限 |
+| `redis` | `addr` · `db: 0` | 后端用 Redis **DB 0** |
+| `jwt` | `secret` · `expire: 86400` | JWT 密钥与有效期（24h）**生产务必更换** |
+| `fastapi` | `base_url` · `timeout: 120` | FastAPI 内网地址与超时 |
+| `minio` | `endpoint` · `access/secret_key` · `bucket` | 对象存储连接 |
+| `ratelimit` | `llm_per_minute: 20` · `llm_per_minute_admin: 60` | LLM 端点分级限流（每用户每分钟，≤0 关闭）|
+| `upload` | `max_size_mb: 50` · `file_exts` · `doc_exts` | 上传大小上限与扩展名白名单 |
+| `security` | `secret_key` | 敏感字段（api_key）AES-256-GCM 加密密钥，留空回退 `jwt.secret` |
+| `cors` | `allowed_origins` | 留空/含 `*` 放通；多用户部署填显式白名单 |
+| `log` | `level` · `filename` · 轮转 | zap + lumberjack 日志轮转 |
+
+> 容器内使用 `config.docker.yaml`（主机名替换为 compose 服务名 mysql/redis/minio）。
+
+### 6.2 AI 服务 `.env`（Pydantic BaseSettings）
+
+| 分组 | 变量 | 说明 |
+|---|---|---|
+| **Chat LLM** | `LLM_API_KEY` · `LLM_API_BASE` · `LLM_MODEL` · `LLM_TIMEOUT` · `LLM_MAX_RETRIES` | 任意 OpenAI 兼容接口（示例 DeepSeek）|
+| **Embedding** | `EMBEDDING_API_KEY` · `EMBEDDING_API_BASE` · `EMBEDDING_MODEL` | 独立嵌入提供商（DeepSeek 无嵌入端点，推荐硅基流动 `BAAI/bge-m3`）；留空回退 `LLM_*` |
+| **Rerank** | `RERANK_ENABLED` · `RERANK_MODEL` · `RERANK_RECALL_K` | 召回后精排（P2-3）；关闭时退化纯向量检索 |
+| **Redis** | `REDIS_HOST/PORT/DB=1` | AI 服务用 **DB 1**（与后端 DB 0 隔离）|
+| **ChromaDB** | `CHROMA_HOST/PORT` · `CHROMA_COLLECTION_PREFIX` | 向量库地址与集合前缀（多租户隔离）|
+| **MinIO** | `MINIO_ENDPOINT` · `ACCESS/SECRET_KEY` · `BUCKET` | 嵌入管道下载文档 |
+| **App** | `APP_HOST/PORT/DEBUG` · `CORS_ORIGINS` | 服务自身配置，生产 `APP_DEBUG=false` |
+
+> ⚠️ 切换嵌入模型后**必须重建知识库索引**（旧向量与新模型不兼容）。
+
+### 6.3 Docker Compose
+
+| 文件 | 职责 |
+|---|---|
+| `docker-compose.infra.yml` | MySQL/Redis/MinIO/ChromaDB；命名网络 `ai-workspace-net`；数据持久化到命名卷；`init.sql` 只读挂载 |
+| `docker-compose.app.yml` | backend/ai-service/web；以 `external` 方式加入同一网络；LLM 密钥从宿主环境透传；nginx 反代 `/api` 并开启 SSE 透传 |
+
+---
+
+## 7. API 文档
+
+所有端点以 `/api/` 为前缀，标准响应包装 `{ code, message, data }`（`internal/common/result.go`）。
+
+### Swagger / OpenAPI
+
+后端集成 **swag** 注解生成 OpenAPI 文档：
+
 ```bash
-cd ai-service
-cp .env.example .env
-# 填写 LLM_API_KEY（Chat）及 EMBEDDING_API_KEY（嵌入，见下方说明）
-pip install -r requirements.txt
-python main.py
-# 默认运行在 http://localhost:8001
+cd ai-workspace-backend
+make swag        # = swag init -g cmd/server/main.go -o docs（生成 docs/ 下 OpenAPI spec）
 ```
 
-> **Chat 与 Embedding 分离配置**  
-> DeepSeek API 不提供嵌入端点，因此 Chat 与 Embedding 使用独立的 API 配置：
-> - `LLM_API_*` / `LLM_MODEL`：Chat 模型（如 DeepSeek `deepseek-chat`）  
-> - `EMBEDDING_API_KEY` / `EMBEDDING_API_BASE` / `EMBEDDING_MODEL`：嵌入模型（推荐 [硅基流动](https://siliconflow.cn) `BAAI/bge-m3`，兼容 OpenAI 格式，支持中英文）  
->
-> 若 `EMBEDDING_API_KEY` / `EMBEDDING_API_BASE` 留空，自动回退使用 `LLM_*` 配置（适合 OpenAI 一套走通的场景）。  
-> **切换嵌入模型后必须重建知识库索引**——旧向量与新模型不兼容。
+### 主要端点一览
 
-## 🐳 基础设施说明
+| 模块 | 端点 | 备注 |
+|---|---|---|
+| **Auth** | `POST /api/auth/login` · `/logout` · `GET /api/auth/info` | 返回 roles / mustChangePwd |
+| **用户管理** | `/api/user/`（page/add/update/delete/status）| 仅管理员，bcrypt 密码 |
+| **Chat** | `POST /api/chat/send`（SSE）· `/api/chat/session/`（CRUD）| 滚动摘要降 token |
+| **KB/RAG** | `/api/kb/` · `/api/document/` · `POST /api/rag/chat`（SSE）· `/api/rag/rebuild` | 答案带来源引用帧 |
+| **Files** | `/api/file/`（MinIO，presign 1h）| 大小/扩展名/真实 MIME 校验 |
+| **Agent** | `/api/agent/` + `POST /api/agent/{id}/run` | 用户私有 · HTTP/MCP 工具循环 |
+| **Workflow** | `/api/workflow/` + `POST /api/workflow/{id}/run` | LangGraph 画布定义 |
+| **Job** | `/api/job/`（+ run/log/clean）| 仅管理员，cron 调度 |
+| **Prompt / Tool / MCP** | `/api/prompt/` · `/api/tool/` · `/api/mcp/`（+ `test/{id}`）| 用户私有 |
+| **Monitor/Dashboard** | `GET /api/dashboard/stats` · `/api/monitor/server` · `/health` | server/health 仅管理员 |
 
-所有基础设施（MySQL、Redis、MinIO、ChromaDB）均通过 `docker-compose.infra.yml` 统一管理，数据持久化到 Docker named volume，`docker compose down` 不加 `-v` 不会丢数据。
+### FastAPI 内部接口（仅后端调用，不对外暴露）
 
-### 健康检查
+`POST /chat` · `POST /rag/chat` · `POST /embedding/build` · `DELETE /embedding/delete` · `POST /agent/run` · `POST /workflow/run` · `GET /health`（`http://localhost:8001`）
 
-```powershell
-docker compose -f docker-compose.infra.yml ps        # 查看容器状态
-curl http://localhost:9000/minio/health/live          # MinIO
-curl http://localhost:8000/api/v2/heartbeat           # ChromaDB
+### SSE 流式约定
+
+Chat/RAG 用原生 `fetch()`（Axios 不支持 SSE），前端统一走 `api/sse.ts:streamSSE`：处理鉴权头、UTF-8 增量解码、`data: <json>` 解析、`data: [DONE]` 哨兵、`AbortSignal` 取消。Go handler 将 FastAPI 的 SSE 透传到浏览器。
+
+---
+
+## 8. 数据库设计
+
+MySQL 8，**19+ 张表**，统一约定：`BIGINT AUTO_INCREMENT` 主键、`deleted BIGINT` 软删除（GORM soft_delete milli 模式：0=未删，非 0=删除毫秒时间戳）、`utf8mb4`、时间戳由 GORM 自动填充。DDL 与种子数据全部在 `ai-workspace/sql/init.sql`。
+
+### 表结构关系
+
+```mermaid
+erDiagram
+    sys_user ||--o{ sys_user_role : has
+    sys_role ||--o{ sys_user_role : has
+    sys_role ||--o{ sys_role_menu : has
+    sys_menu ||--o{ sys_role_menu : has
+    sys_user ||--o{ chat_session : owns
+    chat_session ||--o{ chat_message : contains
+    chat_model ||..o{ chat_session : routes
+    kb_knowledge_base ||--o{ kb_document : contains
+    kb_document ||--o{ kb_chunk_task : tracks
+    sys_job ||--o{ sys_job_log : logs
+    sys_user ||--o{ usage_daily : aggregates
 ```
 
-### 配置 `ai-service/.env`
+### 表清单
 
-由 `.env.example` 复制后保持以下默认值即可对接容器：
+| 分类 | 表 | 职责 / 归属列 |
+|---|---|---|
+| **RBAC** | `sys_user` · `sys_role` · `sys_user_role` · `sys_menu` · `sys_role_menu` | 用户/角色/菜单权限；`role_code` 带 `ROLE_` 前缀；`must_change_pwd` 强制改密；`api_key` 加密存储 |
+| **Chat** | `chat_session` · `chat_message` · `chat_model` | 会话/消息（`user_id`）；`summary`+`summary_upto_id` 滚动摘要；`chat_model` 多模型路由（Go 管理）|
+| **知识库** | `kb_knowledge_base` · `kb_document` · `kb_chunk_task` | RAG 管道（`create_by`）；`status` PENDING→PROCESSING→DONE/FAILED；`task_status` PENDING/RUNNING/SUCCESS/FAILED |
+| **文件** | `file_info` | 文件中心，归属列 `upload_by` |
+| **Agent/Workflow** | `agent` · `workflow` | `tools`/`definition` 为 JSON 字符串（`create_by`）|
+| **自动化** | `sys_job` · `sys_job_log` | cron 任务（`status` 0=运行/1=暂停）；日志**物理删除**、仅 `create_time`、无 `deleted` 列 |
+| **能力扩展** | `prompt` · `tool` · `mcp_server` | 提示词/工具/MCP 注册表（`create_by`）；`mcp_server.transport` sse/stdio |
+| **统计** | `usage_daily` | 按用户按日用量聚合 |
 
-```dotenv
-# Chat LLM（以 DeepSeek 为例）
-LLM_API_KEY=sk-xxx
-LLM_API_BASE=https://api.deepseek.com/v1
-LLM_MODEL=deepseek-chat
+### 资源归属（强约束）
 
-# Embedding（以硅基流动 bge-m3 为例）
-EMBEDDING_API_KEY=sk-xxx
-EMBEDDING_API_BASE=https://api.siliconflow.cn/v1
-EMBEDDING_MODEL=BAAI/bge-m3
+用户私有资源严格隔离，强制经 `internal/service/owned.go` 泛型 helper（`getOwnedResource[T]` 单条 404/403 三态、`ownedScope[T]` 列表过滤）。**禁止手写 `Where("create_by = ?")` 字面量**（曾因此出现 IDOR）。归属列：KB/Agent/Workflow/Prompt/Tool/MCP=`create_by`，Chat=`user_id`，文件=`upload_by`。
 
-CHROMA_HOST=localhost
-CHROMA_PORT=8000
-CHROMA_COLLECTION_PREFIX=ai_workspace
+> 维护约定：任何表结构变更必须同步更新 `init.sql`。
 
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=ai-workspace
-MINIO_SECURE=false
+---
+
+## 9. 部署指南
+
+### 环境矩阵
+
+```mermaid
+flowchart TB
+    subgraph DEV[开发环境 · 本地进程]
+        D1[Docker 基础设施] --> D2[go run / uv run / vite dev]
+        D2 --> D3[热重载 · debug 模式 · CORS 放通]
+    end
+    subgraph TEST[测试环境 · 容器整栈]
+        T1[infra compose] --> T2[app compose --build]
+        T2 --> T3[nginx 入口 :3000 · GitHub Actions CI 门禁]
+    end
+    subgraph PROD[生产环境 · 加固]
+        P1[独立密钥 · 加密 · 白名单 CORS] --> P2[release 模式 · 限流 · HTTPS]
+        P2 --> P3[持久化卷 · 健康检查 · 监控]
+    end
+    DEV --> TEST --> PROD
 ```
 
-ChromaDB 无需手动建集合，FastAPI 首次写入时会按 `CHROMA_COLLECTION_PREFIX` 自动创建。
+### 9.1 开发环境
 
-## 🐍 Python 依赖安装（已适配 Python 3.14）
+- 基础设施用 Docker，三个应用以本地进程运行（`make run` / `uv run python main.py` / `npm run dev`）。
+- `server.mode=debug`、`APP_DEBUG=true`，热重载开启，CORS 放通便于联调。
 
-`ai-service` 的 `requirements.txt` 已升级并**锁定为在 Python 3.14 上验证可运行的版本**。
-相比最初基线,这是一次大版本升级:langchain `0.3.x → 1.3.x`、chromadb `0.6.x → 1.5.x`、
-langgraph `0.2.x → 1.2.x`、fastapi/pydantic 等同步升级。3.14 上所有包均有预编译 wheel,无需本地编译。
+### 9.2 测试环境
 
-### 安装步骤
+- 容器化整栈：先 `infra` 后 `app --build`，统一从 nginx 入口 `:3000` 访问。
+- **CI 门禁**（`.github/workflows/ci.yml`，push/PR 到 master/main 触发）：
+  - **Go**：`gofmt` 检查 → `go vet` → `go test` → `go build`
+  - **前端**：`npm ci` → `vue-tsc --noEmit` → `vitest run` → `vite build`
+  - **AI 服务**：`uv sync --frozen` → 导入冒烟（路由装配 + 配置加载）
 
-```powershell
-cd "C:\Users\leker\Desktop\AI Workspace\ai-service"
+### 9.3 生产环境（加固清单）
 
-# 1. 用 Python 3.14 创建虚拟环境
-python -m venv .venv
+| 项 | 要求 |
+|---|---|
+| **密钥** | 更换 `jwt.secret`；单独配置 `security.secret_key`（勿回退 jwt）；轮换 MySQL/MinIO 默认口令 |
+| **运行模式** | 后端 `server.mode=release`；AI 服务 `APP_DEBUG=false` |
+| **网络** | `cors.allowed_origins` 与 `CORS_ORIGINS` 改为显式白名单；前端经 HTTPS（在 nginx 前置 TLS）|
+| **限流** | 按需调整 `ratelimit.llm_per_minute(_admin)` |
+| **强制改密** | 默认 admin 首登强制改密（`must_change_pwd`），勿保留默认口令 |
+| **持久化** | MySQL/Redis(AOF)/MinIO/ChromaDB 均挂命名卷；定期备份 |
+| **可观测** | `GET /health`（后端/AI）做容器健康检查；`/api/monitor/*` 看服务器与依赖健康 |
+| **SSE** | nginx `proxy_buffering off` 保证流式不被缓冲 |
 
-# 2. 激活（若报执行策略错误，先跑一次下面被注释的命令）
-.\.venv\Scripts\Activate.ps1
-# Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+---
 
-# 3. 升级 pip 并安装
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+## 附录：开发规范要点
 
-# 4. 配置环境变量
-copy .env.example .env   # 填入 LLM_API_KEY 等
-
-# 5. 启动
-python main.py           # http://localhost:8001
-```
-
-验证:`curl http://localhost:8001/health` 返回 `{"code":200,"message":"ok"}`。
-
-### 升级带来的代码变更
-
-langchain 1.x 拆分了文本分割模块,已相应修改:
-
-- `app/embedding/service.py`:`from langchain.text_splitter ...` → `from langchain_text_splitters import RecursiveCharacterTextSplitter`
-
-### 注意事项
-
-- **客户端版本对齐**:chromadb 客户端为 `1.5.9`,与 Docker 镜像 `chromadb/chroma:latest`(1.x)匹配,
-  心跳端点为 `/api/v2/heartbeat`。
-- **运行期功能需实测**:上述已验证服务可正常启动、所有模块可加载。但 RAG / embedding / agent
-  链路涉及 langchain 1.x、chromadb 1.x 的运行时行为,建议接好 LLM Key 与 MinIO/ChromaDB 容器后,
-  实测「上传文档 → 向量化 → RAG 问答」全链路;如遇 1.x API 差异,可能需要少量适配。
-- **MCP 依赖**:Agent 运行时通过 `langchain-mcp-adapters` + `mcp` 加载 SSE MCP 服务器工具,二者已加入
-  `requirements.txt`。该能力仅在 AI 服务运行环境(WSL/Linux/Docker)生效,且首次实跑建议复核
-  `MultiServerMCPClient` 的 API 与锁定版本;Agent 的 HTTP 工具调用基于已内置的 `httpx`,无额外依赖。
-
-## 📝 开发进度表 (Roadmap)
-
-- [x] **Sprint 1**: 基础系统搭建、Spring Boot 及 Vue3 初始化、JWT 认证与 RBAC 权限。
-- [x] **Sprint 2**: AI 会话模块开发，支持 SSE 流式输出与 Markdown 渲染。
-- [x] **Sprint 3**: 文件中心 (MinIO) 对接，知识库基础 CRUD 开发。
-- [x] **Sprint 4**: RAG 引擎上线，支持文档解析、Chunk 切片、Embedding 向量化与问答。
-- [x] **Sprint 5**: 数据看板 (Dashboard) 完成统计与概览开发。
-- [x] **Sprint 6**: 系统监控 (Monitor) 上线；Agent 与工作流模块（CRUD + 运行代理至 FastAPI）；动态 Cron 定时任务调度器 (Job)。
-- [x] **Sprint 7**: 提示词中心 (Prompt)、工具中心 (Tool)、MCP 服务器注册表上线（用户级 CRUD，含 MCP 连通性检测）。
-- [x] **Sprint 8**: Agent 运行时工具联动——真实 HTTP 工具执行 + SSE MCP 工具加载，贯通 Spring → FastAPI 工具调用循环；前端可选择工具/MCP 并展示执行轨迹。
-- [x] **Sprint 9**: 架构优化——统一 `FastApiClient`（连接池 + 集中超时）、SSE/嵌入线程池隔离、聊天上下文有界化与断连保存、CORS/LLM 超时重试修复；前端统一 `streamSSE` 流式工具、新增 RAG 流式问答页、Element Plus 按需引入 + 路由级拆包（消除 >500KB 单体包）。
-
-## 📄 许可证
-
-Personal Use.
+- **前端**：禁用 Element Plus / `<style scoped>` / `::v-deep` / `!important`；样式一律 Tailwind utility；统一组件从 `components/ui/index.ts` 出口引入。
+- **后端**：归属过滤必走 `owned.go`，禁止字面量 `Where`；表结构变更同步 `init.sql`。
+- **AI 服务**：依赖用 `uv add`；嵌入临时文件已用 `tempfile.gettempdir()`（跨平台）。
+- **分层铁律**：Go 不直接调 LLM，FastAPI 不直接读 MySQL；`llm_config` 仅服务间内网流转，不对客户端暴露。
