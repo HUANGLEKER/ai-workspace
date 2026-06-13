@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"testing"
@@ -36,9 +37,11 @@ func newTestDB(t *testing.T) *gorm.DB {
 
 // fakeAI 是 EmbeddingCaller 的可编程假实现
 type fakeAI struct {
-	sendErr   error    // Send 返回的错误（nil 表示成功）
-	sendPanic bool     // Send 时直接 panic，验证 recover 兜底
-	calls     []string // 记录调用的 path
+	sendErr   error           // Send 返回的错误（nil 表示成功）
+	sendPanic bool            // Send 时直接 panic，验证 recover 兜底
+	postData  json.RawMessage // PostForData 返回的数据（如 /summarize 响应）
+	postErr   error           // PostForData 返回的错误
+	calls     []string        // 记录调用的 path
 }
 
 func (f *fakeAI) Send(_ context.Context, path string, _ any, _ time.Duration) error {
@@ -52,6 +55,11 @@ func (f *fakeAI) Send(_ context.Context, path string, _ any, _ time.Duration) er
 func (f *fakeAI) SendMethod(_ context.Context, _, path string, _ any, _ time.Duration) error {
 	f.calls = append(f.calls, path)
 	return f.sendErr
+}
+
+func (f *fakeAI) PostForData(_ context.Context, path string, _ any) (json.RawMessage, error) {
+	f.calls = append(f.calls, path)
+	return f.postData, f.postErr
 }
 
 // fakeStore 是 ObjectStore 的可编程假实现

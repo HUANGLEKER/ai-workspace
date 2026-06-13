@@ -56,7 +56,7 @@ func (minioStore) PresignedURL(ctx context.Context, objectName string, expiry ti
 // Init 组装全部 service 单例，必须在 database/redis/fastapi/minio 初始化之后调用。
 func Init() {
 	db := database.DB
-	ChatSvc = NewChatService(db)
+	ChatSvc = NewChatService(db, fastapi.Client)
 	KBSvc = NewKBService(db, fastapi.Client, minioStore{})
 	AgentSvc = NewAgentService(db, fastapi.Client)
 	WorkflowSvc = NewWorkflowService(db, fastapi.Client)

@@ -3,8 +3,39 @@ import json
 from typing import AsyncIterator
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.llm.provider import get_chat_llm
-from app.models.chat import ChatRequest, Message
+from app.models.chat import ChatRequest, Message, SummarizeRequest
 from app.observability import LlmCallTimer
+
+_SUMMARIZE_PROMPT = """你是对话摘要助手。请把【已有摘要】与【新增对话】融合，生成一份更新后的简洁摘要，
+保留关键事实、用户偏好、未决事项与结论，去除寒暄与冗余。用中文，控制在 300 字以内，只输出摘要正文。
+
+【已有摘要】
+{summary}
+
+【新增对话】
+{conversation}
+"""
+
+
+async def summarize(req: SummarizeRequest) -> str:
+    """把已有摘要与本批旧消息融合为更新后的滚动摘要（P3-2 Memory 层）。"""
+    cfg = req.llm_config
+    llm = get_chat_llm(
+        model=req.model,
+        temperature=0.3,
+        api_key=cfg.api_key if cfg else None,
+        api_base=cfg.api_base if cfg else None,
+    )
+    conversation = "\n".join(f"{m.role}: {m.content}" for m in req.messages)
+    prompt = _SUMMARIZE_PROMPT.format(summary=req.summary or "（无）", conversation=conversation)
+    timer = LlmCallTimer("summarize", req.model)
+    try:
+        resp = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        timer.fail(e)
+        raise
+    timer.done()
+    return resp.content if isinstance(resp.content, str) else str(resp.content)
 
 
 def _to_lc_message(msg: Message):

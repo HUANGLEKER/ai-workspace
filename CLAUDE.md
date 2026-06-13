@@ -206,7 +206,7 @@ FastAPI 健康检查：`GET http://localhost:8001/health`
 ## 数据库关键表
 
 - `sys_user`、`sys_role`、`sys_user_role` —— RBAC 系统（`role_code` 带 `ROLE_` 前缀）
-- `chat_session`、`chat_message`、`chat_model` —— chat 模块。`chat_model` 由 Go 后端完全管理；FastAPI **不**读 MySQL。多模型路由：Go 按会话/请求的模型名查 `chat_model`，将 `api_url`/`api_key` 以 `llm_config {api_base, api_key}` 字段随 `/chat`、`/rag/chat` 请求透传，FastAPI 据此按请求构建（LRU 缓存）LLM 客户端；未配置时回退 `.env` 的 `LLM_*`。`llm_config` 仅在服务间内网流转，不对客户端暴露。
+- `chat_session`、`chat_message`、`chat_model` —— chat 模块。`chat_session.summary` + `summary_upto_id` 为会话滚动摘要（P3-2 Memory 层）：消息数超 `summarizeThreshold`(40) 时，Go 侧异步调 FastAPI `/chat/summarize` 把「最近 20 条之前、未摘要」的旧消息压缩进 `summary` 并推进 `summary_upto_id`；上下文组装为「system prompt + summary（作 system 消息）+ id>summary_upto_id 的最近消息」。`chat_model` 由 Go 后端完全管理；FastAPI **不**读 MySQL。多模型路由：Go 按会话/请求的模型名查 `chat_model`，将 `api_url`/`api_key` 以 `llm_config {api_base, api_key}` 字段随 `/chat`、`/rag/chat` 请求透传，FastAPI 据此按请求构建（LRU 缓存）LLM 客户端；未配置时回退 `.env` 的 `LLM_*`。`llm_config` 仅在服务间内网流转，不对客户端暴露。
 - `kb_knowledge_base`、`kb_document`、`kb_chunk_task` —— 知识库 + RAG 管道（`kb_chunk_task.task_status`：PENDING/RUNNING/SUCCESS/FAILED；`kb_document.status`：PENDING/PROCESSING/DONE/FAILED）
 - `file_info` —— 文件中心（归属列 `upload_by`）
 - `agent` —— Agent 定义，`tools` 是 JSON 数组字符串

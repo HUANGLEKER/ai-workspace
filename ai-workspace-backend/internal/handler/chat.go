@@ -159,17 +159,21 @@ func ChatSend(c *gin.Context) {
 	autoTitle := service.ChatSvc.AutoTitleFromFirstMessage(sess, req.Content)
 	titleChanged := autoTitle != oldTitle
 
-	// 构建有界上下文
-	history, err := service.ChatSvc.ListRecentMessages(req.SessionID)
+	// 构建有界上下文：摘要已覆盖的旧消息排除，只取 id > summary_upto_id 的最近消息
+	history, err := service.ChatSvc.RecentContextMessages(req.SessionID, sess.SummaryUptoID)
 	if err != nil {
 		common.ServerError(c, err.Error())
 		return
 	}
-	messages := make([]map[string]string, 0, len(history)+1)
+	messages := make([]map[string]string, 0, len(history)+2)
 	// 会话绑定了系统提示词（来自提示词中心）：拼为上下文首条 system 消息，
 	// FastAPI 侧按 role 映射为 SystemMessage，无需任何改动
 	if sess.SystemPrompt != "" {
 		messages = append(messages, map[string]string{"role": "system", "content": sess.SystemPrompt})
+	}
+	// Memory（P3-2）：早先对话摘要作为 system 消息注入，让模型保有长会话上文
+	if sess.Summary != "" {
+		messages = append(messages, map[string]string{"role": "system", "content": "以下是本次对话早先内容的摘要，供你保持上下文连贯：\n" + sess.Summary})
 	}
 	for _, m := range history {
 		messages = append(messages, map[string]string{"role": m.Role, "content": m.Content})
@@ -257,6 +261,9 @@ func ChatSend(c *gin.Context) {
 	// 断连保存：不论客户端是否中途断开，只要有已生成内容就持久化
 	if assistantReply.Len() > 0 {
 		_ = service.ChatSvc.SaveMessageWithTokens(req.SessionID, "assistant", assistantReply.String(), completionTokens)
+		// Memory（P3-2）：异步滚动摘要，消息数超阈值时压缩旧消息控制 token 成本
+		llmCfg := service.LlmConfigBody(service.ChatSvc.GetModelConfigByName(req.Model))
+		go service.ChatSvc.MaybeSummarize(req.SessionID, req.Model, llmCfg)
 	}
 }
 

@@ -1,10 +1,18 @@
-"""对话路由：暴露 POST /chat，以 text/event-stream 形式流式返回回复。"""
+"""对话路由：流式对话 POST /chat 与会话摘要 POST /chat/summarize。"""
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from app.models.chat import ChatRequest
-from app.chat.service import stream_chat
+from app.models.chat import ChatRequest, SummarizeRequest
+from app.chat.service import stream_chat, summarize
+from app.utils.response import Result
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+
+
+@router.post("/summarize", response_model=Result)
+async def summarize_route(req: SummarizeRequest):
+    """会话滚动摘要（P3-2）：返回融合后的摘要文本，Go 侧落库到 chat_session.summary。"""
+    text = await summarize(req)
+    return Result.ok(data={"summary": text})
 
 
 @router.post("")

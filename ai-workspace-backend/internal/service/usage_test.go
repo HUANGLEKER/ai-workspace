@@ -12,7 +12,7 @@ func newUsageEnv(t *testing.T) (*UsageService, *ChatService) {
 	if err := db.AutoMigrate(&model.UsageDaily{}); err != nil {
 		t.Fatalf("迁移 usage_daily 失败: %v", err)
 	}
-	return NewUsageService(db), NewChatService(db)
+	return NewUsageService(db), NewChatService(db, nil)
 }
 
 func seedMsgs(t *testing.T, cs *ChatService, userID int64, modelName string, tokens []int) {

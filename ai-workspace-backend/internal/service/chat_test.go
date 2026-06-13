@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -15,7 +16,7 @@ const (
 )
 
 func newChatSvc(t *testing.T) *ChatService {
-	return NewChatService(newTestDB(t))
+	return NewChatService(newTestDB(t), nil)
 }
 
 func mustCreateSession(t *testing.T, s *ChatService, userID int64, title string) *model.ChatSession {
@@ -174,6 +175,60 @@ func TestGetModelConfigByName(t *testing.T) {
 	body := LlmConfigBody(&model.ChatModel{ApiUrl: "http://x", ApiKey: "k"})
 	if body["api_base"] != "http://x" || body["api_key"] != "k" {
 		t.Fatalf("llm_config 字段映射错误: %v", body)
+	}
+}
+
+// 滚动摘要（P3-2）：消息数超阈值时把旧消息压缩进 summary 并推进 summary_upto_id；
+// 上下文只取 id > summary_upto_id 的最近消息
+func TestMaybeSummarize(t *testing.T) {
+	db := newTestDB(t)
+	ai := &fakeAI{postData: json.RawMessage(`{"summary":"早先聊了天气"}`)}
+	s := NewChatService(db, ai)
+
+	sess := &model.ChatSession{Title: "t", ModelName: "m"}
+	_ = s.CreateSession(sess, userA)
+	// 造 50 条消息（> summarizeThreshold=40），触发摘要
+	for i := 1; i <= 50; i++ {
+		_ = s.SaveMessage(sess.ID, "user", fmt.Sprintf("m%d", i))
+	}
+
+	s.MaybeSummarize(sess.ID, "m", nil)
+
+	// 调用了 /summarize
+	if len(ai.calls) != 1 || ai.calls[0] != "/chat/summarize" {
+		t.Fatalf("应调用 /summarize，实际 %v", ai.calls)
+	}
+	got, _ := s.GetOwnedSession(sess.ID, userA)
+	if got.Summary != "早先聊了天气" {
+		t.Fatalf("摘要未落库: %q", got.Summary)
+	}
+	// summary_upto_id 应推进到「保留窗口」之前：50 条保留最近 20 条 → upto 覆盖前 30 条
+	if got.SummaryUptoID == 0 {
+		t.Fatal("summary_upto_id 未推进")
+	}
+	// 上下文只取 id > upto 的最近消息（保留窗口 = maxContextMessages 条）
+	ctx, _ := s.RecentContextMessages(sess.ID, got.SummaryUptoID)
+	if len(ctx) != maxContextMessages {
+		t.Fatalf("摘要后上下文应为 %d 条，实际 %d", maxContextMessages, len(ctx))
+	}
+	if ctx[len(ctx)-1].Content != "m50" {
+		t.Fatalf("上下文应含最新消息 m50，实际尾部 %s", ctx[len(ctx)-1].Content)
+	}
+}
+
+// 未达阈值不触发摘要
+func TestMaybeSummarizeBelowThreshold(t *testing.T) {
+	db := newTestDB(t)
+	ai := &fakeAI{postData: json.RawMessage(`{"summary":"x"}`)}
+	s := NewChatService(db, ai)
+	sess := &model.ChatSession{Title: "t", ModelName: "m"}
+	_ = s.CreateSession(sess, userA)
+	for i := 0; i < 10; i++ {
+		_ = s.SaveMessage(sess.ID, "user", "m")
+	}
+	s.MaybeSummarize(sess.ID, "m", nil)
+	if len(ai.calls) != 0 {
+		t.Fatalf("未达阈值不应调用，实际 %v", ai.calls)
 	}
 }
 

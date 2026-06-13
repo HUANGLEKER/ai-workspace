@@ -29,3 +29,17 @@ class ChatRequest(BaseModel):
     stream: bool = True
     temperature: float = 0.7
     max_tokens: Optional[int] = None
+
+
+class SummarizeRequest(BaseModel):
+    """会话滚动摘要请求体（P3-2 Memory 层）。"""
+    session_id: str
+    summary: str = ""          # 已有摘要（增量更新的基础）
+    messages: list[Message]    # 本批待压缩的旧消息
+    model: Optional[str] = None
+    llm_config: Optional[LlmConfig] = None
+
+
+class SummarizeResponse(BaseModel):
+    """会话摘要响应体。"""
+    summary: str

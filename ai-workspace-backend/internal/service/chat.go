@@ -1,9 +1,13 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
@@ -16,14 +20,19 @@ var ChatSvc *ChatService
 // maxContextMessages 发送给 LLM 的最近上下文消息条数上限，防止 token 成本随会话长度无限增长
 const maxContextMessages = 20
 
+// summarizeThreshold 会话消息数超过此值时触发滚动摘要（P3-2）：
+// 把最近 maxContextMessages 之前的旧消息压缩进 summary，控制长会话 token 成本
+const summarizeThreshold = 40
+
 // ChatService 聊天业务逻辑；依赖经构造函数注入，便于单测以 sqlite 内存库构造
 type ChatService struct {
 	db *gorm.DB
+	ai RunCaller // 调 FastAPI /summarize 做会话摘要；nil 时跳过摘要（如部分单测）
 }
 
 // NewChatService 构造聊天服务
-func NewChatService(db *gorm.DB) *ChatService {
-	return &ChatService{db: db}
+func NewChatService(db *gorm.DB, ai RunCaller) *ChatService {
+	return &ChatService{db: db, ai: ai}
 }
 
 // ListSessions 查询当前用户的所有会话，按创建时间倒序
@@ -119,11 +128,11 @@ func (s *ChatService) ListMessages(sessionID int64) ([]model.ChatMessage, error)
 	return messages, err
 }
 
-// ListRecentMessages 查询最近 N 条消息，用于构建有界 LLM 上下文
-// 按时间倒序取 N 条后再正序返回，保证传给 LLM 的消息时序正确
-func (s *ChatService) ListRecentMessages(sessionID int64) ([]model.ChatMessage, error) {
+// RecentContextMessages 取 id > uptoID 的最近 N 条消息（已被摘要覆盖的旧消息排除），
+// 按时间倒序取 N 条后再正序返回，保证传给 LLM 的消息时序正确。
+func (s *ChatService) RecentContextMessages(sessionID, uptoID int64) ([]model.ChatMessage, error) {
 	var messages []model.ChatMessage
-	err := s.db.Where("session_id = ?", sessionID).
+	err := s.db.Where("session_id = ? AND id > ?", sessionID, uptoID).
 		Order("id DESC").
 		Limit(maxContextMessages).
 		Find(&messages).Error
@@ -134,6 +143,80 @@ func (s *ChatService) ListRecentMessages(sessionID int64) ([]model.ChatMessage, 
 		messages[i], messages[j] = messages[j], messages[i]
 	}
 	return messages, nil
+}
+
+// ListRecentMessages 取最近 N 条消息（不考虑摘要边界），兼容旧调用方。
+func (s *ChatService) ListRecentMessages(sessionID int64) ([]model.ChatMessage, error) {
+	return s.RecentContextMessages(sessionID, 0)
+}
+
+// MaybeSummarize 滚动摘要（P3-2）：会话消息数超阈值时，把「最近 maxContextMessages 之前、
+// 尚未摘要」的旧消息经 FastAPI /summarize 压缩进 session.summary 并推进 summary_upto_id。
+// 设计为异步调用（goroutine）：失败或未注入 ai 时静默跳过，下条消息会再次触发，无需持久化任务。
+func (s *ChatService) MaybeSummarize(sessionID int64, modelName string, llmConfig map[string]string) {
+	// goroutine 内兜底，避免 panic 击穿进程
+	defer func() {
+		if r := recover(); r != nil {
+			zap.L().Warn("会话摘要 panic", zap.Int64("sessionId", sessionID), zap.Any("panic", r))
+		}
+	}()
+	if s.ai == nil {
+		return
+	}
+
+	var total int64
+	s.db.Model(&model.ChatMessage{}).Where("session_id = ?", sessionID).Count(&total)
+	if total <= summarizeThreshold {
+		return
+	}
+
+	var sess model.ChatSession
+	if err := s.db.First(&sess, sessionID).Error; err != nil {
+		return
+	}
+	// 保留窗口起点：最近第 maxContextMessages 条消息（含）之后保持原文，之前的待摘要
+	var boundary model.ChatMessage
+	if err := s.db.Where("session_id = ?", sessionID).
+		Order("id DESC").Offset(maxContextMessages - 1).Limit(1).First(&boundary).Error; err != nil {
+		return
+	}
+	var olds []model.ChatMessage
+	s.db.Where("session_id = ? AND id > ? AND id < ?", sessionID, sess.SummaryUptoID, boundary.ID).
+		Order("id ASC").Find(&olds)
+	if len(olds) == 0 {
+		return
+	}
+
+	msgs := make([]map[string]string, 0, len(olds))
+	for _, m := range olds {
+		msgs = append(msgs, map[string]string{"role": m.Role, "content": m.Content})
+	}
+	body := map[string]any{
+		"session_id": fmt.Sprintf("%d", sessionID),
+		"summary":    sess.Summary,
+		"messages":   msgs,
+		"model":      modelName,
+	}
+	if llmConfig != nil {
+		body["llm_config"] = llmConfig
+	}
+
+	data, err := s.ai.PostForData(context.Background(), "/chat/summarize", body)
+	if err != nil {
+		zap.L().Warn("会话摘要调用失败", zap.Int64("sessionId", sessionID), zap.Error(err))
+		return
+	}
+	var resp struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil || resp.Summary == "" {
+		return
+	}
+	newUpto := olds[len(olds)-1].ID
+	s.db.Model(&model.ChatSession{}).Where("id = ?", sessionID).
+		Updates(map[string]any{"summary": resp.Summary, "summary_upto_id": newUpto})
+	zap.L().Info("会话摘要已更新", zap.Int64("sessionId", sessionID),
+		zap.Int("summarized", len(olds)), zap.Int64("uptoId", newUpto))
 }
 
 // SaveMessage 持久化一条消息，role 为 "user" 或 "assistant"

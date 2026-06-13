@@ -11,6 +11,10 @@ type ChatSession struct {
 	ModelName string `gorm:"column:model_name;size:100" json:"modelName"`
 	// 会话级系统提示词（来自提示词中心），非空时由 Go 侧拼到上下文首条 system 消息
 	SystemPrompt string `gorm:"column:system_prompt;type:text" json:"systemPrompt"`
+	// Memory（P3-2）：早先对话的滚动摘要；非空时作为一条 system 消息注入上下文
+	Summary string `gorm:"column:summary;type:text" json:"summary"`
+	// 摘要已覆盖到的最大消息 ID；上下文只取 id > 此值的「最近未摘要」消息
+	SummaryUptoID int64 `gorm:"column:summary_upto_id;default:0" json:"summaryUptoId"`
 }
 
 func (ChatSession) TableName() string { return "chat_session" }
