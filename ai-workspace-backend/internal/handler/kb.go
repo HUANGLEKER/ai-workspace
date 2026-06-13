@@ -147,7 +147,8 @@ func RAGChat(c *gin.Context) {
 		Question  string `json:"question"  binding:"required"`
 		SessionID string `json:"sessionId"`
 		TopK      int    `json:"topK"`
-		Model     string `json:"model"` // 可选；指定则按 chat_model 配置做多模型路由
+		Model     string `json:"model"`     // 可选；指定则按 chat_model 配置做多模型路由
+		WebSearch bool   `json:"webSearch"` // 可选；开启后 FastAPI 检索图并入联网搜索召回
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.BadRequest(c, err.Error())
@@ -169,11 +170,12 @@ func RAGChat(c *gin.Context) {
 
 	// FastAPI 的 Pydantic 模型要求 kb_id 为字符串，传整数会触发 422 校验错误
 	body := map[string]any{
-		"kb_id":      strconv.FormatInt(req.KbID, 10),
-		"question":   req.Question,
-		"session_id": req.SessionID,
-		"top_k":      req.TopK,
-		"stream":     true,
+		"kb_id":             strconv.FormatInt(req.KbID, 10),
+		"question":          req.Question,
+		"session_id":        req.SessionID,
+		"top_k":             req.TopK,
+		"stream":            true,
+		"enable_web_search": req.WebSearch,
 	}
 	if req.Model != "" {
 		body["model"] = req.Model

@@ -5,14 +5,15 @@
 
 definition schema:
     {
-      "nodes": [{"id": "...", "type": "start|llm|http|end", "data": {...}}],
+      "nodes": [{"id": "...", "type": "start|llm|http|search|end", "data": {...}}],
       "edges": [{"source": "id", "target": "id"}]
     }
 节点 data 约定：
-    start: 无（入口，把 inputs 注入变量表，含 inputs.input/inputs.prompt）
-    llm:   {"prompt": "模板，可含 {{input}} {{节点id}}"}
-    http:  {"method": "GET|POST", "url": "...", "body": "模板字符串"}
-    end:   无（终点，把上游变量作为最终 outputs.result）
+    start:  无（入口，把 inputs 注入变量表，含 inputs.input/inputs.prompt）
+    llm:    {"prompt": "模板，可含 {{input}} {{节点id}}"}
+    http:   {"method": "GET|POST", "url": "...", "body": "模板字符串"}
+    search: {"query": "搜索词模板，可含 {{input}} {{节点id}}", "topK": 3}（联网搜索，输出格式化网页片段）
+    end:    无（终点，把上游变量作为最终 outputs.result）
 """
 import json
 import re
@@ -90,6 +91,23 @@ async def _run_node(node: dict, vars: dict[str, Any], model: str | None) -> str:
                     resp = await client.request(method, url, content=payload)
             resp.raise_for_status()
             return resp.text[:4000]
+
+    if ntype == "search":
+        # 联网搜索节点：渲染查询模板 → search_web_results（自带硬超时 + 失败降级）→
+        # 把结果格式化为带编号的网页片段文本，供下游 {{节点id}} 引用
+        from app.utils.web_search import search_web_results
+
+        query = _render(str(data.get("query") or "{{input}}"), vars)
+        try:
+            top_k = int(data.get("topK") or data.get("top_k") or 3)
+        except (TypeError, ValueError):
+            top_k = 3
+        sources = await search_web_results(query, top_k=top_k)
+        if not sources:
+            return "未搜索到相关结果。"
+        return "\n\n---\n\n".join(
+            f"[{i + 1}] {s.file_name}\n{s.content}" for i, s in enumerate(sources)
+        )
 
     raise ValueError(f"不支持的节点类型: {ntype}")
 

@@ -39,7 +39,7 @@ export const rebuildRag = (kbId: number) =>
  * - 反复出现的 {content:'<token>'} token 帧，通过 onChunk 回调传出
  */
 export const ragChatStream = (
-  params: { kbId: number; question: string; sessionId?: string; topK?: number },
+  params: { kbId: number; question: string; sessionId?: string; topK?: number; webSearch?: boolean },
   onChunk: (text: string) => void,
   onSources: (sources: RagSource[]) => void,
   onDone: () => void,

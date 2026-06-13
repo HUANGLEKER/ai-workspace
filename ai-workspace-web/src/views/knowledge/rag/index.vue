@@ -14,6 +14,19 @@
         class="!w-60 max-w-60"
         @change="resetConversation"
       />
+      <button
+        type="button"
+        :disabled="streaming"
+        class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all duration-200 ease-out disabled:opacity-50"
+        :class="webSearch
+          ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+          : 'border-zinc-200/80 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800'"
+        :title="webSearch ? '联网搜索已开启' : '联网搜索已关闭'"
+        @click="webSearch = !webSearch"
+      >
+        <Globe class="h-3.5 w-3.5" />
+        联网
+      </button>
       <AppButton variant="ghost" size="sm" :icon="Trash2" :disabled="streaming" @click="resetConversation">清空</AppButton>
     </div>
 
@@ -119,7 +132,7 @@
  */
 import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from 'radix-vue'
 import {
-  FileSearch, BookOpen, FileText, Trash2, Bot, User, Send, CircleStop, ChevronDown
+  FileSearch, BookOpen, FileText, Trash2, Bot, User, Send, CircleStop, ChevronDown, Globe
 } from 'lucide-vue-next'
 import type { KnowledgeBase, RagSource } from '@/types'
 import { listKnowledgeBases, ragChatStream } from '@/api/kb'
@@ -138,6 +151,7 @@ const knowledgeBases = ref<KnowledgeBase[]>([])
 const selectedKbId = ref<number>()
 const question = ref('')
 const streaming = ref(false)
+const webSearch = ref(false)
 const turns = ref<QaTurn[]>([])
 const { containerRef, scrollToBottom, scheduleScroll } = useChatScroll()
 let streamController: AbortController | null = null
@@ -185,7 +199,7 @@ function handleAsk() {
   const stream = useStreamingMarkdown((text) => { turn.answer = text })
 
   ragChatStream(
-    { kbId: selectedKbId.value, question: q, sessionId: `rag-${selectedKbId.value}` },
+    { kbId: selectedKbId.value, question: q, sessionId: `rag-${selectedKbId.value}`, webSearch: webSearch.value },
     (text) => {
       stream.append(text)
       scheduleScroll()

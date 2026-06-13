@@ -1,20 +1,21 @@
 """RAG 知识库问答业务逻辑（P2-3：召回 → rerank 精排 → 引用对齐）。
 
-流程：问题向量化 → 向量召回 recall_k 个候选 → reranker 精排取 top_k →
+流程：检索编排图（本地向量召回 + 可选联网搜索 → 多路融合 + rerank 精排）→
 拼为带编号的上下文注入系统提示 → 流式生成答案。
 SSE 先发一帧 sources 元数据（含 rerank 分数与引用标记），随后逐 token 发答案。
+
+检索部分（召回/联网/精排）已抽到 app/rag/graph.py 的 LangGraph StateGraph 编排；
+本模块只负责图外的「上下文拼接 + 流式生成 + 引用对齐」，以保住 SSE 帧顺序契约。
 """
 import json
 import re
 from typing import AsyncIterator
 from langchain_core.messages import SystemMessage, HumanMessage
-from app.config.settings import settings
-from app.llm.provider import get_chat_llm, get_embeddings
+from app.llm.provider import get_chat_llm
 from app.models.rag import RagChatRequest, SourceDocument
 from app.observability import LlmCallTimer
-from app.rag.rerank import rerank
+from app.rag.graph import retrieve
 from app.utils.safety import INJECTION_GUARD, fence
-from app.vectorstore.chroma_client import get_or_create_collection
 
 # 用带编号的来源块，并要求模型在引用时标注 [来源N]，便于回填引用对齐
 _RAG_SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下带编号的参考文档回答用户的问题。
@@ -30,63 +31,6 @@ _RAG_SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下带�
 _CITE_RE = re.compile(r"\[来源\s*(\d+)\]")
 
 
-async def _recall(req: RagChatRequest) -> list[SourceDocument]:
-    """向量召回候选切片（rerank 启用时召回 recall_k 个，否则召回 top_k 个）。"""
-    embeddings = get_embeddings()
-    query_vector = await embeddings.aembed_query(req.question)
-
-    recall_k = settings.rerank_recall_k if settings.rerank_enabled else req.top_k
-    collection = get_or_create_collection(req.kb_id)
-    results = collection.query(
-        query_embeddings=[query_vector],  # type: ignore
-        n_results=recall_k,
-        include=["documents", "metadatas", "distances"],
-    )
-
-    sources: list[SourceDocument] = []
-    documents = results.get("documents")
-    if documents and documents[0]:
-        doc_list = documents[0]
-        metadatas = results.get("metadatas")
-        distances = results.get("distances")
-        meta_list = metadatas[0] if metadatas else [{}] * len(doc_list)
-        dist_list = distances[0] if distances else [0.0] * len(doc_list)
-        for doc, meta, dist in zip(doc_list, meta_list, dist_list):
-            sources.append(SourceDocument(
-                document_id=str(meta.get("document_id", "")) if meta else "",
-                file_name=str(meta.get("file_name", "")) if meta else "",
-                content=doc,
-                score=round(1 - dist, 4),
-            ))
-    return sources
-
-
-async def _retrieve(req: RagChatRequest) -> list[SourceDocument]:
-    """召回 + rerank 精排，支持网络搜索多路召回，返回最终 top_k 条来源（保留 rerank 分数）。"""
-    import asyncio
-    from app.utils.web_search import search_web_results
-    
-    if getattr(req, "enable_web_search", False):
-        local_task = _recall(req)
-        web_task = search_web_results(req.question, top_k=req.top_k)
-        local_docs, web_docs = await asyncio.gather(local_task, web_task)
-        candidates = local_docs + web_docs
-    else:
-        candidates = await _recall(req)
-        
-    if not candidates or not settings.rerank_enabled:
-        return candidates[:req.top_k]
-
-    order = await rerank(req.question, [s.content for s in candidates], req.top_k)
-    reranked: list[SourceDocument] = []
-    for rank, idx in enumerate(order):
-        s = candidates[idx]
-        # rerank 后用 1/(rank+1) 作为展示用的相对精排分数（降序）
-        s.rerank_score = round(1.0 / (rank + 1), 4)
-        reranked.append(s)
-    return reranked
-
-
 def _sources_frame(session_id: str, sources: list[SourceDocument]) -> str:
     """构造 sources 元数据 SSE 帧。"""
     payload = json.dumps(
@@ -97,8 +41,8 @@ def _sources_frame(session_id: str, sources: list[SourceDocument]) -> str:
 
 
 async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
-    """检索增强问答：召回精排 → 下发来源 → 流式生成 → 回填引用对齐。"""
-    sources = await _retrieve(req)
+    """检索增强问答：检索图（召回+联网+精排）→ 下发来源 → 流式生成 → 回填引用对齐。"""
+    sources = await retrieve(req)
 
     # 带编号拼接上下文，编号与 sources 顺序一一对应（从 1 开始）；
     # 文档正文用不可信数据分隔符包裹（注入防护），编号/文件名等可信元数据在栅栏外

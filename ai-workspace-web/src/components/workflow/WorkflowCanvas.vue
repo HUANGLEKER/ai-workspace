@@ -6,6 +6,7 @@
       <div class="absolute left-3 top-3 z-10 flex gap-2">
         <AppButton size="sm" variant="secondary" :icon="Plus" @click="addNode('llm')">LLM 节点</AppButton>
         <AppButton size="sm" variant="secondary" :icon="Plus" @click="addNode('http')">HTTP 节点</AppButton>
+        <AppButton size="sm" variant="secondary" :icon="Plus" @click="addNode('search')">搜索节点</AppButton>
       </div>
       <VueFlow
         v-model:nodes="nodes"
@@ -57,6 +58,15 @@
           </AppFormItem>
         </template>
 
+        <template v-else-if="selected.kind === 'search'">
+          <AppFormItem label="搜索词模板">
+            <AppTextarea v-model="selected.query" :rows="3" placeholder="可用 {{input}} 引用输入，{{节点id}} 引用上游输出" @update:model-value="syncLabel" />
+          </AppFormItem>
+          <AppFormItem label="结果条数">
+            <AppInput :model-value="String(selected.topK ?? 3)" type="number" placeholder="默认 3" @update:model-value="setTopK" />
+          </AppFormItem>
+        </template>
+
         <template v-else>
           <div class="text-xs text-zinc-400">起点/终点节点无需配置。</div>
         </template>
@@ -86,13 +96,15 @@ import '@vue-flow/core/dist/theme-default.css'
 const props = defineProps<{ modelValue?: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
-type NodeKind = 'start' | 'llm' | 'http' | 'end'
+type NodeKind = 'start' | 'llm' | 'http' | 'search' | 'end'
 interface NodeData {
   kind: NodeKind
   prompt?: string
   method?: string
   url?: string
   body?: string
+  query?: string
+  topK?: number
 }
 // Vue Flow 的 Node/Edge 类型极深，会触发 TS2589；画布数组用 any 持有，
 // 类型安全集中在 NodeData（配置面板）这一真正需要约束的部分。
@@ -112,13 +124,14 @@ const methodOptions = [
 ]
 
 function typeLabel(k: NodeKind): string {
-  return { start: '起点', llm: 'LLM', http: 'HTTP', end: '终点' }[k]
+  return { start: '起点', llm: 'LLM', http: 'HTTP', search: '搜索', end: '终点' }[k]
 }
 
 /** 节点展示标签：类型 + 配置摘要 */
 function labelOf(d: NodeData): string {
   if (d.kind === 'llm') return `LLM: ${(d.prompt || '').slice(0, 18) || '(未配置)'}`
   if (d.kind === 'http') return `HTTP ${d.method || 'GET'}: ${(d.url || '').slice(0, 16) || '(未配置)'}`
+  if (d.kind === 'search') return `搜索: ${(d.query || '').slice(0, 16) || '(未配置)'}`
   return typeLabel(d.kind)
 }
 
@@ -127,9 +140,12 @@ function nextId(kind: NodeKind): string {
   return `${kind}_${idSeq++}`
 }
 
-function addNode(kind: 'llm' | 'http') {
+function addNode(kind: 'llm' | 'http' | 'search') {
   const id = nextId(kind)
-  const data: NodeData = kind === 'llm' ? { kind, prompt: '' } : { kind, method: 'GET', url: '', body: '' }
+  const data: NodeData =
+    kind === 'llm' ? { kind, prompt: '' }
+    : kind === 'search' ? { kind, query: '{{input}}', topK: 3 }
+    : { kind, method: 'GET', url: '', body: '' }
   nodes.value = [
     ...nodes.value,
     { id, type: 'default', position: { x: 240, y: 60 + nodes.value.length * 80 }, data, label: labelOf(data) }
@@ -151,6 +167,14 @@ function onNodeClick(e: { node: { id: string; data?: NodeData } }) {
 function syncLabel() {
   const node = nodes.value.find((n) => n.id === selectedId.value)
   if (node && node.data) node.label = labelOf(node.data)
+  emitChange()
+}
+
+/** 搜索节点结果条数：AppInput 只吐字符串，这里收口为 1~10 的整数回写 */
+function setTopK(v: string) {
+  if (!selected.value) return
+  const n = Math.round(Number(v))
+  selected.value.topK = Number.isFinite(n) ? Math.min(Math.max(n, 1), 10) : 3
   emitChange()
 }
 

@@ -77,6 +77,17 @@ class Settings(BaseSettings):
     minio_bucket: str = "ai-workspace"
     minio_secure: bool = False
 
+    # 联网搜索——为 Chat / RAG 问答提供实时网页召回。
+    # provider 可插拔：当前内置 duckduckgo（免费、无需 key）；预留 tavily（为 LLM/RAG 设计，
+    # 返回清洗正文 + 相关度分，配 web_search_api_key 后即可切换）。
+    # 防御性硬约束：单次搜索 timeout 秒硬超时（超时降级为空结果，绝不阻断问答），
+    # 每条结果正文截断至 max_content 字符（防 LLM 上下文 token 溢出）。
+    web_search_provider: str = "duckduckgo"
+    web_search_api_key: str = ""          # tavily 等付费 provider 的 key；duckduckgo 不需要
+    web_search_timeout: float = 10.0      # 单次搜索硬超时（秒）
+    web_search_max_results: int = 5       # 单次搜索返回的网页条数上限
+    web_search_max_content: int = 1500    # 每条结果正文截断长度（字符）
+
     # 分布式链路追踪（OpenTelemetry）——与 Go 网关串联同一条 trace。
     # tracing_endpoint 为 OTLP/HTTP 采集端点（如 http://localhost:4318）；留空则不启用。
     tracing_endpoint: str = ""

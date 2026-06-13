@@ -139,12 +139,13 @@ docker-compose -f docker-compose.infra.yml up -d
 **FastAPI（`ai-service/app`）：**
 
 - `chat/` —— LLM 调用、SSE 流式（`POST /chat`）
-- `rag/` —— 向量检索 + 答案生成（`POST /rag/chat`）
+- `rag/` —— 向量检索 + 答案生成（`POST /rag/chat`）。检索部分由 `rag/graph.py` 的 **LangGraph StateGraph** 编排：`recall`（本地向量召回）与 `web`（联网搜索，按 `enable_web_search` 短路）并行 fan-out → `merge`（多路融合 + rerank 精排）产出 `sources`；生成仍在图外做 token 流式，以保住「先发 sources 帧再逐 token」的 SSE 契约。`rag/service.py` 只负责图外的上下文拼接 / 流式生成 / 引用对齐。
 - `embedding/` —— 文档切片、嵌入、写入 ChromaDB（`POST /embedding/build`、`DELETE /embedding/delete`）
 - `agent/` —— 工具调用 agent（`POST /agent/run`）：绑定由 `HttpToolSpec` 构建的 HTTP 工具（经 `httpx` 执行），外加通过 `langchain-mcp-adapters`（`MultiServerMCPClient`）从 SSE MCP 服务器加载的工具，然后运行有界的 think→act 循环，返回答案与 `steps` 轨迹。MCP 导入做了保护，缺少该可选库时服务仍可运行。
 - `workflow/` —— 基于 LangGraph 的引擎（`POST /workflow/run`）
 - `llm/provider.py` —— LLM 提供方抽象（通过 LangChain 接 OpenAI）
 - `vectorstore/chroma_client.py` —— ChromaDB HTTP 客户端
+- `utils/web_search.py` —— 联网搜索工具层：provider 可插拔（`WEB_SEARCH_PROVIDER`，默认 duckduckgo 免费，预留 tavily），统一收口三项防御（`asyncio.wait_for` 硬超时 / 正文截断 / 全异常 fail-open 降级）。对外暴露 `search_web_results`（结构化 `SourceDocument`，供 RAG 检索图与 workflow `search` 节点）与 `@tool web_search`（供 Chat 侧 LLM tool-calling）
 - `config/settings.py` —— 从 `.env` 加载的 Pydantic `BaseSettings`
 
 **前端（`ai-workspace-web/src`）：**
@@ -201,7 +202,7 @@ KB/RAG：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/re
 Files：`/api/file/`（基于 MinIO）。上传加固（P2-6）：服务端校验大小上限与扩展名白名单（`config.yaml` 的 `upload.*`，文件中心用 `file_exts`、知识库文档用 `doc_exts`），存储用 `http.DetectContentType` 嗅探的真实 MIME 而非客户端传入的 Content-Type；presign 过期 1h。校验逻辑在 `internal/common/upload.go`。  
 Monitor：`GET /api/dashboard/stats`（按用户计数）；`GET /api/monitor/server` + `GET /api/monitor/health`——仅管理员；服务器指标取自 `gopsutil`，健康检查探测 Redis/FastAPI/MinIO。  
 Agent：`/api/agent/`（list/get/add/update/delete + `POST /api/agent/{id}/run`）—— 用户私有（`create_by`）  
-Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）。`definition` 为画布序列化的图 JSON（`{nodes:[{id,type,data,position}], edges:[{source,target}]}`，节点类型 start/llm/http/end），由前端 Vue Flow 画布（`components/workflow/WorkflowCanvas.vue`）编辑、FastAPI `app/workflow/engine.py` 拓扑执行（节点输出以 id 存入变量表供下游 `{{nodeId}}` 模板引用）；为空时回退默认单节点 LLM。  
+Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）。`definition` 为画布序列化的图 JSON（`{nodes:[{id,type,data,position}], edges:[{source,target}]}`，节点类型 start/llm/http/search/end，其中 `search` 为联网搜索节点 `{query,topK}`），由前端 Vue Flow 画布（`components/workflow/WorkflowCanvas.vue`）编辑、FastAPI `app/workflow/engine.py` 拓扑执行（节点输出以 id 存入变量表供下游 `{{nodeId}}` 模板引用）；为空时回退默认单节点 LLM。  
 Job：`/api/job/`（page/handlers/add/update/delete/status + `POST /api/job/run/{id}`、`GET /api/job/log/page`、`DELETE /api/job/log/clean`）——仅管理员；cron 通过 `robfig/cron/v3` 调度  
 Prompt：`/api/prompt/`（list/get/add/update/delete）—— 用户私有（`create_by`）  
 Tool：`/api/tool/`（list/get/add/update/delete）—— 用户私有（`create_by`）；`tool_type` 为 http/builtin，`config` 为 JSON 字符串  
