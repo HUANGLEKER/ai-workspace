@@ -66,6 +66,7 @@ func Init() {
 	UserSvc = NewUserService(db)
 	JobSvc = NewJobService(db)
 	DashboardSvc = NewDashboardService(db)
+	UsageSvc = NewUsageService(db)
 	FileSvc = NewFileService(db, minioStore{})
 	MonitorSvc = NewMonitorService(fastapi.Client.BaseURL(), redisPkg.Client)
 }

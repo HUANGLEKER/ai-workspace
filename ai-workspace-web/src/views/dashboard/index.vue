@@ -50,8 +50,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  MessageSquare, BookOpen, FileText, Folder, Sparkles, Workflow, Cpu
-} from 'lucide-vue-next'
+  MessageSquare, BookOpen, FileText, Folder, Sparkles, Workflow, Cpu, Zap } from 'lucide-vue-next'
 import { getDashboardStats } from '@/api/dashboard'
 import { AppCard } from '@/components/ui'
 
@@ -61,12 +60,21 @@ const todayText = new Date().toLocaleDateString('zh-CN', {
   year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
 })
 
-const stats = ref([
+const stats = ref<{ label: string; value: number | string; icon: unknown }[]>([
   { label: '今日对话', value: 0, icon: MessageSquare },
   { label: '知识库数量', value: 0, icon: BookOpen },
   { label: '文档总数', value: 0, icon: FileText },
-  { label: '文件总数', value: 0, icon: Folder }
+  { label: '文件总数', value: 0, icon: Folder },
+  { label: '今日 Token', value: 0, icon: Zap },
+  { label: '累计 Token', value: 0, icon: Zap }
 ])
+
+/** token 数字缩写展示：12.3k / 4.5M */
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k'
+  return String(n)
+}
 
 onMounted(async () => {
   try {
@@ -75,6 +83,8 @@ onMounted(async () => {
     stats.value[1].value = data.kbCount
     stats.value[2].value = data.docCount
     stats.value[3].value = data.fileCount
+    stats.value[4].value = fmtTokens(data.todayTokens ?? 0)
+    stats.value[5].value = fmtTokens(data.tokenTotal ?? 0)
   } catch (err) {
     // 拉取失败时统计保持 0，记录便于排查
     console.error('[dashboard] 加载统计数据失败：', err)

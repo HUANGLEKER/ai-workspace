@@ -76,6 +76,8 @@ func main() {
 
 	// ── 7. 注册 JobHandler 并启动调度器 ──────────────────────────────
 	scheduler.Registry.Register("sampleJob", &scheduler.SampleJobHandler{})
+	// 每日 token 用量聚合（P2-2）：cron 排程见 sys_job（invoke_target=usageDailyJob）
+	scheduler.Registry.Register("usageDailyJob", &service.UsageJobHandler{})
 	// 注入日志回调，解耦调度器与服务层（避免循环导入）
 	scheduler.OnJobDone = service.JobSvc.WriteLog
 	// 从数据库加载 status=0（运行中）的任务，重新加入调度器

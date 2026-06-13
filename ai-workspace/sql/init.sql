@@ -351,6 +351,19 @@ CREATE TABLE `workflow` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 
+CREATE TABLE `usage_daily` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL COMMENT '用户ID',
+  `stat_date` date NOT NULL COMMENT '统计日',
+  `model_name` varchar(100) NOT NULL DEFAULT '(default)' COMMENT '模型名',
+  `tokens` bigint NOT NULL DEFAULT '0' COMMENT 'token 消耗',
+  `msg_count` bigint NOT NULL DEFAULT '0' COMMENT '回复条数',
+  `create_time` datetime DEFAULT NULL,
+  `update_time` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_date_model` (`user_id`,`stat_date`,`model_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日 token 用量聚合（派生数据，幂等重算）';
+
 -- ───────────────────────── 种子数据 ─────────────────────────
 
 -- 管理员账号：admin / 123456
@@ -365,3 +378,7 @@ INSERT INTO `sys_user_role` (`user_id`, `role_id`) VALUES (1, 1);
 -- 默认 LLM 模型（api_url/api_key 由管理员在系统-模型管理页配置）
 INSERT INTO `chat_model` (`id`, `model_name`, `provider`, `api_url`, `api_key`, `enabled`, `deleted`)
 VALUES (1, 'deepseek-chat', 'DeepSeek', '', '', 1, 0);
+
+-- 每日用量聚合排程（00:05 重算最近 2 天）
+INSERT INTO `sys_job` (`job_name`, `invoke_target`, `cron_expression`, `job_params`, `status`, `remark`, `deleted`)
+VALUES ('每日用量聚合', 'usageDailyJob', '0 5 0 * * ?', '', 0, '聚合 chat_message.token_count 到 usage_daily', 0);

@@ -26,6 +26,8 @@ type DashboardStats struct {
 	KbCount       int64 `json:"kbCount"`       // 知识库总数
 	DocCount      int64 `json:"docCount"`      // 文档总数
 	FileCount     int64 `json:"fileCount"`     // 文件总数
+	TokenTotal    int64 `json:"tokenTotal"`    // 累计 token 消耗（聚合表 + 今日实时）
+	TodayTokens   int64 `json:"todayTokens"`   // 今日 token 消耗（实时）
 }
 
 // GetStats 聚合当前用户的仪表盘统计数据；归属过滤统一走 ownedScope（列名由模型声明）
@@ -58,10 +60,15 @@ func (s *DashboardService) GetStats(userID int64) DashboardStats {
 		Scopes(ownedScope[model.FileInfo](userID)).
 		Count(&fileCount)
 
+	// token 用量：历史查 usage_daily 聚合（常数时间），今日实时补足
+	tokenTotal, todayTokens := UsageSvc.UserTotals(userID)
+
 	return DashboardStats{
 		TodaySessions: todaySessions,
 		KbCount:       kbCount,
 		DocCount:      docCount,
 		FileCount:     fileCount,
+		TokenTotal:    tokenTotal,
+		TodayTokens:   todayTokens,
 	}
 }

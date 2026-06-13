@@ -15,6 +15,10 @@ export interface DashboardStats {
   docCount: number
   /** 当前用户上传的文件总数 */
   fileCount: number
+  /** 累计 token 消耗（usage_daily 聚合 + 今日实时） */
+  tokenTotal: number
+  /** 今日 token 消耗（实时） */
+  todayTokens: number
 }
 
 export const getDashboardStats = () =>
