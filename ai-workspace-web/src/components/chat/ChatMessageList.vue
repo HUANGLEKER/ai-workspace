@@ -24,8 +24,11 @@
     <ThinkingIndicator v-if="showThinking" :phases="phases" :in-progress="inProgress" />
     <div v-if="showStream" v-motion="assistantMessageMotion" class="flex items-start gap-3">
       <AppAvatar :icon="Bot" variant="dark" />
-      <div class="max-w-[72%] break-words rounded-2xl bg-zinc-100/50 px-4 py-3 text-sm leading-relaxed text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-        <MarkdownView :content="streamDisplay" :caret="caretFading ? 'fade' : 'blink'" />
+      <div class="flex max-w-[72%] flex-col gap-1">
+        <div class="break-words rounded-2xl bg-zinc-100/50 px-4 py-3 text-sm leading-relaxed text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
+          <MarkdownView :content="streamDisplay" :caret="caretFading ? 'fade' : 'blink'" />
+        </div>
+        <RagSources v-if="liveSources.length" :sources="liveSources" />
       </div>
     </div>
 
@@ -94,8 +97,9 @@ import { AppAvatar } from '@/components/ui'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ChatMessageItem from './ChatMessageItem.vue'
 import ThinkingIndicator from './ThinkingIndicator.vue'
+import RagSources from './RagSources.vue'
 import { messageMotion, assistantMessageMotion } from '@/composables/useMessageMotion'
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, RagSource } from '@/types'
 import type { ThinkingPhase } from '@/composables/useThinkingPhases'
 import type { Artifact } from '@/utils/artifacts'
 
@@ -115,7 +119,12 @@ const props = defineProps<{
   streamDisplay: string
   phases: ThinkingPhase[]
   inProgress: boolean
+  // RAG 场景：流式期间已下发的引用来源，挂在 live 气泡下方（普通 chat 传 []）
+  liveSources?: RagSource[]
 }>()
+
+// liveSources 可选；解构出带默认值的本地引用，模板直接用 .length 不必判空
+const liveSources = computed<RagSource[]>(() => props.liveSources ?? [])
 
 defineEmits<{
   copy: [msg: ChatMessage]

@@ -66,6 +66,13 @@ func registerKBRoutes(rg *gin.RouterGroup) {
 	rag := rg.Group("/rag")
 	rag.POST("/chat", middleware.LLMRateLimit(), handler.RAGChat)
 	rag.POST("/rebuild", handler.RAGRebuild)
+	// 知识库问答会话（历史持久化 + 多轮上下文）
+	rag.GET("/session/list", handler.ListRagSessions)
+	rag.POST("/session/add", handler.AddRagSession)
+	rag.PUT("/session/:id", handler.RenameRagSession)
+	rag.DELETE("/session/:id", handler.DeleteRagSession)
+	rag.GET("/session/:id/messages", handler.ListRagMessages)
+	rag.DELETE("/session/:id/messages", handler.ClearRagMessages)
 }
 
 func registerFileRoutes(rg *gin.RouterGroup) {

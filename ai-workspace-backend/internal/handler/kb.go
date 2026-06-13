@@ -1,11 +1,8 @@
 package handler
 
 import (
-	"fmt"
 	"io"
-	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -14,7 +11,6 @@ import (
 	"github.com/aiworkspace/backend/internal/middleware"
 	"github.com/aiworkspace/backend/internal/model"
 	"github.com/aiworkspace/backend/internal/service"
-	"github.com/aiworkspace/backend/pkg/fastapi"
 )
 
 // ─── 知识库 CRUD ─────────────────────────────────────────────────────
@@ -139,69 +135,9 @@ func DeleteDocument(c *gin.Context) {
 }
 
 // ─── RAG ─────────────────────────────────────────────────────────────
-
-// RAGChat POST /api/rag/chat — SSE 流式 RAG 问答，代理 FastAPI /rag/chat
-func RAGChat(c *gin.Context) {
-	var req struct {
-		KbID      int64  `json:"kbId"      binding:"required"`
-		Question  string `json:"question"  binding:"required"`
-		SessionID string `json:"sessionId"`
-		TopK      int    `json:"topK"`
-		Model     string `json:"model"`     // 可选；指定则按 chat_model 配置做多模型路由
-		WebSearch bool   `json:"webSearch"` // 可选；开启后 FastAPI 检索图并入联网搜索召回
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		common.BadRequest(c, err.Error())
-		return
-	}
-
-	// 校验知识库归属，防止越权检索他人知识库
-	if _, err := service.KBSvc.GetOwned(req.KbID, middleware.CurrentUserID(c)); err != nil {
-		handleBizError(c, err)
-		return
-	}
-
-	if req.TopK <= 0 {
-		req.TopK = 4
-	}
-	if req.SessionID == "" {
-		req.SessionID = "default"
-	}
-
-	// FastAPI 的 Pydantic 模型要求 kb_id 为字符串，传整数会触发 422 校验错误
-	body := map[string]any{
-		"kb_id":             strconv.FormatInt(req.KbID, 10),
-		"question":          req.Question,
-		"session_id":        req.SessionID,
-		"top_k":             req.TopK,
-		"stream":            true,
-		"enable_web_search": req.WebSearch,
-	}
-	if req.Model != "" {
-		body["model"] = req.Model
-		if cfg := service.LlmConfigBody(service.ChatSvc.GetModelConfigByName(req.Model)); cfg != nil {
-			body["llm_config"] = cfg
-		}
-	}
-
-	prepareSSE(c)
-
-	w := c.Writer
-	flusher, canFlush := w.(http.Flusher)
-	ctx := c.Request.Context()
-
-	_ = fastapi.Client.Stream(ctx, "/rag/chat", body, func(line string) error {
-		if strings.TrimSpace(line) == "" {
-			return nil
-		}
-		// sources 元数据帧与 content token 帧统一透传，由前端 streamSSE.extract 分拣
-		fmt.Fprintf(w, "%s\n\n", line)
-		if canFlush {
-			flusher.Flush()
-		}
-		return nil
-	})
-}
+//
+// RAGChat（SSE 流式问答）及问答会话 CRUD 已迁至 handler/rag.go，
+// 以承载会话历史持久化、多轮上下文与引用来源落库。
 
 // RAGRebuild POST /api/rag/rebuild — 对指定知识库全量重建嵌入（切换模型后调用）
 func RAGRebuild(c *gin.Context) {

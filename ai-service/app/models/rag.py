@@ -2,7 +2,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
-from app.models.chat import LlmConfig
+from app.models.chat import LlmConfig, Message
 
 
 class RagChatRequest(BaseModel):
@@ -16,6 +16,9 @@ class RagChatRequest(BaseModel):
     model: Optional[str] = None
     llm_config: Optional[LlmConfig] = None  # 按请求覆盖提供方（多模型路由）
     enable_web_search: bool = False
+    # 多轮上下文：本轮之前的历史消息（Go 侧组装的有界窗口）。检索仍只用当前 question，
+    # 历史仅注入到生成阶段，让模型能理解追问的指代。
+    history: list[Message] = []
 
 
 

@@ -20,6 +20,10 @@ func (m UserOwnedModel) OwnerID() int64      { return m.CreateBy }
 func (m ChatSession) OwnerColumn() string { return "user_id" }
 func (m ChatSession) OwnerID() int64      { return m.UserID }
 
+// RagSession 与 ChatSession 同构，归属列同为 user_id
+func (m RagSession) OwnerColumn() string { return "user_id" }
+func (m RagSession) OwnerID() int64      { return m.UserID }
+
 // FileInfo 的归属列是 upload_by（区别于 KB 的 create_by）
 func (m FileInfo) OwnerColumn() string { return "upload_by" }
 func (m FileInfo) OwnerID() int64      { return m.UploadBy }

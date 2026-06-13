@@ -93,6 +93,40 @@ CREATE TABLE `chat_session` (
   KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='èŠå¤©ä¼šè¯è¡¨';
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `rag_message`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `rag_message` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `session_id` bigint NOT NULL COMMENT '问答会话ID',
+  `role` varchar(20) NOT NULL COMMENT 'user/assistant',
+  `content` longtext NOT NULL COMMENT '消息内容',
+  `sources` longtext COMMENT '引用来源JSON数组（仅assistant消息）',
+  `token_count` int DEFAULT NULL COMMENT '消耗Token数',
+  `deleted` bigint NOT NULL DEFAULT '0',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_session_id` (`session_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='知识库问答消息表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `rag_session`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `rag_session` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL COMMENT '用户ID',
+  `kb_id` bigint NOT NULL COMMENT '绑定的知识库ID',
+  `title` varchar(255) NOT NULL DEFAULT '新问答' COMMENT '会话标题',
+  `model_name` varchar(100) DEFAULT NULL COMMENT '使用的模型',
+  `deleted` bigint NOT NULL DEFAULT '0',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_kb_id` (`kb_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='知识库问答会话表';
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `file_info`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

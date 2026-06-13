@@ -10,7 +10,7 @@ SSE 先发一帧 sources 元数据（含 rerank 分数与引用标记），随�
 import json
 import re
 from typing import AsyncIterator
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
 from app.llm.provider import get_chat_llm
 from app.models.rag import RagChatRequest, SourceDocument
 from app.observability import LlmCallTimer
@@ -53,7 +53,15 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
     else:
         context = "暂无相关文档"
     system_msg = SystemMessage(content=_RAG_SYSTEM_PROMPT.format(context=context))
+    # 多轮上下文：历史消息注入到 system 与当前问题之间，让模型理解追问指代。
+    # 检索阶段仍只用当前 question（见上 retrieve(req)），历史不参与召回。
+    history_msgs: list[BaseMessage] = [
+        AIMessage(content=m.content) if m.role == "assistant" else HumanMessage(content=m.content)
+        for m in req.history
+        if m.content
+    ]
     human_msg = HumanMessage(content=req.question)
+    llm_messages: list[BaseMessage] = [system_msg, *history_msgs, human_msg]
 
     cfg = req.llm_config
     llm = get_chat_llm(
@@ -68,12 +76,14 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
 
     # 逐 token 下发的同时缓冲完整答案，用于结束后的引用对齐
     answer_parts: list[str] = []
+    last_usage = None
     timer = LlmCallTimer("rag", req.model)
     try:
-        async for chunk in llm.astream([system_msg, human_msg], stream_usage=True):
+        async for chunk in llm.astream(llm_messages, stream_usage=True):
             usage = getattr(chunk, "usage_metadata", None)
             if usage:
                 timer.set_usage(usage)
+                last_usage = usage
             token = chunk.content
             if token:
                 answer_parts.append(token)
@@ -84,6 +94,20 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
         raise
     else:
         timer.done()
+
+    # 用量帧：与 chat 流对齐，便于前端展示 token 统计、Go 侧随消息落库
+    if last_usage:
+        usage_frame = json.dumps(
+            {
+                "type": "usage",
+                "session_id": req.session_id,
+                "prompt_tokens": last_usage.get("input_tokens", 0),
+                "completion_tokens": last_usage.get("output_tokens", 0),
+                "total_tokens": last_usage.get("total_tokens", 0),
+            },
+            ensure_ascii=False,
+        )
+        yield f"data: {usage_frame}\n\n"
 
     # 引用对齐：从完整答案提取 [来源N] 标记，回填 cited 后重发 sources 帧
     cited_idx = {int(m) - 1 for m in _CITE_RE.findall("".join(answer_parts))}

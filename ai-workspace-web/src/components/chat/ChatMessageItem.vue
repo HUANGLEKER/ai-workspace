@@ -25,6 +25,9 @@
         />
       </div>
 
+      <!-- RAG 引用来源：assistant 消息携带 sources 时折叠展示（命中来源高亮） -->
+      <RagSources v-if="sources.length" :sources="sources" class="max-w-[72%]" />
+
       <!-- Feature 3：Show More / Show Less 切换（仅超长消息出现） -->
       <button
         v-if="collapsible"
@@ -87,8 +90,9 @@ import { computed, ref } from 'vue'
 import { Bot, User, Copy, RefreshCw, Trash2, ChevronDown, ChevronUp, LayoutPanelLeft } from 'lucide-vue-next'
 import { AppAvatar, AppTooltip } from '@/components/ui'
 import MarkdownView from '@/components/MarkdownView.vue'
+import RagSources from './RagSources.vue'
 import { extractArtifacts, type Artifact } from '@/utils/artifacts'
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, RagSource } from '@/types'
 
 /** Feature 3 折叠阈值：正文超过 300 行自动折叠 */
 const FOLD_LINES = 300
@@ -109,5 +113,10 @@ const collapsible = computed(() => lineCount.value > FOLD_LINES)
 // 仅助手消息检测 Artifact（用户输入不进面板）
 const artifacts = computed<Artifact[]>(() =>
   props.msg.role === 'assistant' ? extractArtifacts(props.msg.content) : []
+)
+
+// RAG 引用来源（仅 assistant 消息携带）
+const sources = computed<RagSource[]>(() =>
+  props.msg.role === 'assistant' && props.msg.sources ? props.msg.sources : []
 )
 </script>

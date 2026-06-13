@@ -40,6 +40,7 @@ declare module 'vue' {
     MarkdownView: typeof import('./../components/MarkdownView.vue')['default']
     MermaidView: typeof import('./../components/chat/MermaidView.vue')['default']
     PromptPicker: typeof import('./../components/chat/PromptPicker.vue')['default']
+    RagSources: typeof import('./../components/chat/RagSources.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ThinkingIndicator: typeof import('./../components/chat/ThinkingIndicator.vue')['default']

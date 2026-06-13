@@ -117,7 +117,7 @@ sequenceDiagram
 | **前端** | Vue 3.5 · TypeScript 5.7 · Vite 6 · TailwindCSS 4（`@tailwindcss/vite` + typography）· Radix Vue（headless 组件）· lucide-vue-next（图标）· Pinia · Vue Router 4 · Vue Flow（工作流画布）· markdown-it + highlight.js + mermaid（解析下放 Web Worker）· DOMPurify · Vitest |
 | **后端** | Go 1.23 · Gin · GORM（+ soft_delete 插件）· JWT · robfig/cron v3（动态调度）· zap + lumberjack（日志）· gopsutil（监控）· Viper（配置）· Swagger/swag |
 | **AI 服务** | Python · FastAPI 0.115 · LangGraph · LangChain · OpenAI SDK · langchain-mcp-adapters（MCP 工具）· httpx · uv（依赖管理） |
-| **数据库** | MySQL 8（19+ 张表，utf8mb4，软删除）|
+| **数据库** | MySQL 8（21+ 张表，utf8mb4，软删除）|
 | **缓存** | Redis 7（后端 DB 0 / AI 服务 DB 1，AOF 持久化）|
 | **向量库** | ChromaDB（HTTP 客户端模式）|
 | **对象存储** | MinIO（S3 兼容）|
@@ -162,7 +162,7 @@ AI Workspace/
 ├── ai-service/                    # FastAPI AI 服务（LangGraph + LangChain）
 │   └── app/
 │       ├── chat/                  # LLM 调用 + SSE 流式
-│       ├── rag/                   # 向量检索 + rerank + 答案生成
+│       ├── rag/                   # 向量检索 + rerank + 答案生成（多轮 history + sources/usage 帧）
 │       ├── embedding/             # 文档切片 + 嵌入 + 写入 ChromaDB
 │       ├── agent/                 # 工具调用 agent（HTTP 工具 + MCP 工具）
 │       ├── workflow/              # LangGraph 工作流引擎（engine.py 拓扑执行）
@@ -322,7 +322,7 @@ make swag        # = swag init -g cmd/server/main.go -o docs（生成 docs/ 下 
 | **Auth** | `POST /api/auth/login` · `/logout` · `GET /api/auth/info` | 返回 roles / mustChangePwd |
 | **用户管理** | `/api/user/`（page/add/update/delete/status）| 仅管理员，bcrypt 密码 |
 | **Chat** | `POST /api/chat/send`（SSE）· `/api/chat/session/`（CRUD）| 滚动摘要降 token |
-| **KB/RAG** | `/api/kb/` · `/api/document/` · `POST /api/rag/chat`（SSE）· `/api/rag/rebuild` | 答案带来源引用帧 |
+| **KB/RAG** | `/api/kb/` · `/api/document/` · `POST /api/rag/chat`（SSE）· `/api/rag/rebuild` · `/api/rag/session/`（CRUD + 历史/清空）| 问答会话持久化（`rag_session`/`rag_message`）· 多轮上下文 · 答案带来源引用帧并落库 |
 | **Files** | `/api/file/`（MinIO，presign 1h）| 大小/扩展名/真实 MIME 校验 |
 | **Agent** | `/api/agent/` + `POST /api/agent/{id}/run` | 用户私有 · HTTP/MCP 工具循环 |
 | **Workflow** | `/api/workflow/` + `POST /api/workflow/{id}/run` | LangGraph 画布定义 |
@@ -342,7 +342,7 @@ Chat/RAG 用原生 `fetch()`（Axios 不支持 SSE），前端统一走 `api/sse
 
 ## 8. 数据库设计
 
-MySQL 8，**19+ 张表**，统一约定：`BIGINT AUTO_INCREMENT` 主键、`deleted BIGINT` 软删除（GORM soft_delete milli 模式：0=未删，非 0=删除毫秒时间戳）、`utf8mb4`、时间戳由 GORM 自动填充。DDL 与种子数据全部在 `ai-workspace/sql/init.sql`。
+MySQL 8，**21+ 张表**，统一约定：`BIGINT AUTO_INCREMENT` 主键、`deleted BIGINT` 软删除（GORM soft_delete milli 模式：0=未删，非 0=删除毫秒时间戳）、`utf8mb4`、时间戳由 GORM 自动填充。DDL 与种子数据全部在 `ai-workspace/sql/init.sql`。
 
 ### 表结构关系
 
@@ -357,6 +357,9 @@ erDiagram
     chat_model ||..o{ chat_session : routes
     kb_knowledge_base ||--o{ kb_document : contains
     kb_document ||--o{ kb_chunk_task : tracks
+    sys_user ||--o{ rag_session : owns
+    kb_knowledge_base ||..o{ rag_session : scopes
+    rag_session ||--o{ rag_message : contains
     sys_job ||--o{ sys_job_log : logs
     sys_user ||--o{ usage_daily : aggregates
 ```
@@ -368,6 +371,7 @@ erDiagram
 | **RBAC** | `sys_user` · `sys_role` · `sys_user_role` · `sys_menu` · `sys_role_menu` | 用户/角色/菜单权限；`role_code` 带 `ROLE_` 前缀；`must_change_pwd` 强制改密；`api_key` 加密存储 |
 | **Chat** | `chat_session` · `chat_message` · `chat_model` | 会话/消息（`user_id`）；`summary`+`summary_upto_id` 滚动摘要；`chat_model` 多模型路由（Go 管理）|
 | **知识库** | `kb_knowledge_base` · `kb_document` · `kb_chunk_task` | RAG 管道（`create_by`）；`status` PENDING→PROCESSING→DONE/FAILED；`task_status` PENDING/RUNNING/SUCCESS/FAILED；嵌入分批防 OOM + `embeddingReconcileJob` 对账自愈卡死文档 |
+| **知识库问答** | `rag_session` · `rag_message` | 问答会话/消息（`user_id`，每会话绑定 `kb_id`）；与 chat 同构、独立成表；`rag_message.sources` 存来源引用 JSON；多轮取最近 N 条历史 |
 | **文件** | `file_info` | 文件中心，归属列 `upload_by` |
 | **Agent/Workflow** | `agent` · `workflow` | `tools`/`definition` 为 JSON 字符串（`create_by`）|
 | **自动化** | `sys_job` · `sys_job_log` | cron 任务（`status` 0=运行/1=暂停）；日志**物理删除**、仅 `create_time`、无 `deleted` 列 |

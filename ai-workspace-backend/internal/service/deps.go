@@ -57,6 +57,7 @@ func (minioStore) PresignedURL(ctx context.Context, objectName string, expiry ti
 func Init() {
 	db := database.DB
 	ChatSvc = NewChatService(db, fastapi.Client)
+	RagSvc = NewRagService(db)
 	KBSvc = NewKBService(db, fastapi.Client, minioStore{})
 	AgentSvc = NewAgentService(db, fastapi.Client)
 	WorkflowSvc = NewWorkflowService(db, fastapi.Client)

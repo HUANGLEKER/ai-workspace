@@ -75,6 +75,22 @@ export interface ChatMessage {
   content: string
   tokenCount?: number
   createTime?: string
+  /** RAG 问答消息携带的引用来源（普通 chat 消息无此字段） */
+  sources?: RagSource[]
+}
+
+/**
+ * 知识库问答会话，对应后端 rag_session 表。
+ * 与 ChatSession 同构，额外绑定一个知识库（kbId）。
+ */
+export interface RagSession {
+  id: number
+  userId: number
+  kbId: number
+  title: string
+  modelName: string
+  createTime: string
+  updateTime: string
 }
 
 /** Token 用量统计（由 chat SSE 的 {"type":"usage"} 帧携带，通常在流尾到达） */
