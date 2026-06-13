@@ -6,7 +6,6 @@ dependencies = [
     # ── Web 框架 ──────────────────────────────────────────────────
     "fastapi==0.136.3",
     "uvicorn[standard]==0.49.0",   # ASGI 服务器，[standard] 包含 websockets/httptools 加速
-
     # ── LangChain 生态 ────────────────────────────────────────────
     "langchain==1.3.4",
     "langchain-core==1.4.0",
@@ -16,23 +15,27 @@ dependencies = [
     "langgraph==1.2.4",            # Agent 工具调用循环 / 工作流有向图引擎
     "langchain-mcp-adapters>=0.2.0", # 可选：从 SSE MCP 服务器加载工具；缺失时降级跳过
     "mcp==1.16.0",                 # MCP 协议基础库，langchain-mcp-adapters 依赖
-
     # ── 向量库 ────────────────────────────────────────────────────
     "chromadb==1.5.9",             # HTTP 模式连接本地 ChromaDB，存储知识库嵌入向量
-
     # ── 文档解析（嵌入管道）─────────────────────────────────────
     "pypdf==6.12.2",               # PDF 文档解析
     "python-docx==1.2.0",          # Word 文档解析
     "unstructured==0.18.32",       # 通用非结构化文档解析（fallback）
     "tiktoken==0.13.0",            # token 计数，用于控制嵌入分块大小
-
     # ── 基础设施客户端 ────────────────────────────────────────────
     "redis==8.0.0",                # 对话上下文缓存；使用 DB 1（Spring Boot 占用 DB 0）
     "minio==7.2.20",               # 嵌入管道从 MinIO 下载文档原文
     "httpx==0.28.1",               # Agent HTTP 工具调用的异步 HTTP 客户端
-
     # ── 配置与数据校验 ────────────────────────────────────────────
     "pydantic==2.13.4",
     "pydantic-settings==2.14.1",   # 从 .env 加载配置到 BaseSettings
     "python-dotenv==1.2.2",        # .env 文件解析
+    "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.42.1",
+    "opentelemetry-instrumentation-fastapi>=0.63b1",
+    "opentelemetry-instrumentation-httpx>=0.63b1",
 ]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true

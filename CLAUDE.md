@@ -71,8 +71,9 @@ Go 后端结构（`internal/`）：
 - `middleware/` —— JWT（`CtxUserID`/`CtxRoles` 注入 gin.Context）、CORS、RequestLogger、Recovery、AdminRequired
 - `config/` —— Viper 配置加载，全局 `config.Global`
 - `scheduler/` —— 动态 cron 调度器（`manager.go` 管理 `robfig/cron/v3` 实例，`handler.go` 注册 JobHandler）
+- `repository/` —— 数据访问层（DAO）：泛型 `OwnedRepository[T]`（`owned.go`）封装用户私有资源的 CRUD 与归属语义，把 GORM 操作从 service 剥离以提升可测性。prompt/tool/agent/workflow/mcp 已迁移为持有 repository（构造函数仍收 `*gorm.DB`，内部建仓储，DI 与测试不变）；kb/chat/user/job 等复杂查询服务仍直接持有 db，`service/owned.go` 的 `getOwnedResource`/`ownedScope` 现委托到 repository 作为单一真相来源
 - `common/` —— 标准响应包装（`result.go`）
-- `pkg/` —— 基础设施客户端：`database/`（GORM）、`redis/`、`minio/`、`logger/`（zap + lumberjack）、`fastapi/`（FastAPI HTTP 客户端）
+- `pkg/` —— 基础设施客户端：`database/`（GORM）、`redis/`、`minio/`、`logger/`（zap + lumberjack）、`fastapi/`（FastAPI HTTP 客户端）、`tracing/`（OpenTelemetry 初始化）
 
 ### FastAPI AI 服务
 
@@ -170,6 +171,10 @@ Chat 流式（`POST /api/chat/send`）用原生 `fetch()` 实现，而非 Axios�
 4. 成功：两者分别置 SUCCESS/DONE；失败：置 FAILED 并写 `error_msg`
 
 `kb_document.status` 状态流转：`PENDING` → `PROCESSING` → `DONE` / `FAILED`
+
+嵌入按 `EMBED_BATCH_SIZE`(64) 分批 `aembed_documents` + 分批 upsert（流式处理防大文档 OOM）。状态对账自愈：启动时 `RecoverInterruptedTasks` 重置遗留 RUNNING/PROCESSING；运行期由 cron JobHandler `embeddingReconcileJob`（`KBService.ReconcileStuck`，默认每 10 分钟、阈值 10 分钟，已在 init.sql 种子）收敛卡死在 PROCESSING 的文档，修复 MySQL 与 ChromaDB 的状态漂移。
+
+可观测性：分布式链路追踪（OpenTelemetry）串联 Gin → FastAPI。Go 侧 `pkg/tracing` + `otelgin` 中间件起 span，出站 FastAPI 调用经全局传播器注入 W3C `traceparent`；FastAPI 侧 `app/tracing.py`（`FastAPIInstrumentor` + `HTTPXClientInstrumentor`）续接同一条 trace。两端均经端点配置开关：Go `config.tracing.endpoint`、FastAPI `TRACING_ENDPOINT`（OTLP/HTTP，如 `http://localhost:4318`），留空即 no-op。与既有 `X-Request-ID` 文本关联头并存。
 
 ## 资源归属
 

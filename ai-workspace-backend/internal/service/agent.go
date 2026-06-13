@@ -2,45 +2,36 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
+	"github.com/aiworkspace/backend/internal/repository"
 )
 
 // AgentSvc 是 Agent 服务全局单例
 var AgentSvc *AgentService
 
-// AgentService 依赖经构造函数注入（P1-1）
+// AgentService 业务逻辑层；持久化经 repository 完成（P0 分层重构），ai 经构造函数注入
 type AgentService struct {
-	db *gorm.DB
-	ai RunCaller
+	repo repository.OwnedRepository[model.Agent]
+	ai   RunCaller
 }
 
 // NewAgentService 构造服务
 func NewAgentService(db *gorm.DB, ai RunCaller) *AgentService {
-	return &AgentService{db: db, ai: ai}
+	return &AgentService{repo: repository.NewOwnedRepository[model.Agent](db), ai: ai}
 }
 
 // ListByUser 查询当前用户拥有的所有 Agent
 func (s *AgentService) ListByUser(userID int64) ([]model.Agent, error) {
-	var agents []model.Agent
-	err := s.db.Scopes(ownedScope[model.Agent](userID)).Order("create_time DESC").Find(&agents).Error
-	return agents, err
+	return s.repo.List(userID, func(q *gorm.DB) *gorm.DB { return q.Order("create_time DESC") })
 }
 
 // GetByID 按 ID 查询 Agent（不校验归属，用于展示）
 func (s *AgentService) GetByID(id int64) (*model.Agent, error) {
-	var a model.Agent
-	if err := s.db.First(&a, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, common.ErrNotFound("Agent")
-		}
-		return nil, err
-	}
-	return &a, nil
+	return s.repo.FindByID(id, "Agent")
 }
 
 // Create 新建 Agent，强制 CreateBy 为当前用户
@@ -53,7 +44,7 @@ func (s *AgentService) Create(a *model.Agent, userID int64) error {
 	if a.Enabled == 0 {
 		a.Enabled = 1
 	}
-	return s.db.Create(a).Error
+	return s.repo.Create(a)
 }
 
 // Update 更新 Agent，回填 CreateBy 防止归属被篡改
@@ -65,7 +56,7 @@ func (s *AgentService) Update(a *model.Agent, userID int64) error {
 	a.CreateBy = existing.CreateBy
 	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
 	a.CreatedAt = existing.CreatedAt
-	return s.db.Save(a).Error
+	return s.repo.Save(a)
 }
 
 // Delete 校验归属后删除 Agent
@@ -73,12 +64,12 @@ func (s *AgentService) Delete(id, userID int64) error {
 	if _, err := s.GetOwned(id, userID); err != nil {
 		return err
 	}
-	return s.db.Delete(&model.Agent{}, id).Error
+	return s.repo.DeleteByID(id)
 }
 
 // GetOwned 校验 Agent 归属，防止 IDOR
 func (s *AgentService) GetOwned(id, userID int64) (*model.Agent, error) {
-	return getOwnedResource[model.Agent](s.db, id, userID, "Agent")
+	return s.repo.FindOwned(id, userID, "Agent")
 }
 
 // BuildRunBody 校验归属、解析工具与 MCP 服务器，组装发给 FastAPI 的请求体。

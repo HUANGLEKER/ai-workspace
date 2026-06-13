@@ -4,6 +4,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"github.com/aiworkspace/backend/internal/middleware"
 )
@@ -13,6 +14,9 @@ func Setup(r *gin.Engine) {
 	// 全局中间件：顺序很重要——Recovery 必须最先，确保 panic 能被捕获
 	r.Use(middleware.Recovery())
 	r.Use(middleware.CORS())
+	// OpenTelemetry：为每个请求起 span（或延续上游 traceparent），续接前端→网关→FastAPI 链路。
+	// 未配置追踪端点时全局为 no-op TracerProvider，开销可忽略。置于鉴权/日志前以覆盖全程。
+	r.Use(otelgin.Middleware("ai-workspace-backend"))
 	r.Use(middleware.RequestID()) // 必须在 RequestLogger 之前注入
 	r.Use(middleware.RequestLogger())
 

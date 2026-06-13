@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     minio_bucket: str = "ai-workspace"
     minio_secure: bool = False
 
+    # 分布式链路追踪（OpenTelemetry）——与 Go 网关串联同一条 trace。
+    # tracing_endpoint 为 OTLP/HTTP 采集端点（如 http://localhost:4318）；留空则不启用。
+    tracing_endpoint: str = ""
+    tracing_service_name: str = "ai-service"
+
     # 服务自身
     app_host: str = "0.0.0.0"
     app_port: int = 8001

@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.config.settings import settings
 from app.observability import REQUEST_ID_HEADER, request_id_var, setup_logging
+from app.tracing import setup_tracing
 
 setup_logging()
 
@@ -23,6 +24,10 @@ app = FastAPI(
     description="FastAPI AI Service — Chat / RAG / Embedding / Agent / Workflow",
     version="1.0.0",
 )
+
+# 分布式链路追踪（OpenTelemetry）：续接 Go 网关透传的 traceparent，串联全链路。
+# 未配置 tracing_endpoint 时为 no-op。
+setup_tracing(app)
 
 # 请求 ID 贯穿（P2-1）：取 Go 后端透传的 X-Request-ID 存入 contextvar，
 # 本请求内所有日志自动携带 rid；响应头回显便于排障

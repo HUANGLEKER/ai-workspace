@@ -14,8 +14,8 @@
  * 这里用「事件委托」统一处理点击 —— 无需为 v-html 注入的按钮逐个绑定监听，
  * 也不依赖 Vue 响应式即可给出复制成功反馈（直接操作该按钮 DOM）。
  */
-import { computed } from 'vue'
-import { renderMarkdown } from '@/utils/markdown'
+import { computed, watch } from 'vue'
+import { useAsyncMarkdown } from '@/composables/useAsyncMarkdown'
 
 /**
  * caret：流式输出光标状态
@@ -35,7 +35,14 @@ const caretHtml = computed(() => {
   return `<span class="streaming-caret ${modifier}" aria-hidden="true">|</span>`
 })
 
-const html = computed(() => renderMarkdown(props.content, caretHtml.value))
+// 解析下放 Web Worker（见 useAsyncMarkdown），主线程仅净化注入，避免流式卡顿。
+// 历史定稿消息与流式输出统一走该路径；不支持 Worker 的环境自动回退同步渲染。
+const { html, render } = useAsyncMarkdown()
+watch(
+  () => [props.content, caretHtml.value] as const,
+  ([content, caret]) => render(content, caret),
+  { immediate: true }
+)
 
 /** 代码块复制：事件委托，命中 [data-copy] 按钮则复制其所在代码块的正文 */
 function onClick(e: MouseEvent) {

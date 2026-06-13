@@ -1,7 +1,8 @@
 """文档嵌入管道。
 
 从 MinIO 下载文档原文 → 切片 → 调用嵌入模型生成向量 → 写入 ChromaDB。
-注意：临时文件写入系统临时目录，依赖 POSIX 路径行为（Windows 原生运行可能失败）。
+临时文件写入系统临时目录（tempfile.gettempdir()），跨平台可用（含 Windows 原生）。
+嵌入与写入按 EMBED_BATCH_SIZE 分批流式处理，避免大文档把全部向量堆在内存导致 OOM。
 """
 import os
 import tempfile
@@ -15,6 +16,10 @@ from app.config.settings import settings
 from app.llm.provider import get_embeddings
 from app.models.embedding import EmbeddingBuildRequest, EmbeddingBuildResponse
 from app.vectorstore.chroma_client import get_or_create_collection, delete_by_document
+
+
+# 每批嵌入 / 写入的切片数：在内存占用与请求往返之间取平衡，避免大文档一次性堆全部向量。
+EMBED_BATCH_SIZE = 64
 
 
 def _get_minio_client() -> Minio:
@@ -83,23 +88,24 @@ async def build_embedding(req: EmbeddingBuildRequest) -> EmbeddingBuildResponse:
     embeddings = get_embeddings()
     collection = get_or_create_collection(req.kb_id)
 
-    # 逐切片生成向量，并组装 ChromaDB upsert 所需的并行数组
-    ids, docs, embeds = [], [], []
-    metas: list[dict[str, Any]] = []
-    for i, chunk in enumerate(chunks):
-        chunk_id = f"{req.document_id}_{i}"  # 切片 ID = 文档ID_序号
-        vector = await embeddings.aembed_query(chunk.page_content)
-        ids.append(chunk_id)
-        docs.append(chunk.page_content)
-        embeds.append(vector)
-        metas.append({"document_id": req.document_id, "file_name": req.file_name, "chunk_index": i})
-
-    # 批量写入（仅在有切片时）
-    if ids:
-        collection.upsert(ids=ids, documents=docs, embeddings=embeds, metadatas=metas)  # type: ignore
+    # 分批嵌入 + 分批写入：大文档逐批生成向量并立即 upsert，处理完即释放，
+    # 避免把全部切片的向量同时驻留内存导致 OOM。aembed_documents 还能让兼容
+    # 提供商一次请求嵌入整批，较逐条 aembed_query 显著降低往返开销。
+    total = 0
+    for start in range(0, len(chunks), EMBED_BATCH_SIZE):
+        batch = chunks[start:start + EMBED_BATCH_SIZE]
+        texts_batch = [c.page_content for c in batch]
+        vectors = await embeddings.aembed_documents(texts_batch)
+        ids = [f"{req.document_id}_{start + j}" for j in range(len(batch))]  # 切片 ID = 文档ID_全局序号
+        metas: list[dict[str, Any]] = [
+            {"document_id": req.document_id, "file_name": req.file_name, "chunk_index": start + j}
+            for j in range(len(batch))
+        ]
+        collection.upsert(ids=ids, documents=texts_batch, embeddings=vectors, metadatas=metas)  # type: ignore
+        total += len(batch)
 
     return EmbeddingBuildResponse(
         document_id=req.document_id,
-        chunk_count=len(ids),
+        chunk_count=total,
         status="success",
     )

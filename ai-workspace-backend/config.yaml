@@ -50,3 +50,7 @@ security:
 
 cors:
   allowed_origins: []  # 留空或含 "*" 放通所有来源；多用户部署改为显式来源如 ["https://app.example.com"]
+
+tracing:
+  service_name: "ai-workspace-backend"
+  endpoint: ""  # OTLP/HTTP 采集端点（host:port，如 localhost:4318）；留空则不启用链路追踪

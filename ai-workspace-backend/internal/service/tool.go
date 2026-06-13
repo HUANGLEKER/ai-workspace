@@ -3,34 +3,34 @@ package service
 import (
 	"encoding/json"
 
+	"gorm.io/gorm"
+
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
-	"gorm.io/gorm"
+	"github.com/aiworkspace/backend/internal/repository"
 )
 
 // ToolSvc 是工具服务全局单例
 var ToolSvc *ToolService
 
-// ToolService 依赖经构造函数注入（P1-1）
+// ToolService 业务逻辑层；持久化经 repository 完成（P0 分层重构）
 type ToolService struct {
-	db *gorm.DB
+	repo repository.OwnedRepository[model.Tool]
 }
 
 // NewToolService 构造服务
 func NewToolService(db *gorm.DB) *ToolService {
-	return &ToolService{db: db}
+	return &ToolService{repo: repository.NewOwnedRepository[model.Tool](db)}
 }
 
 // ListByUser 查询当前用户注册的所有工具
 func (s *ToolService) ListByUser(userID int64) ([]model.Tool, error) {
-	var tools []model.Tool
-	err := s.db.Scopes(ownedScope[model.Tool](userID)).Order("create_time DESC").Find(&tools).Error
-	return tools, err
+	return s.repo.List(userID, func(q *gorm.DB) *gorm.DB { return q.Order("create_time DESC") })
 }
 
 // GetOwned 查询并校验工具归属，防止 IDOR
 func (s *ToolService) GetOwned(id, userID int64) (*model.Tool, error) {
-	return getOwnedResource[model.Tool](s.db, id, userID, "工具")
+	return s.repo.FindOwned(id, userID, "工具")
 }
 
 // Create 新建工具，强制 CreateBy 为当前用户
@@ -43,7 +43,7 @@ func (s *ToolService) Create(t *model.Tool, userID int64) error {
 	if t.Enabled == 0 {
 		t.Enabled = 1
 	}
-	return s.db.Create(t).Error
+	return s.repo.Create(t)
 }
 
 // Update 更新工具，回填 CreateBy 防止归属被篡改
@@ -55,7 +55,7 @@ func (s *ToolService) Update(t *model.Tool, userID int64) error {
 	t.CreateBy = existing.CreateBy
 	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
 	t.CreatedAt = existing.CreatedAt
-	return s.db.Save(t).Error
+	return s.repo.Save(t)
 }
 
 // Delete 校验归属后删除工具
@@ -63,7 +63,7 @@ func (s *ToolService) Delete(id, userID int64) error {
 	if _, err := s.GetOwned(id, userID); err != nil {
 		return err
 	}
-	return s.db.Delete(&model.Tool{}, id).Error
+	return s.repo.DeleteByID(id)
 }
 
 // ResolveForAgent 按工具名列表（JSON 数组字符串）解析用户名下已启用的完整工具规格
@@ -79,8 +79,9 @@ func (s *ToolService) ResolveForAgent(userID int64, toolNamesJSON string) ([]map
 		return []map[string]any{}, nil
 	}
 
-	var tools []model.Tool
-	err := s.db.Scopes(ownedScope[model.Tool](userID)).Where("name IN ? AND enabled = 1", names).Find(&tools).Error
+	tools, err := s.repo.List(userID, func(q *gorm.DB) *gorm.DB {
+		return q.Where("name IN ? AND enabled = 1", names)
+	})
 	if err != nil {
 		return nil, err
 	}

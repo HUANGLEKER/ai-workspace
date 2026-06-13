@@ -385,3 +385,5 @@ VALUES (1, 'deepseek-chat', 'DeepSeek', '', '', 1, 0);
 -- 每日用量聚合排程（00:05 重算最近 2 天）
 INSERT INTO `sys_job` (`job_name`, `invoke_target`, `cron_expression`, `job_params`, `status`, `remark`, `deleted`)
 VALUES ('每日用量聚合', 'usageDailyJob', '0 5 0 * * ?', '', 0, '聚合 chat_message.token_count 到 usage_daily', 0);
+INSERT INTO `sys_job` (`job_name`, `invoke_target`, `cron_expression`, `job_params`, `status`, `remark`, `deleted`)
+VALUES ('嵌入对账自愈', 'embeddingReconcileJob', '0 */10 * * * ?', '', 0, '收敛卡死在 PROCESSING 的文档，修复与向量库的状态漂移', 0);

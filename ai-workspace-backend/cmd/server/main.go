@@ -25,6 +25,7 @@ import (
 	"github.com/aiworkspace/backend/pkg/logger"
 	minioPkg "github.com/aiworkspace/backend/pkg/minio"
 	redisPkg "github.com/aiworkspace/backend/pkg/redis"
+	"github.com/aiworkspace/backend/pkg/tracing"
 )
 
 func main() {
@@ -43,6 +44,24 @@ func main() {
 		os.Exit(1)
 	}
 	defer logger.Sync()
+
+	// ── 2.3 初始化分布式链路追踪（OpenTelemetry）──────────────────────
+	// 端点未配置时为 no-op；配置后串联 Gin → FastAPI 全链路。
+	svcName := config.Global.Tracing.ServiceName
+	if svcName == "" {
+		svcName = "ai-workspace-backend"
+	}
+	tpShutdown, err := tracing.Init(svcName, config.Global.Tracing.Endpoint)
+	if err != nil {
+		zap.L().Warn("初始化链路追踪失败，将以无追踪模式运行", zap.Error(err))
+	} else if config.Global.Tracing.Endpoint != "" {
+		zap.L().Info("链路追踪已启用", zap.String("endpoint", config.Global.Tracing.Endpoint))
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = tpShutdown(ctx)
+	}()
 
 	// ── 2.5 初始化敏感字段加密（P3-6）——密钥空时回退 JWT secret ──────
 	secret := config.Global.Security.SecretKey
@@ -88,6 +107,9 @@ func main() {
 	scheduler.Registry.Register("sampleJob", &scheduler.SampleJobHandler{})
 	// 每日 token 用量聚合（P2-2）：cron 排程见 sys_job（invoke_target=usageDailyJob）
 	scheduler.Registry.Register("usageDailyJob", &service.UsageJobHandler{})
+	// 嵌入对账自愈：把卡死在 PROCESSING 的文档收敛为 FAILED，修复 MySQL 与向量库的状态漂移
+	// （invoke_target=embeddingReconcileJob，建议 cron 每 10 分钟）
+	scheduler.Registry.Register("embeddingReconcileJob", &service.EmbeddingReconcileHandler{})
 	// 注入日志回调，解耦调度器与服务层（避免循环导入）
 	scheduler.OnJobDone = service.JobSvc.WriteLog
 	// 从数据库加载 status=0（运行中）的任务，重新加入调度器

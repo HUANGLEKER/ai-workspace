@@ -16,6 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+
 	"github.com/aiworkspace/backend/internal/config"
 	"github.com/aiworkspace/backend/pkg/reqid"
 )
@@ -169,6 +172,9 @@ func (c *fastapiClient) doJSON(ctx context.Context, client *http.Client, method,
 	if rid := reqid.From(ctx); rid != "" {
 		req.Header.Set(reqid.Header, rid)
 	}
+	// OpenTelemetry：把当前 span 的 W3C traceparent 注入出站请求头，
+	// FastAPI 侧自动埋点据此续接同一条 trace（未启用追踪时全局传播器为 no-op，无副作用）。
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	resp, err := client.Do(req)
 	if err != nil {

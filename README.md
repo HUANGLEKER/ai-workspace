@@ -114,13 +114,14 @@ sequenceDiagram
 
 | 层级 | 技术 |
 |---|---|
-| **前端** | Vue 3.5 · TypeScript 5.7 · Vite 6 · TailwindCSS 4（`@tailwindcss/vite` + typography）· Radix Vue（headless 组件）· lucide-vue-next（图标）· Pinia · Vue Router 4 · Vue Flow（工作流画布）· markdown-it + highlight.js + mermaid · DOMPurify · Vitest |
+| **前端** | Vue 3.5 · TypeScript 5.7 · Vite 6 · TailwindCSS 4（`@tailwindcss/vite` + typography）· Radix Vue（headless 组件）· lucide-vue-next（图标）· Pinia · Vue Router 4 · Vue Flow（工作流画布）· markdown-it + highlight.js + mermaid（解析下放 Web Worker）· DOMPurify · Vitest |
 | **后端** | Go 1.23 · Gin · GORM（+ soft_delete 插件）· JWT · robfig/cron v3（动态调度）· zap + lumberjack（日志）· gopsutil（监控）· Viper（配置）· Swagger/swag |
 | **AI 服务** | Python · FastAPI 0.115 · LangGraph · LangChain · OpenAI SDK · langchain-mcp-adapters（MCP 工具）· httpx · uv（依赖管理） |
 | **数据库** | MySQL 8（19+ 张表，utf8mb4，软删除）|
 | **缓存** | Redis 7（后端 DB 0 / AI 服务 DB 1，AOF 持久化）|
 | **向量库** | ChromaDB（HTTP 客户端模式）|
 | **对象存储** | MinIO（S3 兼容）|
+| **可观测** | OpenTelemetry（Go `otelgin` + FastAPI 自动埋点，OTLP/HTTP 导出）· W3C traceparent 跨服务串联 · X-Request-ID 文本关联 |
 | **DevOps** | Docker Compose（基础设施 + 应用双栈）· nginx（前端反代 + SSE 透传）· GitHub Actions CI |
 
 ---
@@ -146,13 +147,14 @@ AI Workspace/
 │   ├── internal/
 │   │   ├── handler/               # Gin handler（各业务模块）
 │   │   ├── service/               # 业务逻辑层（owned.go 统一资源归属过滤）
+│   │   ├── repository/            # 数据访问层（DAO）：泛型 OwnedRepository[T] 封装 CRUD + 归属
 │   │   ├── model/                 # GORM 模型（软删除 / Owned 接口）
-│   │   ├── router/router.go       # 路由分层 public → auth → admin
+│   │   ├── router/router.go       # 路由分层 public → auth → admin（含 otelgin 追踪中间件）
 │   │   ├── middleware/            # JWT / CORS / 限流 / 日志 / Recovery / AdminRequired
 │   │   ├── config/                # Viper 配置加载（config.Global）
 │   │   ├── scheduler/             # 动态 cron 调度器
 │   │   └── common/                # 标准响应包装 + 上传校验
-│   ├── pkg/                       # 基础设施客户端：database/redis/minio/logger/fastapi/crypto
+│   ├── pkg/                       # 基础设施客户端：database/redis/minio/logger/fastapi/crypto/tracing
 │   ├── config.yaml                # 本地开发配置
 │   ├── config.docker.yaml         # 容器内配置（主机名为 compose 服务名）
 │   └── Makefile                   # run / build / swag / tidy
@@ -166,6 +168,7 @@ AI Workspace/
 │       ├── workflow/              # LangGraph 工作流引擎（engine.py 拓扑执行）
 │       ├── llm/provider.py        # LLM 提供方抽象（LRU 缓存多模型客户端）
 │       ├── vectorstore/           # ChromaDB HTTP 客户端
+│       ├── tracing.py             # OpenTelemetry 初始化（续接 Go 网关 traceparent）
 │       └── config/settings.py     # Pydantic BaseSettings（从 .env 加载）
 │
 ├── ai-workspace/sql/init.sql      # 全部表 DDL + 种子数据（MySQL 首次启动自动执行）
@@ -270,6 +273,7 @@ docker-compose -f docker-compose.app.yml up -d --build
 | `upload` | `max_size_mb: 50` · `file_exts` · `doc_exts` | 上传大小上限与扩展名白名单 |
 | `security` | `secret_key` | 敏感字段（api_key）AES-256-GCM 加密密钥，留空回退 `jwt.secret` |
 | `cors` | `allowed_origins` | 留空/含 `*` 放通；多用户部署填显式白名单 |
+| `tracing` | `service_name` · `endpoint` | OpenTelemetry OTLP/HTTP 端点（如 `localhost:4318`），留空则不启用追踪 |
 | `log` | `level` · `filename` · 轮转 | zap + lumberjack 日志轮转 |
 
 > 容器内使用 `config.docker.yaml`（主机名替换为 compose 服务名 mysql/redis/minio）。
@@ -285,6 +289,7 @@ docker-compose -f docker-compose.app.yml up -d --build
 | **ChromaDB** | `CHROMA_HOST/PORT` · `CHROMA_COLLECTION_PREFIX` | 向量库地址与集合前缀（多租户隔离）|
 | **MinIO** | `MINIO_ENDPOINT` · `ACCESS/SECRET_KEY` · `BUCKET` | 嵌入管道下载文档 |
 | **App** | `APP_HOST/PORT/DEBUG` · `CORS_ORIGINS` | 服务自身配置，生产 `APP_DEBUG=false` |
+| **Tracing** | `TRACING_ENDPOINT` · `TRACING_SERVICE_NAME` | OpenTelemetry OTLP/HTTP 端点（如 `http://localhost:4318`），留空则不启用；续接 Go 网关同一条 trace |
 
 > ⚠️ 切换嵌入模型后**必须重建知识库索引**（旧向量与新模型不兼容）。
 
@@ -362,7 +367,7 @@ erDiagram
 |---|---|---|
 | **RBAC** | `sys_user` · `sys_role` · `sys_user_role` · `sys_menu` · `sys_role_menu` | 用户/角色/菜单权限；`role_code` 带 `ROLE_` 前缀；`must_change_pwd` 强制改密；`api_key` 加密存储 |
 | **Chat** | `chat_session` · `chat_message` · `chat_model` | 会话/消息（`user_id`）；`summary`+`summary_upto_id` 滚动摘要；`chat_model` 多模型路由（Go 管理）|
-| **知识库** | `kb_knowledge_base` · `kb_document` · `kb_chunk_task` | RAG 管道（`create_by`）；`status` PENDING→PROCESSING→DONE/FAILED；`task_status` PENDING/RUNNING/SUCCESS/FAILED |
+| **知识库** | `kb_knowledge_base` · `kb_document` · `kb_chunk_task` | RAG 管道（`create_by`）；`status` PENDING→PROCESSING→DONE/FAILED；`task_status` PENDING/RUNNING/SUCCESS/FAILED；嵌入分批防 OOM + `embeddingReconcileJob` 对账自愈卡死文档 |
 | **文件** | `file_info` | 文件中心，归属列 `upload_by` |
 | **Agent/Workflow** | `agent` · `workflow` | `tools`/`definition` 为 JSON 字符串（`create_by`）|
 | **自动化** | `sys_job` · `sys_job_log` | cron 任务（`status` 0=运行/1=暂停）；日志**物理删除**、仅 `create_time`、无 `deleted` 列 |
@@ -371,7 +376,7 @@ erDiagram
 
 ### 资源归属（强约束）
 
-用户私有资源严格隔离，强制经 `internal/service/owned.go` 泛型 helper（`getOwnedResource[T]` 单条 404/403 三态、`ownedScope[T]` 列表过滤）。**禁止手写 `Where("create_by = ?")` 字面量**（曾因此出现 IDOR）。归属列：KB/Agent/Workflow/Prompt/Tool/MCP=`create_by`，Chat=`user_id`，文件=`upload_by`。
+用户私有资源严格隔离，归属语义统一收口在 `internal/repository`（泛型 `OwnedRepository[T]`：`FindOwned` 单条 404/403 三态、`OwnedScope[T]` 列表过滤）；`internal/service/owned.go` 委托到 repository 作为单一真相来源。**禁止手写 `Where("create_by = ?")` 字面量**（曾因此出现 IDOR）。归属列：KB/Agent/Workflow/Prompt/Tool/MCP=`create_by`，Chat=`user_id`，文件=`upload_by`。
 
 > 维护约定：任何表结构变更必须同步更新 `init.sql`。
 
@@ -421,7 +426,7 @@ flowchart TB
 | **限流** | 按需调整 `ratelimit.llm_per_minute(_admin)` |
 | **强制改密** | 默认 admin 首登强制改密（`must_change_pwd`），勿保留默认口令 |
 | **持久化** | MySQL/Redis(AOF)/MinIO/ChromaDB 均挂命名卷；定期备份 |
-| **可观测** | `GET /health`（后端/AI）做容器健康检查；`/api/monitor/*` 看服务器与依赖健康 |
+| **可观测** | `GET /health`（后端/AI）做容器健康检查；`/api/monitor/*` 看服务器与依赖健康；配置 `tracing.endpoint`/`TRACING_ENDPOINT` 接入 OTLP 后端（Jaeger/Tempo/Collector）串联全链路 |
 | **SSE** | nginx `proxy_buffering off` 保证流式不被缓冲 |
 
 ---
@@ -429,6 +434,6 @@ flowchart TB
 ## 附录：开发规范要点
 
 - **前端**：禁用 Element Plus / `<style scoped>` / `::v-deep` / `!important`；样式一律 Tailwind utility；统一组件从 `components/ui/index.ts` 出口引入。
-- **后端**：归属过滤必走 `owned.go`，禁止字面量 `Where`；表结构变更同步 `init.sql`。
-- **AI 服务**：依赖用 `uv add`；嵌入临时文件已用 `tempfile.gettempdir()`（跨平台）。
+- **后端**：归属过滤必走 `owned.go` / `repository.OwnedRepository`，禁止字面量 `Where`；表结构变更同步 `init.sql`。
+- **AI 服务**：依赖用 `uv add`；嵌入临时文件已用 `tempfile.gettempdir()`（跨平台），按 `EMBED_BATCH_SIZE` 分批嵌入防 OOM。
 - **分层铁律**：Go 不直接调 LLM，FastAPI 不直接读 MySQL；`llm_config` 仅服务间内网流转，不对客户端暴露。

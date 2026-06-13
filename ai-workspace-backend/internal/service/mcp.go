@@ -6,34 +6,34 @@ import (
 	"net/http"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
-	"gorm.io/gorm"
+	"github.com/aiworkspace/backend/internal/repository"
 )
 
 // MCPSvc 是 MCP 服务器服务全局单例
 var MCPSvc *MCPService
 
-// MCPService 依赖经构造函数注入（P1-1）
+// MCPService 业务逻辑层；持久化经 repository 完成（P0 分层重构）
 type MCPService struct {
-	db *gorm.DB
+	repo repository.OwnedRepository[model.McpServer]
 }
 
 // NewMCPService 构造服务
 func NewMCPService(db *gorm.DB) *MCPService {
-	return &MCPService{db: db}
+	return &MCPService{repo: repository.NewOwnedRepository[model.McpServer](db)}
 }
 
 // ListByUser 查询当前用户注册的所有 MCP 服务器
 func (s *MCPService) ListByUser(userID int64) ([]model.McpServer, error) {
-	var servers []model.McpServer
-	err := s.db.Scopes(ownedScope[model.McpServer](userID)).Order("create_time DESC").Find(&servers).Error
-	return servers, err
+	return s.repo.List(userID, func(q *gorm.DB) *gorm.DB { return q.Order("create_time DESC") })
 }
 
 // GetOwned 查询并校验 MCP 服务器归属，防止 IDOR
 func (s *MCPService) GetOwned(id, userID int64) (*model.McpServer, error) {
-	return getOwnedResource[model.McpServer](s.db, id, userID, "MCP服务器")
+	return s.repo.FindOwned(id, userID, "MCP服务器")
 }
 
 // Create 新建 MCP 服务器，强制 CreateBy 为当前用户
@@ -49,7 +49,7 @@ func (s *MCPService) Create(srv *model.McpServer, userID int64, isAdmin bool) er
 	if srv.Enabled == 0 {
 		srv.Enabled = 1
 	}
-	return s.db.Create(srv).Error
+	return s.repo.Create(srv)
 }
 
 // guardStdio 拦截非管理员注册 stdio 类型 MCP——stdio 等于在 AI 服务主机执行任意命令，
@@ -79,7 +79,7 @@ func (s *MCPService) Update(srv *model.McpServer, userID int64, isAdmin bool) er
 	srv.CreateBy = existing.CreateBy
 	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
 	srv.CreatedAt = existing.CreatedAt
-	return s.db.Save(srv).Error
+	return s.repo.Save(srv)
 }
 
 // Delete 校验归属后删除 MCP 服务器
@@ -87,7 +87,7 @@ func (s *MCPService) Delete(id, userID int64) error {
 	if _, err := s.GetOwned(id, userID); err != nil {
 		return err
 	}
-	return s.db.Delete(&model.McpServer{}, id).Error
+	return s.repo.DeleteByID(id)
 }
 
 // TestConnectivity 对 SSE 类型 MCP 服务器发起 HTTP 可达性探测
@@ -133,9 +133,9 @@ func (s *MCPService) ResolveForAgent(userID int64, serverNamesJSON string, isAdm
 		return []map[string]any{}, nil
 	}
 
-	var servers []model.McpServer
-	err := s.db.Scopes(ownedScope[model.McpServer](userID)).
-		Where("name IN ? AND enabled = 1", names).Find(&servers).Error
+	servers, err := s.repo.List(userID, func(q *gorm.DB) *gorm.DB {
+		return q.Where("name IN ? AND enabled = 1", names)
+	})
 	if err != nil {
 		return nil, err
 	}

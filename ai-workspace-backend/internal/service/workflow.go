@@ -2,46 +2,37 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strconv"
 
 	"gorm.io/gorm"
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
+	"github.com/aiworkspace/backend/internal/repository"
 )
 
 // WorkflowSvc 是工作流服务全局单例
 var WorkflowSvc *WorkflowService
 
-// WorkflowService 依赖经构造函数注入（P1-1）
+// WorkflowService 业务逻辑层；持久化经 repository 完成（P0 分层重构），ai 经构造函数注入
 type WorkflowService struct {
-	db *gorm.DB
-	ai RunCaller
+	repo repository.OwnedRepository[model.Workflow]
+	ai   RunCaller
 }
 
 // NewWorkflowService 构造服务
 func NewWorkflowService(db *gorm.DB, ai RunCaller) *WorkflowService {
-	return &WorkflowService{db: db, ai: ai}
+	return &WorkflowService{repo: repository.NewOwnedRepository[model.Workflow](db), ai: ai}
 }
 
 // ListByUser 查询当前用户拥有的所有工作流
 func (s *WorkflowService) ListByUser(userID int64) ([]model.Workflow, error) {
-	var workflows []model.Workflow
-	err := s.db.Scopes(ownedScope[model.Workflow](userID)).Order("create_time DESC").Find(&workflows).Error
-	return workflows, err
+	return s.repo.List(userID, func(q *gorm.DB) *gorm.DB { return q.Order("create_time DESC") })
 }
 
 // GetByID 按 ID 查询工作流
 func (s *WorkflowService) GetByID(id int64) (*model.Workflow, error) {
-	var w model.Workflow
-	if err := s.db.First(&w, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, common.ErrNotFound("工作流")
-		}
-		return nil, err
-	}
-	return &w, nil
+	return s.repo.FindByID(id, "工作流")
 }
 
 // Create 新建工作流，强制 CreateBy 为当前用户
@@ -54,7 +45,7 @@ func (s *WorkflowService) Create(w *model.Workflow, userID int64) error {
 	if w.Enabled == 0 {
 		w.Enabled = 1
 	}
-	return s.db.Create(w).Error
+	return s.repo.Create(w)
 }
 
 // Update 更新工作流，回填 CreateBy 防止归属被篡改
@@ -66,7 +57,7 @@ func (s *WorkflowService) Update(w *model.Workflow, userID int64) error {
 	w.CreateBy = existing.CreateBy
 	// Save 全字段覆盖，回填创建时间防止 create_time 被写成零值
 	w.CreatedAt = existing.CreatedAt
-	return s.db.Save(w).Error
+	return s.repo.Save(w)
 }
 
 // Delete 校验归属后删除工作流
@@ -74,12 +65,12 @@ func (s *WorkflowService) Delete(id, userID int64) error {
 	if _, err := s.GetOwned(id, userID); err != nil {
 		return err
 	}
-	return s.db.Delete(&model.Workflow{}, id).Error
+	return s.repo.DeleteByID(id)
 }
 
 // GetOwned 校验工作流归属，防止 IDOR
 func (s *WorkflowService) GetOwned(id, userID int64) (*model.Workflow, error) {
-	return getOwnedResource[model.Workflow](s.db, id, userID, "工作流")
+	return s.repo.FindOwned(id, userID, "工作流")
 }
 
 // Run 执行工作流：校验归属后将 definition 与输入 POST 给 FastAPI /workflow/run

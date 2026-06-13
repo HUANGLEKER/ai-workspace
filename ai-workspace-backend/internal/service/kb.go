@@ -192,6 +192,33 @@ func (s *KBService) RecoverInterruptedTasks() error {
 	return nil
 }
 
+// ReconcileStuck 周期性对账：把停留在 PROCESSING 超过 maxAge 的文档与对应 RUNNING
+// 任务收敛为 FAILED。区别于 RecoverInterruptedTasks（仅进程启动时跑一次）——本方法
+// 覆盖进程未重启、但嵌入 goroutine 因超时/夭折/与 ChromaDB 写入失联而永久卡死的场景，
+// 避免文档与向量库状态长期漂移。判定依据为 update_time（GORM autoUpdateTime 在置
+// PROCESSING 时刷新），早于 now-maxAge 即视为卡死。由 cron JobHandler 调度，
+// 收敛后用户可经「重建」入口自助重跑。返回收敛的文档数。
+func (s *KBService) ReconcileStuck(maxAge time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-maxAge)
+	docRes := s.db.Model(&model.KbDocument{}).
+		Where("status = ? AND update_time < ?", model.DocStatusProcessing, cutoff).
+		Update("status", model.DocStatusFailed)
+	if docRes.Error != nil {
+		return 0, docRes.Error
+	}
+	taskRes := s.db.Model(&model.KbChunkTask{}).
+		Where("task_status = ? AND update_time < ?", model.TaskStatusRunning, cutoff).
+		Updates(map[string]any{"task_status": model.TaskStatusFailed, "error_msg": "任务超时，对账自愈置失败"})
+	if taskRes.Error != nil {
+		return docRes.RowsAffected, taskRes.Error
+	}
+	if docRes.RowsAffected > 0 || taskRes.RowsAffected > 0 {
+		zap.L().Warn("对账自愈：已收敛卡死的嵌入任务",
+			zap.Int64("docs", docRes.RowsAffected), zap.Int64("tasks", taskRes.RowsAffected))
+	}
+	return docRes.RowsAffected, nil
+}
+
 // buildEmbedding 执行单文档嵌入流程：写任务审计记录 → 置 PROCESSING → POST FastAPI → 更新状态
 // 对应 Spring Boot EmbeddingServiceImpl.buildAsync()，此处以 goroutine 调用实现等价的异步行为
 func (s *KBService) buildEmbedding(doc *model.KbDocument) {
@@ -235,4 +262,20 @@ func (s *KBService) buildEmbedding(doc *model.KbDocument) {
 	s.db.Model(&model.KbDocument{}).Where("id = ?", doc.ID).Update("status", model.DocStatusDone)
 	s.db.Model(&model.KbChunkTask{}).Where("id = ?", task.ID).Update("task_status", model.TaskStatusSuccess)
 	zap.L().Info("嵌入完成", zap.Int64("docId", doc.ID))
+}
+
+// reconcileStuckMaxAge 是对账判定卡死的阈值；略大于 buildEmbedding 的 5 分钟超时，
+// 给正常长耗时嵌入留出余量，避免误杀仍在进行的任务。
+const reconcileStuckMaxAge = 10 * time.Minute
+
+// EmbeddingReconcileHandler 适配 scheduler.JobHandler 的嵌入对账自愈任务
+// （invoke_target: embeddingReconcileJob）。建议配置为每 10 分钟执行的 cron。
+type EmbeddingReconcileHandler struct{}
+
+func (h *EmbeddingReconcileHandler) Execute(params string) error {
+	if KBSvc == nil {
+		return fmt.Errorf("KBSvc 未初始化")
+	}
+	_, err := KBSvc.ReconcileStuck(reconcileStuckMaxAge)
+	return err
 }

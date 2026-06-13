@@ -19,6 +19,15 @@ type Config struct {
 	Upload    UploadConfig    `mapstructure:"upload"`
 	Security  SecurityConfig  `mapstructure:"security"`
 	CORS      CORSConfig      `mapstructure:"cors"`
+	Tracing   TracingConfig   `mapstructure:"tracing"`
+}
+
+// TracingConfig 控制 OpenTelemetry 分布式链路追踪（全链路可观测性）。
+type TracingConfig struct {
+	// ServiceName 在 APM 后端中标识本服务；为空时回退 "ai-workspace-backend"
+	ServiceName string `mapstructure:"service_name"`
+	// Endpoint 为 OTLP/HTTP 采集端点（host:port，如 localhost:4318）；为空则不启用追踪
+	Endpoint string `mapstructure:"endpoint"`
 }
 
 type SecurityConfig struct {

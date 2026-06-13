@@ -60,8 +60,27 @@ const CARET_SENTINEL = '' //''
  *                  注意：光标 HTML 在 DOMPurify 之后注入，属可信片段，不参与净化。
  */
 export function renderMarkdown(content: string, caretHtml = ''): string {
-  const source = content || ''
-  if (!caretHtml) return DOMPurify.sanitize(md.render(source))
-  const html = DOMPurify.sanitize(md.render(source + CARET_SENTINEL))
-  return html.replace(CARET_SENTINEL, caretHtml)
+  return sanitizeRendered(renderRaw(content, !!caretHtml), caretHtml)
+}
+
+/**
+ * 纯 markdown-it 渲染：把 Markdown 文本解析为「未净化」的 HTML。
+ *
+ * 这一步是整条渲染链里最重的 CPU 工作（解析 + linkify + typographer + fence 规则），
+ * 因此被单独抽出，既供主线程同步 fallback 复用，也供 Web Worker 离线程调用
+ * （见 markdown.worker.ts），把流式输出大段内容时的解析开销移出主线程。
+ * withCaret 为 true 时把光标哨兵拼到原文末尾参与解析，使其落入最后一个文本节点内部。
+ */
+export function renderRaw(content: string, withCaret = false): string {
+  return md.render((content || '') + (withCaret ? CARET_SENTINEL : ''))
+}
+
+/**
+ * 净化已渲染的 HTML 并注入光标。
+ *
+ * 必须在主线程执行（DOMPurify 依赖 DOM）。光标 HTML 在净化之后注入，属可信片段。
+ */
+export function sanitizeRendered(rawHtml: string, caretHtml = ''): string {
+  const clean = DOMPurify.sanitize(rawHtml)
+  return caretHtml ? clean.replace(CARET_SENTINEL, caretHtml) : clean
 }
