@@ -207,6 +207,7 @@ func ChatSend(c *gin.Context) {
 	}
 
 	var assistantReply strings.Builder
+	var completionTokens int
 	ctx := c.Request.Context()
 
 	streamErr := fastapi.Client.Stream(ctx, "/chat", body, func(line string) error {
@@ -227,6 +228,12 @@ func ChatSend(c *gin.Context) {
 		if err := json.Unmarshal([]byte(data), &payload); err == nil {
 			if token, ok := payload["token"].(string); ok {
 				assistantReply.WriteString(token)
+			}
+			// usage 帧：记录本次回复的 completion_tokens，随 assistant 消息落库
+			if t, ok := payload["type"].(string); ok && t == "usage" {
+				if v, ok := payload["completion_tokens"].(float64); ok {
+					completionTokens = int(v)
+				}
 			}
 		}
 		// 原样透传 SSE 行到浏览器
@@ -251,7 +258,7 @@ func ChatSend(c *gin.Context) {
 
 	// 断连保存：不论客户端是否中途断开，只要有已生成内容就持久化
 	if assistantReply.Len() > 0 {
-		_ = service.ChatSvc.SaveMessage(req.SessionID, "assistant", assistantReply.String())
+		_ = service.ChatSvc.SaveMessageWithTokens(req.SessionID, "assistant", assistantReply.String(), completionTokens)
 	}
 }
 

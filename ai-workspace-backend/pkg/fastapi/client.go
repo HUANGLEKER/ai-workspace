@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/aiworkspace/backend/internal/config"
+	"github.com/aiworkspace/backend/pkg/reqid"
 )
 
 // standardResp 是 FastAPI 统一响应结构，与 Python 侧 utils/response.py 对应
@@ -156,6 +157,10 @@ func (c *fastapiClient) doJSON(ctx context.Context, client *http.Client, method,
 		return nil, fmt.Errorf("构造请求失败: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	// 链路追踪：请求 ID 随调用透传到 FastAPI，三服务日志可按 rid 串联
+	if rid := reqid.From(ctx); rid != "" {
+		req.Header.Set(reqid.Header, rid)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

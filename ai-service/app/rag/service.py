@@ -8,6 +8,7 @@ from typing import AsyncIterator
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.llm.provider import get_chat_llm, get_embeddings
 from app.models.rag import RagChatRequest, SourceDocument
+from app.observability import LlmCallTimer
 from app.vectorstore.chroma_client import get_or_create_collection
 
 _RAG_SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下参考文档回答用户的问题。
@@ -72,11 +73,21 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
         api_key=cfg.api_key if cfg else None,
         api_base=cfg.api_base if cfg else None,
     )
-    async for chunk in llm.astream([system_msg, human_msg]):
-        token = chunk.content
-        if token:
-            data = json.dumps({"type": "token", "session_id": req.session_id, "token": token}, ensure_ascii=False)
-            yield f"data: {data}\n\n"
+    timer = LlmCallTimer("rag", req.model)
+    try:
+        async for chunk in llm.astream([system_msg, human_msg], stream_usage=True):
+            usage = getattr(chunk, "usage_metadata", None)
+            if usage:
+                timer.set_usage(usage)
+            token = chunk.content
+            if token:
+                data = json.dumps({"type": "token", "session_id": req.session_id, "token": token}, ensure_ascii=False)
+                yield f"data: {data}\n\n"
+    except Exception as e:
+        timer.fail(e)
+        raise
+    else:
+        timer.done()
 
     # 结束哨兵
     yield "data: [DONE]\n\n"

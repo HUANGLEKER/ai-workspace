@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/aiworkspace/backend/pkg/reqid"
 )
 
 // RequestLogger 记录每条请求的耗时、状态码和客户端 IP
@@ -16,6 +18,7 @@ func RequestLogger() gin.HandlerFunc {
 		c.Next()
 
 		zap.L().Info("request",
+			zap.String("requestId", reqid.From(c.Request.Context())),
 			zap.String("method", c.Request.Method),
 			zap.String("path", path),
 			zap.Int("status", c.Writer.Status()),

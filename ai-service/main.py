@@ -12,6 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.config.settings import settings
+from app.observability import REQUEST_ID_HEADER, request_id_var, setup_logging
+
+setup_logging()
 
 logger = logging.getLogger("ai-service")
 
@@ -20,6 +23,20 @@ app = FastAPI(
     description="FastAPI AI Service — Chat / RAG / Embedding / Agent / Workflow",
     version="1.0.0",
 )
+
+# 请求 ID 贯穿（P2-1）：取 Go 后端透传的 X-Request-ID 存入 contextvar，
+# 本请求内所有日志自动携带 rid；响应头回显便于排障
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    rid = request.headers.get(REQUEST_ID_HEADER, "-")
+    token = request_id_var.set(rid)
+    try:
+        response = await call_next(request)
+    finally:
+        request_id_var.reset(token)
+    response.headers[REQUEST_ID_HEADER] = rid
+    return response
+
 
 # 注册 CORS 中间件
 app.add_middleware(

@@ -4,6 +4,7 @@ from typing import AsyncIterator
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.llm.provider import get_chat_llm
 from app.models.chat import ChatRequest, Message
+from app.observability import LlmCallTimer
 
 
 def _to_lc_message(msg: Message):
@@ -27,6 +28,22 @@ async def stream_chat(req: ChatRequest) -> AsyncIterator[str]:
     )
     lc_messages = [_to_lc_message(m) for m in req.messages]
 
+    timer = LlmCallTimer("chat", req.model)
+    try:
+        async for frame in _stream_tokens(llm, lc_messages, req, timer):
+            yield frame
+    except Exception as e:
+        timer.fail(e)
+        raise
+    else:
+        timer.done()
+
+    # 结束哨兵，通知前端流式完成
+    yield "data: [DONE]\n\n"
+
+
+async def _stream_tokens(llm, lc_messages, req: ChatRequest, timer: LlmCallTimer):
+    """逐 token 产出 SSE 帧；usage 帧夹带下发并喂给计时器。"""
     # stream_usage=True：让 OpenAI 兼容端在流尾返回 token 用量（usage_metadata）。
     # 逐块消费 LLM 流式输出，将每个 token 包装为 SSE 帧；用量帧以独立 type=usage 帧夹带。
     async for chunk in llm.astream(lc_messages, stream_usage=True):
@@ -39,6 +56,7 @@ async def stream_chat(req: ChatRequest) -> AsyncIterator[str]:
         # 前端经 onMeta 旁路消费，不污染 Markdown 渲染。
         usage = getattr(chunk, "usage_metadata", None)
         if usage:
+            timer.set_usage(usage)
             usage_frame = json.dumps(
                 {
                     "type": "usage",
@@ -50,6 +68,3 @@ async def stream_chat(req: ChatRequest) -> AsyncIterator[str]:
                 ensure_ascii=False,
             )
             yield f"data: {usage_frame}\n\n"
-
-    # 结束哨兵，通知前端流式完成
-    yield "data: [DONE]\n\n"

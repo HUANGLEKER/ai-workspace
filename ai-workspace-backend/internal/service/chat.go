@@ -138,10 +138,17 @@ func (s *ChatService) ListRecentMessages(sessionID int64) ([]model.ChatMessage, 
 
 // SaveMessage 持久化一条消息，role 为 "user" 或 "assistant"
 func (s *ChatService) SaveMessage(sessionID int64, role, content string) error {
+	return s.SaveMessageWithTokens(sessionID, role, content, 0)
+}
+
+// SaveMessageWithTokens 持久化消息并记录 token 消耗（P2-1 指标）。
+// assistant 消息记 completion_tokens（来自 FastAPI usage 帧），是用量统计的数据源。
+func (s *ChatService) SaveMessageWithTokens(sessionID int64, role, content string, tokenCount int) error {
 	msg := &model.ChatMessage{
-		SessionID: sessionID,
-		Role:      role,
-		Content:   content,
+		SessionID:  sessionID,
+		Role:       role,
+		Content:    content,
+		TokenCount: tokenCount,
 	}
 	return s.db.Create(msg).Error
 }

@@ -13,6 +13,7 @@ func Setup(r *gin.Engine) {
 	// 全局中间件：顺序很重要——Recovery 必须最先，确保 panic 能被捕获
 	r.Use(middleware.Recovery())
 	r.Use(middleware.CORS())
+	r.Use(middleware.RequestID()) // 必须在 RequestLogger 之前注入
 	r.Use(middleware.RequestLogger())
 
 	// 容器/负载均衡健康检查端点（无鉴权，不含任何业务信息）
