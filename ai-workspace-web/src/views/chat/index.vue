@@ -185,6 +185,7 @@
                 :active-id="artifact.activeId.value"
                 :active="artifact.active.value"
                 :fullscreen="artifact.fullscreen.value"
+                :versions="artifact.versions.value"
                 @select="artifact.select"
                 @close="artifact.close"
                 @toggle-fullscreen="artifact.fullscreen.value = !artifact.fullscreen.value"
@@ -304,6 +305,7 @@ onMounted(() => {
 async function selectSession(session: ChatSession) {
   cancelFade()
   artifact.close()
+  artifact.clearVersions() // 切换会话清空 Artifact 版本链，避免跨会话串味
   await chatStore.selectSession(session)
   scrollToBottom()
 }

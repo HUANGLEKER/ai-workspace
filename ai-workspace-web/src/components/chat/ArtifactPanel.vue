@@ -20,8 +20,23 @@
           {{ a.title }}
         </button>
       </div>
+      <!-- 版本切换（P3-4）：链长 > 1 时显示 v1..vN，末位为当前 -->
+      <div v-if="versionChain.length > 1" class="flex shrink-0 items-center gap-0.5">
+        <button
+          v-for="(_, i) in versionChain"
+          :key="i"
+          class="rounded-md px-1.5 py-0.5 text-[11px] font-medium transition-colors"
+          :class="(viewingIdx === null ? i === versionChain.length - 1 : viewingIdx === i)
+            ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
+            : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800'"
+          :title="i === versionChain.length - 1 ? '当前版本' : `历史版本 v${i + 1}`"
+          @click="viewingIdx = i === versionChain.length - 1 ? null : i"
+        >
+          v{{ i + 1 }}
+        </button>
+      </div>
       <div class="flex shrink-0 items-center gap-0.5">
-        <AppTooltip v-if="active && (active.type === 'html' || active.type === 'mermaid')" :content="rawView ? '预览' : '查看源码'">
+        <AppTooltip v-if="disp && (disp.type === 'html' || disp.type === 'mermaid')" :content="rawView ? '预览' : '查看源码'">
           <button class="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200" @click="rawView = !rawView">
             <Code v-if="!rawView" class="h-4 w-4" />
             <Eye v-else class="h-4 w-4" />
@@ -52,27 +67,36 @@
       </div>
     </div>
 
+    <!-- 历史版本提示条 -->
+    <div
+      v-if="isHistory"
+      class="flex shrink-0 items-center justify-between border-b border-amber-200/70 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400"
+    >
+      <span>正在查看历史版本 v{{ (viewingIdx ?? 0) + 1 }}（只读）</span>
+      <button class="rounded-md px-2 py-0.5 font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40" @click="viewingIdx = null">回到最新</button>
+    </div>
+
     <!-- 预览区 -->
     <div class="flex-1 overflow-auto">
-      <div v-if="!active" class="flex h-full items-center justify-center text-sm text-zinc-400">暂无可预览内容</div>
+      <div v-if="!disp" class="flex h-full items-center justify-center text-sm text-zinc-400">暂无可预览内容</div>
 
       <!-- HTML：默认沙箱 iframe 预览，可切源码 -->
       <iframe
-        v-else-if="active.type === 'html' && !rawView"
+        v-else-if="disp.type === 'html' && !rawView"
         ref="frame"
         class="h-full w-full border-0 bg-white"
         sandbox="allow-scripts"
-        :srcdoc="active.content"
+        :srcdoc="disp.content"
       />
 
       <!-- Mermaid：默认渲染图，可切源码 -->
-      <div v-else-if="active.type === 'mermaid' && !rawView" class="p-4">
-        <MermaidView :code="active.content" :dark="isDark" />
+      <div v-else-if="disp.type === 'mermaid' && !rawView" class="p-4">
+        <MermaidView :code="disp.content" :dark="isDark" />
       </div>
 
       <!-- Markdown / PRD：富文本渲染 -->
-      <div v-else-if="active.type === 'markdown' || active.type === 'prd'" class="p-5">
-        <MarkdownView :content="active.content" />
+      <div v-else-if="disp.type === 'markdown' || disp.type === 'prd'" class="p-5">
+        <MarkdownView :content="disp.content" />
       </div>
 
       <!-- SQL / JSON / 长代码 / 源码视图：高亮 pre -->
@@ -109,6 +133,8 @@ const props = defineProps<{
   activeId: string
   active: Artifact | null
   fullscreen: boolean
+  /** 版本链（P3-4）：id → 历史快照（不含当前实时版本） */
+  versions?: Record<string, Artifact[]>
 }>()
 defineEmits<{ select: [id: string]; close: []; 'toggle-fullscreen': [] }>()
 
@@ -117,24 +143,38 @@ const rawView = ref(false)
 const copied = ref(false)
 const codeEl = ref<HTMLElement>()
 
+// 版本链：历史快照 + 当前实时版本（末位）。viewingIdx=null 表示看最新（随流式更新）
+const versionChain = computed<Artifact[]>(() => {
+  const a = props.active
+  if (!a) return []
+  return [...(props.versions?.[a.id] || []), a]
+})
+const viewingIdx = ref<number | null>(null)
+// 实际展示的 Artifact：选中历史版本则显示该快照，否则显示当前（active）
+const disp = computed<Artifact | null>(() => {
+  if (viewingIdx.value === null) return props.active
+  return versionChain.value[viewingIdx.value] ?? props.active
+})
+const isHistory = computed(() => viewingIdx.value !== null && viewingIdx.value < versionChain.value.length - 1)
+
 // highlight.js 语言名映射（mmd→源码用 text；html/json/sql 直传）
 const hlLang = computed(() => {
-  const a = props.active
+  const a = disp.value
   if (!a) return 'text'
   if (a.type === 'mermaid') return 'text'
   return a.language || 'text'
 })
 
-// 切换 Artifact 时回到默认预览视图
-watch(() => props.activeId, () => { rawView.value = false; copied.value = false })
+// 切换 Artifact 时回到默认预览视图并回到最新版本
+watch(() => props.activeId, () => { rawView.value = false; copied.value = false; viewingIdx.value = null })
 
 /** 高亮当前代码型 Artifact；md/prd/html-preview/mermaid-preview 不走此路径 */
 async function highlight() {
   await nextTick()
   const el = codeEl.value
-  if (!el || !props.active) return
+  if (!el || !disp.value) return
   const lang = hlLang.value
-  const code = props.active.content
+  const code = disp.value.content
   try {
     el.innerHTML = hljs.getLanguage(lang)
       ? hljs.highlight(code, { language: lang }).value
@@ -144,17 +184,17 @@ async function highlight() {
   }
 }
 
-// 内容或视图变化时重渲高亮（仅在 pre 路径挂载了 codeEl 时生效）
+// 内容或视图变化时重渲高亮（含版本切换；仅在 pre 路径挂载了 codeEl 时生效）
 watch(
-  () => [props.active?.content, props.active?.id, rawView.value],
+  () => [disp.value?.content, disp.value?.id, viewingIdx.value, rawView.value],
   () => highlight(),
   { immediate: true }
 )
 
 async function copy() {
-  if (!props.active) return
+  if (!disp.value) return
   try {
-    await navigator.clipboard.writeText(props.active.content)
+    await navigator.clipboard.writeText(disp.value.content)
     copied.value = true
     setTimeout(() => (copied.value = false), 1500)
   } catch {
@@ -163,7 +203,7 @@ async function copy() {
 }
 
 function download() {
-  const a = props.active
+  const a = disp.value
   if (!a) return
   const blob = new Blob([a.content], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)

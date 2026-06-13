@@ -13,6 +13,11 @@ export function useArtifactPanel() {
   const fullscreen = ref(false)
   const artifacts = ref<Artifact[]>([])
   const activeId = ref('')
+  /**
+   * 版本链（P3-4）：同会话内同 id 的 Artifact 每轮完成后归档为一个历史版本，
+   * 面板可回切查看。键为 Artifact id，值为按时间升序的历史快照（不含当前在流的实时版本）。
+   */
+  const versions = ref<Record<string, Artifact[]>>({})
   /** 是否由流式自动打开：用户手动关闭后，本轮不再自动弹出，避免反复打断 */
   const autoOpenedThisTurn = ref(false)
   /** 用户本轮主动关闭过面板的标记 */
@@ -53,10 +58,27 @@ export function useArtifactPanel() {
     }
   }
 
-  /** 新一轮回复开始：重置「本轮自动打开/关闭」标记（不强制关已开的面板） */
+  /** 把当前 Artifact 集合归档为历史版本（内容相对上一版本有变化才记，避免空版本） */
+  function commitVersions() {
+    for (const a of artifacts.value) {
+      const list = versions.value[a.id] || (versions.value[a.id] = [])
+      const last = list[list.length - 1]
+      if (!last || last.content !== a.content) {
+        list.push({ ...a }) // 快照：与实时引用解耦
+      }
+    }
+  }
+
+  /** 新一轮回复开始：先把上一轮成品归档为版本，再重置「本轮自动打开/关闭」标记 */
   function newTurn() {
+    commitVersions()
     autoOpenedThisTurn.value = false
     dismissed.value = false
+  }
+
+  /** 切换会话时清空版本链，避免跨会话串味 */
+  function clearVersions() {
+    versions.value = {}
   }
 
   function close() {
@@ -69,5 +91,5 @@ export function useArtifactPanel() {
     activeId.value = id
   }
 
-  return { open, fullscreen, artifacts, activeId, active, show, sync, newTurn, close, select }
+  return { open, fullscreen, artifacts, activeId, active, versions, show, sync, newTurn, clearVersions, close, select }
 }
