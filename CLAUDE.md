@@ -191,7 +191,7 @@ Auth：`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/info`�
 用户管理：`/api/user/`（page/add/update/delete/status）——仅管理员。密码经 bcrypt；更新时用户名不可变；列表响应中剥离哈希。  
 Chat：`POST /api/chat/send`（SSE），会话 CRUD 位于 `/api/chat/session/`  
 KB/RAG：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/rebuild`。前端 RAG 问答页（`views/knowledge/rag`）通过 `api/kb.ts:ragChatStream` 流式接收答案，将 `{type:'sources'}` 元数据帧（可折叠来源引用）与 `{content}` token 帧拆开。  
-Files：`/api/file/`（基于 MinIO）  
+Files：`/api/file/`（基于 MinIO）。上传加固（P2-6）：服务端校验大小上限与扩展名白名单（`config.yaml` 的 `upload.*`，文件中心用 `file_exts`、知识库文档用 `doc_exts`），存储用 `http.DetectContentType` 嗅探的真实 MIME 而非客户端传入的 Content-Type；presign 过期 1h。校验逻辑在 `internal/common/upload.go`。  
 Monitor：`GET /api/dashboard/stats`（按用户计数）；`GET /api/monitor/server` + `GET /api/monitor/health`——仅管理员；服务器指标取自 `gopsutil`，健康检查探测 Redis/FastAPI/MinIO。  
 Agent：`/api/agent/`（list/get/add/update/delete + `POST /api/agent/{id}/run`）—— 用户私有（`create_by`）  
 Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）  

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/aiworkspace/backend/internal/common"
+	"github.com/aiworkspace/backend/internal/config"
 	"github.com/aiworkspace/backend/internal/middleware"
 	"github.com/aiworkspace/backend/internal/model"
 	"github.com/aiworkspace/backend/internal/service"
@@ -109,8 +110,14 @@ func UploadDocument(c *gin.Context) {
 		return
 	}
 
+	// 加固：大小 + 文档扩展名白名单校验；存储用嗅探出的真实 MIME
+	cfg := config.Global.Upload
+	if err := common.ValidateUpload(header.Filename, int64(len(data)), cfg.DocExts, cfg.MaxSizeMB); err != nil {
+		handleBizError(c, err)
+		return
+	}
 	doc, err := service.KBSvc.UploadDocument(c.Request.Context(), kbID, middleware.CurrentUserID(c),
-		header.Filename, data, header.Header.Get("Content-Type"))
+		header.Filename, data, common.SniffContentType(data))
 	if err != nil {
 		handleBizError(c, err)
 		return

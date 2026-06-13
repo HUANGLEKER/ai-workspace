@@ -16,11 +16,21 @@ type Config struct {
 	MinIO     MinIOConfig     `mapstructure:"minio"`
 	Log       LogConfig       `mapstructure:"log"`
 	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
+	Upload    UploadConfig    `mapstructure:"upload"`
 }
 
 type RateLimitConfig struct {
 	// 每用户每分钟允许的 LLM 端点请求数；<=0 表示关闭限流
 	LLMPerMinute int `mapstructure:"llm_per_minute"`
+}
+
+type UploadConfig struct {
+	// 单文件大小上限（MB）；<=0 表示不限制
+	MaxSizeMB int `mapstructure:"max_size_mb"`
+	// 文件中心允许的扩展名（小写含点，如 .pdf）；为空表示不限制
+	FileExts []string `mapstructure:"file_exts"`
+	// 知识库文档允许的扩展名；为空表示不限制
+	DocExts []string `mapstructure:"doc_exts"`
 }
 
 type ServerConfig struct {
