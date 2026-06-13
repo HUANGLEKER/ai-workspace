@@ -110,6 +110,10 @@ export interface RagSource {
   file_name: string
   content: string
   score: number
+  /** rerank 精排分数（启用 rerank 时存在） */
+  rerank_score?: number
+  /** 是否被答案实际引用（命中来源高亮） */
+  cited?: boolean
 }
 
 // 文件相关

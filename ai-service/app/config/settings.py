@@ -29,6 +29,26 @@ class Settings(BaseSettings):
     embedding_api_base: str = ""
     embedding_model: str = "text-embedding-3-small"
 
+    # Rerank（重排）——召回后用 reranker 精排，提升答案命中率。
+    # 与嵌入同提供商即可（如硅基流动 BAAI/bge-reranker-v2-m3），未配 key 时回退嵌入配置。
+    # rerank_enabled=False 时退化为纯向量检索（零额外延迟）。
+    rerank_enabled: bool = False
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    rerank_api_key: str = ""
+    rerank_api_base: str = ""
+    # 召回候选数（精排前）：向量召回 recall_k 个，rerank 后取 top_k 个
+    rerank_recall_k: int = 20
+
+    @property
+    def resolved_rerank_api_key(self) -> str:
+        """Rerank API Key：未单独配置时回退到嵌入配置。"""
+        return self.rerank_api_key or self.resolved_embedding_api_key
+
+    @property
+    def resolved_rerank_api_base(self) -> str:
+        """Rerank API Base：未单独配置时回退到嵌入配置。"""
+        return self.rerank_api_base or self.resolved_embedding_api_base
+
     @property
     def resolved_embedding_api_key(self) -> str:
         """嵌入 API Key：未单独配置时回退到对话 LLM 的 Key。"""

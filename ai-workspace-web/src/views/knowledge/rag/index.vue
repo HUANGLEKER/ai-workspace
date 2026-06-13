@@ -53,9 +53,15 @@
               </div>
               <CollapsibleRoot v-for="(src, sIdx) in turn.sources" :key="sIdx" class="mb-1 last:mb-0">
                 <CollapsibleTrigger
-                  class="flex w-full items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-3 py-2 text-left text-sm text-zinc-800 transition-all duration-200 ease-out hover:bg-zinc-50 [&[data-state=open]>svg]:rotate-180 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                  class="flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-200 ease-out [&[data-state=open]>svg]:rotate-180"
+                  :class="src.cited
+                    ? 'border-emerald-300 bg-emerald-50 text-zinc-800 hover:bg-emerald-100/70 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-zinc-100'
+                    : 'border-zinc-200/80 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700'"
                 >
+                  <span class="shrink-0 text-xs text-zinc-400">[{{ sIdx + 1 }}]</span>
                   <span class="flex-1 truncate">{{ src.file_name || '未知文档' }}</span>
+                  <AppTag v-if="src.cited" variant="success">已引用</AppTag>
+                  <AppTag v-if="src.rerank_score != null" variant="warning">精排 {{ (src.rerank_score * 100).toFixed(0) }}</AppTag>
                   <AppTag variant="info">相关度 {{ (src.score * 100).toFixed(0) }}%</AppTag>
                   <ChevronDown class="h-4 w-4 shrink-0 text-zinc-400 transition-all duration-200 ease-out" />
                 </CollapsibleTrigger>

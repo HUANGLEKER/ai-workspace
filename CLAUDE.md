@@ -93,7 +93,7 @@ uv run python main.py         # 以 uvicorn 运行于 8001 端口，开启自动
 
 FastAPI 使用 Redis DB 1；Go 后端使用 DB 0。切换嵌入模型后必须重建知识库索引（旧向量与新模型不兼容）。
 
-嵌入管道会把下载的文档写入硬编码的 `/tmp/` 路径（`ai-service/app/embedding/service.py` 的 `_load_document`），这仅适用于 POSIX。RAG/嵌入相关工作请在 WSL/Linux/Docker 下运行 AI 服务——Windows 原生 `python main.py` 会在这些路径上失败。
+嵌入管道的临时文件已使用 `tempfile.gettempdir()`（跨平台），Windows 原生运行 AI 服务可用。
 
 ### 数据库
 

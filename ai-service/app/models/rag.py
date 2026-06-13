@@ -22,4 +22,6 @@ class SourceDocument(BaseModel):
     document_id: str
     file_name: str
     content: str
-    score: float  # 相似度分数（1 - 余弦距离）
+    score: float  # 向量相似度分数（1 - 余弦距离）
+    rerank_score: Optional[float] = None  # rerank 精排分数（启用 rerank 时填充）
+    cited: bool = False  # 是否被答案实际引用（前端高亮命中来源）
