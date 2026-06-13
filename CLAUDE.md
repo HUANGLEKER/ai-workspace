@@ -99,6 +99,21 @@ FastAPI 使用 Redis DB 1；Go 后端使用 DB 0。切换嵌入模型后必须�
 
 `docker-compose.infra.yml` 将 `ai-workspace/sql/init.sql` 挂载为 MySQL 初始化脚本（仅数据卷首次初始化时执行），包含全部 19 张表的 DDL 与种子数据（admin/123456、ROLE_ADMIN、默认 chat_model）。**维护约定：任何表结构变更必须同步更新 init.sql**（可用 `docker exec ai-workspace-mysql mysqldump -uroot -p123456 --no-data ai_workspace` 重新导出）。
 
+### 容器化整栈运行（可选）
+
+三个应用服务均有 Dockerfile，经 `docker-compose.app.yml` 编排（先起基础设施）：
+
+```bash
+docker-compose -f docker-compose.infra.yml up -d
+docker-compose -f docker-compose.app.yml up -d --build   # 入口 http://localhost:3000
+```
+
+- 两个 compose 共享命名网络 `ai-workspace-net`；后端容器配置用 `ai-workspace-backend/config.docker.yaml`（主机名为 compose 服务名），AI 服务配置经环境变量注入（LLM key 从宿主环境透传）。
+- 前端容器 nginx 反代 `/api` 到 backend（`nginx.conf` 已配 SSE 透传：`proxy_buffering off`）。
+- 后端有公开 `GET /health`（容器健康检查用，无业务信息）。
+- 注意：应用容器与本机开发进程端口冲突（3000/8080/8001），二者择一运行。
+- CI（`.github/workflows/ci.yml`）：Go gofmt/vet/test/build、前端 vue-tsc/vitest/build、AI 服务 uv 冻结安装 + 导入冒烟。
+
 ### 本地基础设施（全部 Docker 化）
 
 所有基础设施（MySQL、Redis、MinIO、ChromaDB）均通过 `docker-compose.infra.yml` 统一管理：

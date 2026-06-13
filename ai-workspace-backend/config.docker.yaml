@@ -1,0 +1,42 @@
+# 容器编排用配置：主机名指向 docker-compose 服务名（同一网络 ai-workspace-net）。
+# 由 docker-compose.app.yml 挂载为 /app/config.yaml，覆盖镜像内的本机默认配置。
+server:
+  port: 8080
+  mode: release
+
+database:
+  dsn: "root:123456@tcp(mysql:3306)/ai_workspace?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 100
+  max_idle_conns: 10
+  conn_max_lifetime: 3600
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+
+jwt:
+  secret: "ai-workspace-jwt-secret-change-in-production"
+  expire: 86400
+
+fastapi:
+  base_url: "http://ai-service:8001"
+  timeout: 120
+
+minio:
+  endpoint: "minio:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  bucket: "ai-workspace"
+  use_ssl: false
+
+log:
+  level: "info"
+  filename: "logs/app.log"
+  max_size: 100
+  max_backups: 7
+  max_age: 30
+  compress: true
+
+ratelimit:
+  llm_per_minute: 20

@@ -15,6 +15,11 @@ func Setup(r *gin.Engine) {
 	r.Use(middleware.CORS())
 	r.Use(middleware.RequestLogger())
 
+	// 容器/负载均衡健康检查端点（无鉴权，不含任何业务信息）
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "UP"})
+	})
+
 	api := r.Group("/api")
 
 	// ── 公开接口（无需 JWT）──────────────────────────────────────────

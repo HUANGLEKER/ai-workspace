@@ -89,3 +89,9 @@ volumes:
   redis-data:
   minio-data:
   chroma-data:
+
+# 统一命名网络：应用层 compose（docker-compose.app.yml）以 external 方式加入，
+# 使 backend/ai-service 能以服务名（mysql/redis/minio/chroma）访问基础设施
+networks:
+  default:
+    name: ai-workspace-net

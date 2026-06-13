@@ -1,0 +1,49 @@
+# 应用服务编排：Go 后端 + FastAPI AI 服务 + 前端（nginx）
+# 前置：基础设施先起（docker-compose -f docker-compose.infra.yml up -d）
+#
+#   docker-compose -f docker-compose.app.yml up -d --build
+#
+# 访问入口：http://localhost:3000（nginx 反代 /api 到后端）
+services:
+  backend:
+    build: ./ai-workspace-backend
+    container_name: ai-workspace-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      # 容器配置：主机名指向 compose 服务名
+      - ./ai-workspace-backend/config.docker.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+
+  ai-service:
+    build: ./ai-service
+    container_name: ai-workspace-ai
+    ports:
+      - "8001:8001"
+    environment:
+      APP_DEBUG: "false"          # 容器内关闭自动重载
+      REDIS_HOST: redis
+      CHROMA_HOST: chroma
+      MINIO_ENDPOINT: minio:9000
+      # LLM/嵌入密钥从宿主环境透传（也可改用 env_file）
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+    restart: unless-stopped
+
+  web:
+    build: ./ai-workspace-web
+    container_name: ai-workspace-web
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: ai-workspace-net
+    external: true
