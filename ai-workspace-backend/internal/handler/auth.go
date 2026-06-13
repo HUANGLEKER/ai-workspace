@@ -118,6 +118,8 @@ type authInfoResp struct {
 	Avatar   string   `json:"avatar"`
 	Roles    []string `json:"roles"`
 	IsAdmin  bool     `json:"isAdmin"`
+	// 是否仍需强制改密（P3-6）：前端据此弹出强制改密引导
+	MustChangePwd bool `json:"mustChangePwd"`
 }
 
 // GetAuthInfo GET /api/auth/info — 返回当前登录用户信息与角色列表
@@ -139,12 +141,13 @@ func GetAuthInfo(c *gin.Context) {
 	}
 
 	common.OK(c, authInfoResp{
-		UserID:   user.ID,
-		Username: user.Username,
-		Nickname: user.Nickname,
-		Avatar:   user.Avatar,
-		Roles:    roles,
-		IsAdmin:  isAdmin,
+		UserID:        user.ID,
+		Username:      user.Username,
+		Nickname:      user.Nickname,
+		Avatar:        user.Avatar,
+		Roles:         roles,
+		IsAdmin:       isAdmin,
+		MustChangePwd: user.MustChangePwd == 1,
 	})
 }
 

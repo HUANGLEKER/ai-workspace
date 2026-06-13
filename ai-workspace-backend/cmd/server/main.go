@@ -19,6 +19,7 @@ import (
 	"github.com/aiworkspace/backend/internal/router"
 	"github.com/aiworkspace/backend/internal/scheduler"
 	"github.com/aiworkspace/backend/internal/service"
+	"github.com/aiworkspace/backend/pkg/crypto"
 	"github.com/aiworkspace/backend/pkg/database"
 	"github.com/aiworkspace/backend/pkg/fastapi"
 	"github.com/aiworkspace/backend/pkg/logger"
@@ -42,6 +43,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer logger.Sync()
+
+	// ── 2.5 初始化敏感字段加密（P3-6）——密钥空时回退 JWT secret ──────
+	secret := config.Global.Security.SecretKey
+	if secret == "" {
+		secret = config.Global.JWT.Secret
+	}
+	if err := crypto.Init(secret); err != nil {
+		zap.L().Fatal("初始化加密失败", zap.Error(err))
+	}
 
 	// ── 3. 初始化 MySQL ──────────────────────────────────────────────
 	if err := database.Init(config.Global.Database); err != nil {

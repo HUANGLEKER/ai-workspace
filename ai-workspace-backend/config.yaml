@@ -37,9 +37,16 @@ log:
   compress: true
 
 ratelimit:
-  llm_per_minute: 20  # 每用户每分钟 LLM 端点请求上限；<=0 关闭
+  llm_per_minute: 20
+  llm_per_minute_admin: 60  # 每用户每分钟 LLM 端点请求上限；<=0 关闭
 
 upload:
   max_size_mb: 50  # 单文件大小上限 MB；<=0 不限制
   file_exts: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".txt", ".md", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".csv", ".json"]
   doc_exts: [".pdf", ".txt", ".md", ".doc", ".docx"]  # 知识库文档（嵌入管道支持的类型）
+
+security:
+  secret_key: ""  # 敏感字段加密密钥；留空回退 jwt.secret，生产务必单独配置
+
+cors:
+  allowed_origins: []  # 留空或含 "*" 放通所有来源；多用户部署改为显式来源如 ["https://app.example.com"]

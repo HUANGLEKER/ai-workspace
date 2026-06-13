@@ -289,6 +289,7 @@ CREATE TABLE `sys_user` (
   `phone` varchar(20) DEFAULT NULL COMMENT 'æ‰‹æœºå·',
   `status` tinyint NOT NULL DEFAULT '1' COMMENT 'çŠ¶æ€ 1æ­£å¸¸ 0ç¦ç”¨',
   `remark` varchar(500) DEFAULT NULL COMMENT 'å¤‡æ³¨',
+  `must_change_pwd` tinyint NOT NULL DEFAULT '0' COMMENT '是否强制改密',
   `deleted` bigint NOT NULL DEFAULT '0',
   `create_time` datetime DEFAULT NULL COMMENT 'åˆ›å»ºæ—¶é—´',
   `update_time` datetime DEFAULT NULL COMMENT 'æ›´æ–°æ—¶é—´',
@@ -369,8 +370,8 @@ CREATE TABLE `usage_daily` (
 -- ───────────────────────── 种子数据 ─────────────────────────
 
 -- 管理员账号：admin / 123456
-INSERT INTO `sys_user` (`id`, `username`, `password`, `nickname`, `status`, `deleted`)
-VALUES (1, 'admin', '$2a$10$HcxBz3vUrhQKF3ZeU6mAduQPKbvvm5wLCcPdvuWWFLAwagBt0JBjm', '管理员', 1, 0);
+INSERT INTO `sys_user` (`id`, `username`, `password`, `nickname`, `status`, `must_change_pwd`, `deleted`)
+VALUES (1, 'admin', '$2a$10$HcxBz3vUrhQKF3ZeU6mAduQPKbvvm5wLCcPdvuWWFLAwagBt0JBjm', '管理员', 1, 1, 0);
 
 INSERT INTO `sys_role` (`id`, `role_name`, `role_code`, `remark`, `deleted`)
 VALUES (1, '超级管理员', 'ROLE_ADMIN', '系统管理员', 0);

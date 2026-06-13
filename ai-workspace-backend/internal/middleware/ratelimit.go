@@ -18,7 +18,13 @@ import (
 // Redis 不可用时 fail-open 放行：限流是成本保护，不能成为 chat 的可用性单点。
 func LLMRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 限流分级（P3-6）：管理员用更宽松的限额（未配则回退普通限额）
 		limit := config.Global.RateLimit.LLMPerMinute
+		if IsAdmin(c) {
+			if adm := config.Global.RateLimit.LLMPerMinuteAdmin; adm > 0 {
+				limit = adm
+			}
+		}
 		if limit <= 0 {
 			c.Next()
 			return

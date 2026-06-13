@@ -140,7 +140,8 @@ func (s *UserService) UpdatePassword(userID int64, oldPassword, newPassword stri
 		return err
 	}
 
-	return s.db.Model(&user).Update("password", string(hash)).Error
+	// 改密后清除强制改密标记（P3-6）
+	return s.db.Model(&user).Updates(map[string]any{"password": string(hash), "must_change_pwd": 0}).Error
 }
 
 // GetRoles 查询用户的角色码列表，用于 JWT 生成和权限校验

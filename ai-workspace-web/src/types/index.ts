@@ -34,6 +34,8 @@ export interface UserInfo {
   avatar: string
   roles: string[]
   isAdmin: boolean
+  /** 是否需强制改密（默认密码未改）；前端据此弹出强制改密引导 */
+  mustChangePwd?: boolean
 }
 
 // 对话相关

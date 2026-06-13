@@ -20,6 +20,8 @@
         </main>
       </router-view>
     </div>
+    <!-- 强制改密引导（P3-6）：默认密码未改时弹出，不可绕过 -->
+    <ForcePasswordChange />
   </div>
 </template>
 
@@ -32,6 +34,7 @@
 import { ref } from 'vue'
 import Sidebar from './components/Sidebar.vue'
 import Header from './components/Header.vue'
+import ForcePasswordChange from './components/ForcePasswordChange.vue'
 
 const sidebarCollapsed = ref(false)
 </script>

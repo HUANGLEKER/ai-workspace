@@ -59,7 +59,9 @@ gofmt -l -w .                           # 格式化所有 Go 文件
 ```
 
 配置文件：`ai-workspace-backend/config.yaml`（服务端口、DSN、Redis、JWT、FastAPI、MinIO、日志）。  
-默认凭证：MySQL `root / 123456`，管理员账号 `admin / 123456`。
+默认凭证：MySQL `root / 123456`，管理员账号 `admin / 123456`（首次登录会被强制改密，见 P3-6）。
+
+多用户收尾（P3-6）：`chat_model.api_key` 经 AES-256-GCM 加密落库（`pkg/crypto`，密钥取 `config.security.secret_key`，空则回退 `jwt.secret`；密文带 `enc:v1:` 前缀，解密对历史明文向后兼容）；CORS 由 `config.cors.allowed_origins` 控制（空/含 `*` 放通，否则白名单回显）；限流分级 `ratelimit.llm_per_minute`（普通）/ `llm_per_minute_admin`（管理员，更宽松）；`sys_user.must_change_pwd` 标记强制改密，`/auth/info` 暴露 `mustChangePwd`，前端 `ForcePasswordChange` 弹不可绕过的改密框。
 
 Go 后端结构（`internal/`）：
 - `handler/` —— Gin handler，对应各业务模块（auth/chat/kb/file/agent/workflow/job/prompt/tool/mcp/user/monitor/dashboard）

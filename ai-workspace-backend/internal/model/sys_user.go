@@ -11,6 +11,8 @@ type SysUser struct {
 	Avatar   string `gorm:"column:avatar;size:256"             json:"avatar"`
 	Status   int8   `gorm:"column:status;default:1"            json:"status"` // 1=启用 0=禁用
 	Remark   string `gorm:"column:remark;size:500"             json:"remark"`
+	// 是否仍需强制改密（P3-6）：1=需要（如默认 admin 首次登录），改密后置 0
+	MustChangePwd int8 `gorm:"column:must_change_pwd;default:0"  json:"mustChangePwd"`
 }
 
 func (SysUser) TableName() string { return "sys_user" }

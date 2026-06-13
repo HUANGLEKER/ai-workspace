@@ -12,6 +12,7 @@ import (
 
 	"github.com/aiworkspace/backend/internal/common"
 	"github.com/aiworkspace/backend/internal/model"
+	"github.com/aiworkspace/backend/pkg/crypto"
 )
 
 // ChatSvc 是聊天服务单例，由 service.Init() 在基础设施就绪后组装
@@ -263,7 +264,8 @@ func LlmConfigBody(m *model.ChatModel) map[string]string {
 	if m == nil || (m.ApiUrl == "" && m.ApiKey == "") {
 		return nil
 	}
-	return map[string]string{"api_base": m.ApiUrl, "api_key": m.ApiKey}
+	// api_key 落库加密（P3-6），透传 FastAPI 前解密（历史明文原样返回）
+	return map[string]string{"api_base": m.ApiUrl, "api_key": crypto.Decrypt(m.ApiKey)}
 }
 
 // PageModels 分页查询全部模型配置（含禁用），供管理员模型管理页使用
@@ -290,9 +292,10 @@ func (s *ChatService) UpdateModelStatus(id int64, enabled int8) error {
 	return s.db.Model(&model.ChatModel{}).Where("id = ?", id).Update("enabled", enabled).Error
 }
 
-// AddModel 新增 LLM 模型配置，仅管理员可操作
+// AddModel 新增 LLM 模型配置，仅管理员可操作；api_key 加密落库
 func (s *ChatService) AddModel(m *model.ChatModel) error {
 	m.ID = 0
+	m.ApiKey = crypto.EncryptIfNeeded(m.ApiKey)
 	return s.db.Create(m).Error
 }
 
@@ -308,9 +311,12 @@ func (s *ChatService) UpdateModel(m *model.ChatModel) error {
 		}
 		return err
 	}
-	// ApiKey 的 json tag 为 "-"，请求体不会带入；Save 全字段覆盖前必须回填，否则密钥被清空
+	// ApiKey 的 json tag 为 "-"，请求体不会带入；Save 全字段覆盖前必须回填，否则密钥被清空。
+	// 回填用已加密的存量值；新传入的明文则加密后落库（P3-6）
 	if m.ApiKey == "" {
 		m.ApiKey = existing.ApiKey
+	} else {
+		m.ApiKey = crypto.EncryptIfNeeded(m.ApiKey)
 	}
 	m.CreatedAt = existing.CreatedAt
 	return s.db.Save(m).Error

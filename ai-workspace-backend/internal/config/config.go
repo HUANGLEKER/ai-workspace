@@ -17,11 +17,25 @@ type Config struct {
 	Log       LogConfig       `mapstructure:"log"`
 	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
 	Upload    UploadConfig    `mapstructure:"upload"`
+	Security  SecurityConfig  `mapstructure:"security"`
+	CORS      CORSConfig      `mapstructure:"cors"`
+}
+
+type SecurityConfig struct {
+	// 敏感字段（chat_model.api_key 等）落库加密的密钥；生产务必改并保密
+	SecretKey string `mapstructure:"secret_key"`
+}
+
+type CORSConfig struct {
+	// 允许的跨域来源列表；含 "*" 或为空时放通所有来源（仅本地/单用户安全）
+	AllowedOrigins []string `mapstructure:"allowed_origins"`
 }
 
 type RateLimitConfig struct {
-	// 每用户每分钟允许的 LLM 端点请求数；<=0 表示关闭限流
+	// 普通用户每分钟允许的 LLM 端点请求数；<=0 表示关闭限流
 	LLMPerMinute int `mapstructure:"llm_per_minute"`
+	// 管理员每分钟限额（通常更宽松）；<=0 时回退用 LLMPerMinute
+	LLMPerMinuteAdmin int `mapstructure:"llm_per_minute_admin"`
 }
 
 type UploadConfig struct {
