@@ -1,0 +1,7 @@
+# pnpm 配置（pnpm 10+ 起此类设置从 package.json 迁至本文件）。
+# 默认 pnpm 不执行依赖的安装脚本（安全默认）；此处显式放行确需构建脚本的包：
+#   - esbuild：postinstall 拉取对应平台的原生二进制，vite 构建依赖它
+#   - vue-demi：postinstall 按 Vue 版本切换适配 shim（vue-virtual-scroller 等间接依赖）
+allowBuilds:
+  esbuild: true
+  vue-demi: true

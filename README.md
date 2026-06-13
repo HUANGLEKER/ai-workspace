@@ -238,9 +238,9 @@ uv run python main.py    # uvicorn :8001，开发自动重载
 
 ```bash
 cd ai-workspace-web
-npm install
-npm run dev              # Vite :3000，代理 /api → localhost:8080
-# 生产构建：npm run build （先 vue-tsc 再 vite build）
+pnpm install             # 包管理器为 pnpm（corepack enable 可激活 packageManager 锁定版本）
+pnpm dev                 # Vite :3000，代理 /api → localhost:8080
+# 生产构建：pnpm build （先 vue-tsc 再 vite build）
 ```
 
 打开 **http://localhost:3000**，使用 `admin / 123456` 登录（首次登录强制改密）。
@@ -405,7 +405,7 @@ flowchart TB
 
 ### 9.1 开发环境
 
-- 基础设施用 Docker，三个应用以本地进程运行（`make run` / `uv run python main.py` / `npm run dev`）。
+- 基础设施用 Docker，三个应用以本地进程运行（`make run` / `uv run python main.py` / `pnpm dev`）。
 - `server.mode=debug`、`APP_DEBUG=true`，热重载开启，CORS 放通便于联调。
 
 ### 9.2 测试环境
@@ -413,7 +413,7 @@ flowchart TB
 - 容器化整栈：先 `infra` 后 `app --build`，统一从 nginx 入口 `:3000` 访问。
 - **CI 门禁**（`.github/workflows/ci.yml`，push/PR 到 master/main 触发）：
   - **Go**：`gofmt` 检查 → `go vet` → `go test` → `go build`
-  - **前端**：`npm ci` → `vue-tsc --noEmit` → `vitest run` → `vite build`
+  - **前端**：`pnpm install --frozen-lockfile` → `vue-tsc --noEmit` → `vitest run` → `vite build`
   - **AI 服务**：`uv sync --frozen` → 导入冒烟（路由装配 + 配置加载）
 
 ### 9.3 生产环境（加固清单）

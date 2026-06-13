@@ -34,15 +34,18 @@ jobs:
         working-directory: ai-workspace-web
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: ai-workspace-web/package-lock.json
-      - run: npm ci
-      - run: npx vue-tsc --noEmit
-      - run: npx vitest run
-      - run: npx vite build
+          cache: pnpm
+          cache-dependency-path: ai-workspace-web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vue-tsc --noEmit
+      - run: pnpm exec vitest run
+      - run: pnpm exec vite build
 
   ai-service:
     name: AI 服务（依赖锁定 + 导入冒烟）

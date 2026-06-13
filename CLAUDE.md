@@ -31,11 +31,11 @@ Vue3 (3000) → Go/Gin (8080) → FastAPI (8001) → [Redis, ChromaDB, MinIO] �
 ### 前端
 
 ```bash
-# 在 ai-workspace-web/ 下
-npm install
-npm run dev      # 开发服务器运行于 3000 端口，代理到 localhost:8080
-npm run build    # 生产构建（先 vue-tsc 再 vite build）
-npx vue-tsc --noEmit   # 仅类型检查，不输出文件
+# 在 ai-workspace-web/ 下（包管理器为 pnpm，版本由 package.json 的 packageManager 锁定，可经 corepack enable 激活）
+pnpm install
+pnpm dev         # 开发服务器运行于 3000 端口，代理到 localhost:8080
+pnpm build       # 生产构建（先 vue-tsc 再 vite build）
+pnpm exec vue-tsc --noEmit   # 仅类型检查，不输出文件
 ```
 
 UI 栈已从 Element Plus 全面迁移为 **TailwindCSS 4（`@tailwindcss/vite` 插件 + `@tailwindcss/typography`）+ Radix Vue（headless 交互组件）+ lucide-vue-next（图标）**。规范：
