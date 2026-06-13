@@ -9,6 +9,7 @@ class WorkflowRunRequest(BaseModel):
     session_id: str
     inputs: dict[str, Any] = {}  # 工作流输入参数
     model: Optional[str] = None
+    definition: Optional[str] = None  # 画布序列化的图定义 JSON；空则回退默认单节点
 
 
 class WorkflowRunResponse(BaseModel):
