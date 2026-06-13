@@ -13,12 +13,14 @@ from app.llm.provider import get_chat_llm, get_embeddings
 from app.models.rag import RagChatRequest, SourceDocument
 from app.observability import LlmCallTimer
 from app.rag.rerank import rerank
+from app.utils.safety import INJECTION_GUARD, fence
 from app.vectorstore.chroma_client import get_or_create_collection
 
 # 用带编号的来源块，并要求模型在引用时标注 [来源N]，便于回填引用对齐
 _RAG_SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下带编号的参考文档回答用户的问题。
 引用某条参考文档的内容时，请在句末标注其编号，格式为 [来源N]（N 为文档编号）。
 如果参考文档中没有相关信息，请如实告知用户，不要编造答案。
+""" + INJECTION_GUARD + """
 
 参考文档：
 {context}
@@ -88,10 +90,11 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
     """检索增强问答：召回精排 → 下发来源 → 流式生成 → 回填引用对齐。"""
     sources = await _retrieve(req)
 
-    # 带编号拼接上下文，编号与 sources 顺序一一对应（从 1 开始）
+    # 带编号拼接上下文，编号与 sources 顺序一一对应（从 1 开始）；
+    # 文档正文用不可信数据分隔符包裹（注入防护），编号/文件名等可信元数据在栅栏外
     if sources:
         context = "\n\n---\n\n".join(
-            f"[来源{i + 1}] ({s.file_name})\n{s.content}" for i, s in enumerate(sources)
+            f"[来源{i + 1}] ({s.file_name})\n{fence(s.content)}" for i, s in enumerate(sources)
         )
     else:
         context = "暂无相关文档"

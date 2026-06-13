@@ -11,6 +11,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 from app.llm.provider import get_chat_llm
 from app.models.agent import AgentRunRequest, AgentRunResponse, HttpToolSpec, McpServerSpec
+from app.utils.safety import INJECTION_GUARD, fence, sanitize_tool_output
 from app.utils.sse import with_keepalive
 
 # 思考→行动循环的最大轮数，用于限制工具调用循环防止无限循环
@@ -120,8 +121,11 @@ async def _agent_events(req: AgentRunRequest):
     runnable = llm.bind_tools(tools) if tools else llm
 
     messages: list = []
+    # 注入防护：始终注入安全规则；用户自定义 system_prompt 拼在其后
+    guard = INJECTION_GUARD
     if req.system_prompt:
-        messages.append(SystemMessage(content=req.system_prompt))
+        guard = req.system_prompt + "\n\n" + guard
+    messages.append(SystemMessage(content=guard))
     messages.append(HumanMessage(content=req.input))
 
     output = ""
@@ -148,9 +152,11 @@ async def _agent_events(req: AgentRunRequest):
                     result = await tool.ainvoke(args)
                 except Exception as e:  # noqa: BLE001 — 工具执行失败不应中断 Agent 循环，将错误文本回传给模型让其自行处理
                     result = f"工具执行出错: {e}"
-            result_str = str(result)
-            yield ("step", {"type": "tool_result", "tool": name, "content": result_str[:2000]})
-            messages.append(ToolMessage(content=result_str, tool_call_id=tc.get("id", name)))
+            # 工具返回是不可信内容：清洗（截断 + 剥离伪造分隔标记）后用数据栅栏包裹回填给模型，
+            # 防止工具响应里夹带的"忽略指令/调用新工具"类注入生效
+            result_str = sanitize_tool_output(str(result))
+            yield ("step", {"type": "tool_result", "tool": name, "content": result_str})
+            messages.append(ToolMessage(content=fence(result_str), tool_call_id=tc.get("id", name)))
 
     yield ("answer", output)
 
