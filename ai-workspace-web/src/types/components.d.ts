@@ -39,8 +39,10 @@ declare module 'vue' {
     ChatMessageList: typeof import('./../components/chat/ChatMessageList.vue')['default']
     MarkdownView: typeof import('./../components/MarkdownView.vue')['default']
     MermaidView: typeof import('./../components/chat/MermaidView.vue')['default']
+    PromptPicker: typeof import('./../components/chat/PromptPicker.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ThinkingIndicator: typeof import('./../components/chat/ThinkingIndicator.vue')['default']
+    WorkflowCanvas: typeof import('./../components/workflow/WorkflowCanvas.vue')['default']
   }
 }

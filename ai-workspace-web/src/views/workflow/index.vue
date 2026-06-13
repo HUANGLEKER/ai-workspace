@@ -42,8 +42,11 @@
       <AppFormItem label="描述">
         <AppInput v-model="form.description" placeholder="一句话描述用途" />
       </AppFormItem>
-      <AppFormItem label="定义(JSON)">
-        <AppTextarea v-model="form.definition" :rows="4" placeholder="可选：节点/连线定义，留空使用默认单节点流程" />
+      <AppFormItem label="编排">
+        <div class="flex items-center gap-2">
+          <AppButton variant="secondary" :icon="Workflow" @click="canvasVisible = true">打开画布编辑</AppButton>
+          <span class="text-xs text-zinc-400">{{ definitionSummary }}</span>
+        </div>
       </AppFormItem>
       <AppFormItem label="模型">
         <AppSelect v-model="form.model" :options="modelOptions" placeholder="留空使用默认模型" />
@@ -56,6 +59,14 @@
         <AppButton variant="primary" :loading="submitting" @click="handleSubmit">
           {{ editing ? '保存修改' : '确认创建' }}
         </AppButton>
+      </template>
+    </AppDialog>
+
+    <!-- 画布编排 -->
+    <AppDialog v-model="canvasVisible" title="工作流编排画布" width="980px">
+      <WorkflowCanvas v-model="form.definition" />
+      <template #footer>
+        <AppButton variant="primary" @click="canvasVisible = false">完成</AppButton>
       </template>
     </AppDialog>
 
@@ -94,15 +105,29 @@ import {
   AppButton, AppDialog, AppFormItem, AppInput, AppTextarea, AppSelect, AppRadioGroup,
   AppTag, AppEmpty, AppLoading, toast, confirm
 } from '@/components/ui'
+import WorkflowCanvas from '@/components/workflow/WorkflowCanvas.vue'
 
 const loading = ref(false)
 const submitting = ref(false)
 const workflows = ref<WorkflowType[]>([])
 const models = ref<{ modelName?: string }[]>([])
 const dialogVisible = ref(false)
+const canvasVisible = ref(false)
 const editing = ref<WorkflowType | null>(null)
 
 const form = reactive<WorkflowType>({ name: '', description: '', definition: '', model: '', enabled: 1 })
+
+/** 定义摘要：节点数概览，给用户一个非空提示 */
+const definitionSummary = computed(() => {
+  if (!form.definition?.trim()) return '空（运行默认单节点）'
+  try {
+    const spec = JSON.parse(form.definition)
+    const n = (spec.nodes || []).length
+    return n ? `${n} 个节点` : '空（运行默认单节点）'
+  } catch {
+    return '自定义定义'
+  }
+})
 
 const modelOptions = computed(() =>
   models.value.filter((m) => m.modelName).map((m) => ({ label: m.modelName!, value: m.modelName! }))

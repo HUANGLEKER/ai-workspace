@@ -194,7 +194,7 @@ KB/RAG：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/re
 Files：`/api/file/`（基于 MinIO）。上传加固（P2-6）：服务端校验大小上限与扩展名白名单（`config.yaml` 的 `upload.*`，文件中心用 `file_exts`、知识库文档用 `doc_exts`），存储用 `http.DetectContentType` 嗅探的真实 MIME 而非客户端传入的 Content-Type；presign 过期 1h。校验逻辑在 `internal/common/upload.go`。  
 Monitor：`GET /api/dashboard/stats`（按用户计数）；`GET /api/monitor/server` + `GET /api/monitor/health`——仅管理员；服务器指标取自 `gopsutil`，健康检查探测 Redis/FastAPI/MinIO。  
 Agent：`/api/agent/`（list/get/add/update/delete + `POST /api/agent/{id}/run`）—— 用户私有（`create_by`）  
-Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）  
+Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）。`definition` 为画布序列化的图 JSON（`{nodes:[{id,type,data,position}], edges:[{source,target}]}`，节点类型 start/llm/http/end），由前端 Vue Flow 画布（`components/workflow/WorkflowCanvas.vue`）编辑、FastAPI `app/workflow/engine.py` 拓扑执行（节点输出以 id 存入变量表供下游 `{{nodeId}}` 模板引用）；为空时回退默认单节点 LLM。  
 Job：`/api/job/`（page/handlers/add/update/delete/status + `POST /api/job/run/{id}`、`GET /api/job/log/page`、`DELETE /api/job/log/clean`）——仅管理员；cron 通过 `robfig/cron/v3` 调度  
 Prompt：`/api/prompt/`（list/get/add/update/delete）—— 用户私有（`create_by`）  
 Tool：`/api/tool/`（list/get/add/update/delete）—— 用户私有（`create_by`）；`tool_type` 为 http/builtin，`config` 为 JSON 字符串  
