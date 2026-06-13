@@ -84,6 +84,7 @@ func registerAgentRoutes(rg *gin.RouterGroup) {
 	g.PUT("/update", handler.UpdateAgent)
 	g.DELETE("/delete/:id", handler.DeleteAgent)
 	g.POST("/:id/run", middleware.LLMRateLimit(), handler.RunAgent)
+	g.POST("/:id/run/stream", middleware.LLMRateLimit(), handler.RunAgentStream)
 }
 
 func registerWorkflowRoutes(rg *gin.RouterGroup) {

@@ -108,7 +108,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { Plus, Bot, Play, Pencil, Trash2 } from 'lucide-vue-next'
 import {
-  listAgents, addAgent, updateAgent, deleteAgent, runAgent, type Agent
+  listAgents, addAgent, updateAgent, deleteAgent, runAgentStream, type Agent
 } from '@/api/agent'
 import { listModels } from '@/api/chat'
 import { listTools, type Tool } from '@/api/tool'
@@ -214,11 +214,13 @@ async function doRun() {
   running.value = true
   runOutput.value = ''
   runSteps.value = []
-  try {
-    const res = await runAgent(runTarget.value.id, runInput.value)
-    runOutput.value = res.output || '(无输出)'
-    runSteps.value = res.steps || []
-  } catch { } finally { running.value = false }
+  // 流式运行：think→act 轨迹逐步追加展示，不再一次性等待
+  await runAgentStream(runTarget.value.id, runInput.value, {
+    onStep: (step) => { runSteps.value = [...runSteps.value, step as unknown as Record<string, unknown>] },
+    onAnswer: (output) => { runOutput.value = output || '(无输出)' },
+    onDone: () => { running.value = false },
+    onError: (err) => { toast.error('运行失败：' + err); running.value = false }
+  })
 }
 
 function stepLabel(t: unknown): string {
