@@ -45,16 +45,24 @@ func Init(cfg config.FastAPIConfig) {
 		IdleConnTimeout:     90 * time.Second,
 	}
 	timeout := time.Duration(cfg.Timeout) * time.Second
+	// SSE 流用独立 transport：只限制「首字节响应头」时间，不对整条流设绝对超时。
+	// http.Client.Timeout 是绝对值，会在中途打断长流（如 agent 多轮工具调用）；
+	// 流式场景改由请求 ctx 取消（浏览器断连即取消），配合 FastAPI 侧 keepalive 帧防代理空闲超时。
+	streamTransport := &http.Transport{
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   20,
+		IdleConnTimeout:       90 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second, // 上游迟迟不返回响应头则放弃
+	}
 	Client = &fastapiClient{
 		baseURL: cfg.BaseURL,
 		httpClient: &http.Client{
 			Transport: transport,
 			Timeout:   timeout,
 		},
-		// SSE 流超时设为 3 分钟，给 LLM 足够的生成窗口
+		// 无绝对超时：长流靠 ctx 取消 + keepalive 帧维持
 		streamClient: &http.Client{
-			Transport: transport,
-			Timeout:   180 * time.Second,
+			Transport: streamTransport,
 		},
 	}
 }

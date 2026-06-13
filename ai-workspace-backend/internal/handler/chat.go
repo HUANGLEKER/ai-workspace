@@ -187,10 +187,8 @@ func ChatSend(c *gin.Context) {
 		body["llm_config"] = cfg
 	}
 
-	// 设置 SSE 响应头
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("X-Accel-Buffering", "no")
+	// 设置 SSE 响应头并清除写超时（长流不被 server WriteTimeout 截断）
+	prepareSSE(c)
 	c.Header("Connection", "keep-alive")
 
 	w := c.Writer

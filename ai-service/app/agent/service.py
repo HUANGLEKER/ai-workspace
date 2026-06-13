@@ -3,6 +3,7 @@
 将工具中心的 HTTP 工具规格构建为可调用的 LangChain 工具，并（可选）从 SSE MCP
 服务器加载工具，然后运行有界的「思考→行动」循环，返回最终答案与执行轨迹 steps。
 """
+import json
 import httpx
 from typing import Any, Optional
 from pydantic import create_model
@@ -10,6 +11,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 from app.llm.provider import get_chat_llm
 from app.models.agent import AgentRunRequest, AgentRunResponse, HttpToolSpec, McpServerSpec
+from app.utils.sse import with_keepalive
 
 # 思考→行动循环的最大轮数，用于限制工具调用循环防止无限循环
 MAX_ITERATIONS = 6
@@ -169,19 +171,20 @@ async def run_agent_stream(req: AgentRunRequest):
     """运行 Agent（流式）：将每条事件包装为 SSE 帧实时下发，[DONE] 收尾。
 
     帧格式：{"type":"step","session_id","step":{...}} / {"type":"answer","session_id","output":"..."}
+    工具调用/LLM 思考可能数十秒无帧，故用 with_keepalive 在空闲时插入注释帧防代理断连。
     """
-    import json
+    async def _frames():
+        try:
+            async for kind, payload in _agent_events(req):
+                if kind == "step":
+                    frame = {"type": "step", "session_id": req.session_id, "step": payload}
+                else:
+                    frame = {"type": "answer", "session_id": req.session_id, "output": payload}
+                yield f"data: {json.dumps(frame, ensure_ascii=False)}\n\n"
+        except Exception as e:  # noqa: BLE001 — 把运行期异常作为 error 帧下发，前端可提示
+            err = json.dumps({"type": "error", "session_id": req.session_id, "error": str(e)[:500]}, ensure_ascii=False)
+            yield f"data: {err}\n\n"
+        yield "data: [DONE]\n\n"
 
-    try:
-        async for kind, payload in _agent_events(req):
-            if kind == "step":
-                frame = {"type": "step", "session_id": req.session_id, "step": payload}
-            else:
-                frame = {"type": "answer", "session_id": req.session_id, "output": payload}
-            yield f"data: {json.dumps(frame, ensure_ascii=False)}\n\n"
-    except Exception as e:  # noqa: BLE001 — 把运行期异常作为 error 帧下发，前端可提示
-        import json as _json
-        err = _json.dumps({"type": "error", "session_id": req.session_id, "error": str(e)[:500]}, ensure_ascii=False)
-        yield f"data: {err}\n\n"
-
-    yield "data: [DONE]\n\n"
+    async for chunk in with_keepalive(_frames()):
+        yield chunk

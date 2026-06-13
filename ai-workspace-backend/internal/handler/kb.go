@@ -182,9 +182,7 @@ func RAGChat(c *gin.Context) {
 		}
 	}
 
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("X-Accel-Buffering", "no")
+	prepareSSE(c)
 
 	w := c.Writer
 	flusher, canFlush := w.(http.Flusher)
