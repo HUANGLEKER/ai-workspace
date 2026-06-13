@@ -62,8 +62,18 @@ async def _recall(req: RagChatRequest) -> list[SourceDocument]:
 
 
 async def _retrieve(req: RagChatRequest) -> list[SourceDocument]:
-    """召回 + rerank 精排，返回最终 top_k 条来源（保留 rerank 分数）。"""
-    candidates = await _recall(req)
+    """召回 + rerank 精排，支持网络搜索多路召回，返回最终 top_k 条来源（保留 rerank 分数）。"""
+    import asyncio
+    from app.utils.web_search import search_web_results
+    
+    if getattr(req, "enable_web_search", False):
+        local_task = _recall(req)
+        web_task = search_web_results(req.question, top_k=req.top_k)
+        local_docs, web_docs = await asyncio.gather(local_task, web_task)
+        candidates = local_docs + web_docs
+    else:
+        candidates = await _recall(req)
+        
     if not candidates or not settings.rerank_enabled:
         return candidates[:req.top_k]
 

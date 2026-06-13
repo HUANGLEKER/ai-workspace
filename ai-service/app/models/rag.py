@@ -15,6 +15,8 @@ class RagChatRequest(BaseModel):
     temperature: float = 0.3  # 问答温度偏低以提升答案稳定性
     model: Optional[str] = None
     llm_config: Optional[LlmConfig] = None  # 按请求覆盖提供方（多模型路由）
+    enable_web_search: bool = False
+
 
 
 class SourceDocument(BaseModel):
@@ -25,3 +27,4 @@ class SourceDocument(BaseModel):
     score: float  # 向量相似度分数（1 - 余弦距离）
     rerank_score: Optional[float] = None  # rerank 精排分数（启用 rerank 时填充）
     cited: bool = False  # 是否被答案实际引用（前端高亮命中来源）
+    source_type: str = "local"
