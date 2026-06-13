@@ -139,7 +139,7 @@ docker-compose -f docker-compose.infra.yml up -d
 **FastAPI（`ai-service/app`）：**
 
 - `chat/` —— LLM 调用、SSE 流式（`POST /chat`）
-- `rag/` —— 向量检索 + 答案生成（`POST /rag/chat`）。检索部分由 `rag/graph.py` 的 **LangGraph StateGraph** 编排：`recall`（本地向量召回）与 `web`（联网搜索，按 `enable_web_search` 短路）并行 fan-out → `merge`（多路融合 + rerank 精排）产出 `sources`；生成仍在图外做 token 流式，以保住「先发 sources 帧再逐 token」的 SSE 契约。`rag/service.py` 只负责图外的上下文拼接 / 流式生成 / 引用对齐。多轮：请求体含 `history`（Go 侧组装的有界上下文），仅注入生成阶段（检索仍只用当前 `question`）；流尾补一帧 `{type:'usage'}`（与 chat 对齐，供前端用量条 + Go 落库）。
+- `rag/` —— 向量检索 + 答案生成（`POST /rag/chat`）。检索部分由 `rag/graph.py` 的 **LangGraph StateGraph** 编排：`recall`（本地向量召回）与 `web`（联网搜索，按 `enable_web_search` 短路）并行 fan-out → `merge`（多路融合 + rerank 精排）产出 `sources`；生成仍在图外做 token 流式，以保住「先发 sources 帧再逐 token」的 SSE 契约。`rag/service.py` 只负责图外的上下文拼接 / 流式生成 / 引用对齐。多轮：请求体含 `history`（Go 侧组装的有界上下文），仅注入生成阶段（检索仍只用当前 `question`）；流尾补一帧 `{type:'usage'}`（与 chat 对齐，供前端用量条 + Go 落库）。提示词中心：请求体可选 `system_prompt`（会话级提示词），注入顺序为「`system_prompt`（角色/风格）→ RAG 引用规则+上下文 → history → 当前问题」——引用规则离问题最近、优先级不被覆盖，回答既符合提示词设定又遵守来源标注。
 - `embedding/` —— 文档切片、嵌入、写入 ChromaDB（`POST /embedding/build`、`DELETE /embedding/delete`）
 - `agent/` —— 工具调用 agent（`POST /agent/run`）：绑定由 `HttpToolSpec` 构建的 HTTP 工具（经 `httpx` 执行），外加通过 `langchain-mcp-adapters`（`MultiServerMCPClient`）从 SSE MCP 服务器加载的工具，然后运行有界的 think→act 循环，返回答案与 `steps` 轨迹。MCP 导入做了保护，缺少该可选库时服务仍可运行。
 - `workflow/` —— 基于 LangGraph 的引擎（`POST /workflow/run`）
@@ -198,13 +198,13 @@ JWT Claims 包含 `userID`、`username`、`roles`（`[]string`，角色码已带
 Auth：`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/info`（返回 roles）  
 用户管理：`/api/user/`（page/add/update/delete/status）——仅管理员。密码经 bcrypt；更新时用户名不可变；列表响应中剥离哈希。  
 Chat：`POST /api/chat/send`（SSE），会话 CRUD 位于 `/api/chat/session/`  
-KB/RAG：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/rebuild`。知识库问答已对齐 chat 能力：问答会话独立持久化在 `rag_session`/`rag_message` 表（归属列 `user_id`，每会话绑定一个 `kb_id`），路由 `/api/rag/session/`（list?kbId=/add/`:id` 改名/`:id` 删/`:id/messages` 历史/`:id/messages` DELETE 清空），handler 在 `internal/handler/rag.go`、service 为 `service.RagSvc`（`internal/service/rag.go`）。`RAGChat` 现以 `sessionId` 为键，持久化用户问题 + 断连保存 assistant 回复（含 `sources` JSON）、首条问题自动起名（推 `{type:'title'}` 帧）。前端 RAG 问答页（`views/knowledge/rag`，数据状态在 `stores/rag.ts`）复用 chat 的 `ChatMessageList`/Artifact/Thinking/用量条，`api/kb.ts:ragChatStream`（按 `sessionId`）以 `extract` 取 token、`onMeta` 旁路分拣 `{type:'sources'|'usage'|'title'|'status'}`；来源卡片抽到共享组件 `components/chat/RagSources.vue`，assistant 消息的 `sources` 持久化为 JSON、加载时反序列化还原。  
+KB/RAG：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/rebuild`。知识库问答已对齐 chat 能力：问答会话独立持久化在 `rag_session`/`rag_message` 表（归属列 `user_id`，每会话绑定一个 `kb_id`），路由 `/api/rag/session/`（list?kbId=/add/`:id` 改名/`:id/prompt` 设置会话系统提示词/`:id` 删/`:id/messages` 历史/`:id/messages` DELETE 清空），handler 在 `internal/handler/rag.go`、service 为 `service.RagSvc`（`internal/service/rag.go`）。`RAGChat` 现以 `sessionId` 为键，持久化用户问题 + 断连保存 assistant 回复（含 `sources` JSON）、首条问题自动起名（推 `{type:'title'}` 帧）、把会话 `system_prompt` 透传给 FastAPI。前端 RAG 问答页（`views/knowledge/rag`，数据状态在 `stores/rag.ts`）复用 chat 的 `ChatMessageList`/Artifact/Thinking/用量条/`PromptPicker`，`api/kb.ts:ragChatStream`（按 `sessionId`）以 `extract` 取 token、`onMeta` 旁路分拣 `{type:'sources'|'usage'|'title'|'status'}`；来源卡片抽到共享组件 `components/chat/RagSources.vue`，assistant 消息的 `sources` 持久化为 JSON、加载时反序列化还原。  
 Files：`/api/file/`（基于 MinIO）。上传加固（P2-6）：服务端校验大小上限与扩展名白名单（`config.yaml` 的 `upload.*`，文件中心用 `file_exts`、知识库文档用 `doc_exts`），存储用 `http.DetectContentType` 嗅探的真实 MIME 而非客户端传入的 Content-Type；presign 过期 1h。校验逻辑在 `internal/common/upload.go`。  
 Monitor：`GET /api/dashboard/stats`（按用户计数）；`GET /api/monitor/server` + `GET /api/monitor/health`——仅管理员；服务器指标取自 `gopsutil`，健康检查探测 Redis/FastAPI/MinIO。  
 Agent：`/api/agent/`（list/get/add/update/delete + `POST /api/agent/{id}/run`）—— 用户私有（`create_by`）  
 Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）。`definition` 为画布序列化的图 JSON（`{nodes:[{id,type,data,position}], edges:[{source,target}]}`，节点类型 start/llm/http/search/end，其中 `search` 为联网搜索节点 `{query,topK}`），由前端 Vue Flow 画布（`components/workflow/WorkflowCanvas.vue`）编辑、FastAPI `app/workflow/engine.py` 拓扑执行（节点输出以 id 存入变量表供下游 `{{nodeId}}` 模板引用）；为空时回退默认单节点 LLM。  
 Job：`/api/job/`（page/handlers/add/update/delete/status + `POST /api/job/run/{id}`、`GET /api/job/log/page`、`DELETE /api/job/log/clean`）——仅管理员；cron 通过 `robfig/cron/v3` 调度  
-Prompt：`/api/prompt/`（list/get/add/update/delete）—— 用户私有（`create_by`）  
+Prompt：`/api/prompt/`（list/get/add/update/delete）—— 用户私有（`create_by`）。提示词中心与 chat / 知识库问答打通：两个模块的输入框以 `/` 唤起共享组件 `components/chat/PromptPicker.vue`，可「插入到输入框」或「设为会话系统提示词」（含 `{{变量}}` 填空，`utils/promptVars`）；后者分别写入 `chat_session.system_prompt` / `rag_session.system_prompt`（路由 `PUT /api/chat/session/:id/prompt`、`PUT /api/rag/session/:id/prompt`），由对应 SSE 端点拼为 system 消息注入，约束回答风格/角色。  
 Tool：`/api/tool/`（list/get/add/update/delete）—— 用户私有（`create_by`）；`tool_type` 为 http/builtin，`config` 为 JSON 字符串  
 MCP：`/api/mcp/`（list/get/add/update/delete + `POST /api/mcp/test/{id}`）—— 用户私有（`create_by`）  
 FastAPI 内部接口（由 Go 后端调用，不对客户端暴露）：`POST /chat`、`POST /rag/chat`、`POST /embedding/build`、`POST /agent/run`、`POST /workflow/run`。所有调用经由 `pkg/fastapi/` 统一客户端，base URL 与超时来自 `config.yaml` 的 `fastapi.*`。  
@@ -216,7 +216,7 @@ FastAPI 健康检查：`GET http://localhost:8001/health`
 - `sys_user`、`sys_role`、`sys_user_role` —— RBAC 系统（`role_code` 带 `ROLE_` 前缀）
 - `chat_session`、`chat_message`、`chat_model` —— chat 模块。`chat_session.summary` + `summary_upto_id` 为会话滚动摘要（P3-2 Memory 层）：消息数超 `summarizeThreshold`(40) 时，Go 侧异步调 FastAPI `/chat/summarize` 把「最近 20 条之前、未摘要」的旧消息压缩进 `summary` 并推进 `summary_upto_id`；上下文组装为「system prompt + summary（作 system 消息）+ id>summary_upto_id 的最近消息」。`chat_model` 由 Go 后端完全管理；FastAPI **不**读 MySQL。多模型路由：Go 按会话/请求的模型名查 `chat_model`，将 `api_url`/`api_key` 以 `llm_config {api_base, api_key}` 字段随 `/chat`、`/rag/chat` 请求透传，FastAPI 据此按请求构建（LRU 缓存）LLM 客户端；未配置时回退 `.env` 的 `LLM_*`。`llm_config` 仅在服务间内网流转，不对客户端暴露。
 - `kb_knowledge_base`、`kb_document`、`kb_chunk_task` —— 知识库 + RAG 管道（`kb_chunk_task.task_status`：PENDING/RUNNING/SUCCESS/FAILED；`kb_document.status`：PENDING/PROCESSING/DONE/FAILED）
-- `rag_session`、`rag_message` —— 知识库问答会话/消息（与 chat 同构但独立成表）。`rag_session` 归属列 `user_id`、绑定 `kb_id`；`rag_message.sources` 存 assistant 回复的引用来源 JSON。多轮上下文取最近 N 条历史（不做滚动摘要）。
+- `rag_session`、`rag_message` —— 知识库问答会话/消息（与 chat 同构但独立成表）。`rag_session` 归属列 `user_id`、绑定 `kb_id`、`system_prompt` 存会话级提示词（来自提示词中心）；`rag_message.sources` 存 assistant 回复的引用来源 JSON。多轮上下文取最近 N 条历史（不做滚动摘要）。
 - `file_info` —— 文件中心（归属列 `upload_by`）
 - `agent` —— Agent 定义，`tools` 是 JSON 数组字符串
 - `workflow` —— 工作流定义，`definition` 是 JSON 字符串

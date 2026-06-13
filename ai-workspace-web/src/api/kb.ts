@@ -42,6 +42,9 @@ export const createRagSession = (data: { kbId: number; title?: string; modelName
 export const renameRagSession = (id: number, title: string) =>
   request.put<unknown, void>(`/rag/session/${id}`, { title })
 
+export const updateRagSessionPrompt = (id: number, systemPrompt: string) =>
+  request.put<unknown, void>(`/rag/session/${id}/prompt`, { systemPrompt })
+
 export const deleteRagSession = (id: number) =>
   request.delete<unknown, void>(`/rag/session/${id}`)
 

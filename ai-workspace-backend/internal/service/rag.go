@@ -65,6 +65,14 @@ func (s *RagService) RenameSession(id, userID int64, title string) error {
 	return s.db.Model(&model.RagSession{}).Where("id = ?", id).Update("title", title).Error
 }
 
+// SetSystemPrompt 设置/清除会话级系统提示词（空串=清除），先校验归属（防 IDOR）
+func (s *RagService) SetSystemPrompt(id, userID int64, prompt string) error {
+	if err := s.getOwned(id, userID); err != nil {
+		return err
+	}
+	return s.db.Model(&model.RagSession{}).Where("id = ?", id).Update("system_prompt", prompt).Error
+}
+
 // DeleteSession 删除会话前先校验归属，同时级联软删除该会话下所有消息
 func (s *RagService) DeleteSession(id, userID int64) error {
 	if err := s.getOwned(id, userID); err != nil {

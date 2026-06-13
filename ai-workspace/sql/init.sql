@@ -119,6 +119,7 @@ CREATE TABLE `rag_session` (
   `kb_id` bigint NOT NULL COMMENT '绑定的知识库ID',
   `title` varchar(255) NOT NULL DEFAULT '新问答' COMMENT '会话标题',
   `model_name` varchar(100) DEFAULT NULL COMMENT '使用的模型',
+  `system_prompt` text COMMENT '会话级系统提示词（来自提示词中心）',
   `deleted` bigint NOT NULL DEFAULT '0',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',

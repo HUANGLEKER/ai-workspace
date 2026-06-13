@@ -19,6 +19,9 @@ class RagChatRequest(BaseModel):
     # 多轮上下文：本轮之前的历史消息（Go 侧组装的有界窗口）。检索仍只用当前 question，
     # 历史仅注入到生成阶段，让模型能理解追问的指代。
     history: list[Message] = []
+    # 会话级系统提示词（来自提示词中心）。非空时作为一条额外 system 消息注入，
+    # 与 RAG 引用规则并存——既遵守来源标注，又符合提示词设定的风格/角色。
+    system_prompt: Optional[str] = None
 
 
 

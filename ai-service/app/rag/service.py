@@ -61,7 +61,12 @@ async def stream_rag_chat(req: RagChatRequest) -> AsyncIterator[str]:
         if m.content
     ]
     human_msg = HumanMessage(content=req.question)
-    llm_messages: list[BaseMessage] = [system_msg, *history_msgs, human_msg]
+    # 提示词中心的会话系统提示词置于最前（设定角色/风格），RAG 引用规则+上下文紧随其后，
+    # 保证「来源标注」等硬性规则离问题最近、优先级不被覆盖。
+    llm_messages: list[BaseMessage] = []
+    if req.system_prompt and req.system_prompt.strip():
+        llm_messages.append(SystemMessage(content=req.system_prompt.strip()))
+    llm_messages += [system_msg, *history_msgs, human_msg]
 
     cfg = req.llm_config
     llm = get_chat_llm(

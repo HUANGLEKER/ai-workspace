@@ -89,6 +89,8 @@ export interface RagSession {
   kbId: number
   title: string
   modelName: string
+  /** 会话级系统提示词（来自提示词中心），空表示未绑定 */
+  systemPrompt?: string
   createTime: string
   updateTime: string
 }

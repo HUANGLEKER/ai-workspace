@@ -322,12 +322,12 @@ make swag        # = swag init -g cmd/server/main.go -o docs（生成 docs/ 下 
 | **Auth** | `POST /api/auth/login` · `/logout` · `GET /api/auth/info` | 返回 roles / mustChangePwd |
 | **用户管理** | `/api/user/`（page/add/update/delete/status）| 仅管理员，bcrypt 密码 |
 | **Chat** | `POST /api/chat/send`（SSE）· `/api/chat/session/`（CRUD）| 滚动摘要降 token |
-| **KB/RAG** | `/api/kb/` · `/api/document/` · `POST /api/rag/chat`（SSE）· `/api/rag/rebuild` · `/api/rag/session/`（CRUD + 历史/清空）| 问答会话持久化（`rag_session`/`rag_message`）· 多轮上下文 · 答案带来源引用帧并落库 |
+| **KB/RAG** | `/api/kb/` · `/api/document/` · `POST /api/rag/chat`（SSE）· `/api/rag/rebuild` · `/api/rag/session/`（CRUD + 历史/清空 + `:id/prompt` 会话提示词）| 问答会话持久化（`rag_session`/`rag_message`）· 多轮上下文 · 提示词中心打通 · 答案带来源引用帧并落库 |
 | **Files** | `/api/file/`（MinIO，presign 1h）| 大小/扩展名/真实 MIME 校验 |
 | **Agent** | `/api/agent/` + `POST /api/agent/{id}/run` | 用户私有 · HTTP/MCP 工具循环 |
 | **Workflow** | `/api/workflow/` + `POST /api/workflow/{id}/run` | LangGraph 画布定义 |
 | **Job** | `/api/job/`（+ run/log/clean）| 仅管理员，cron 调度 |
-| **Prompt / Tool / MCP** | `/api/prompt/` · `/api/tool/` · `/api/mcp/`（+ `test/{id}`）| 用户私有 |
+| **Prompt / Tool / MCP** | `/api/prompt/` · `/api/tool/` · `/api/mcp/`（+ `test/{id}`）| 用户私有；prompt 经 `/` PromptPicker 打通 chat / 知识库问答 |
 | **Monitor/Dashboard** | `GET /api/dashboard/stats` · `/api/monitor/server` · `/health` | server/health 仅管理员 |
 
 ### FastAPI 内部接口（仅后端调用，不对外暴露）
@@ -371,11 +371,11 @@ erDiagram
 | **RBAC** | `sys_user` · `sys_role` · `sys_user_role` · `sys_menu` · `sys_role_menu` | 用户/角色/菜单权限；`role_code` 带 `ROLE_` 前缀；`must_change_pwd` 强制改密；`api_key` 加密存储 |
 | **Chat** | `chat_session` · `chat_message` · `chat_model` | 会话/消息（`user_id`）；`summary`+`summary_upto_id` 滚动摘要；`chat_model` 多模型路由（Go 管理）|
 | **知识库** | `kb_knowledge_base` · `kb_document` · `kb_chunk_task` | RAG 管道（`create_by`）；`status` PENDING→PROCESSING→DONE/FAILED；`task_status` PENDING/RUNNING/SUCCESS/FAILED；嵌入分批防 OOM + `embeddingReconcileJob` 对账自愈卡死文档 |
-| **知识库问答** | `rag_session` · `rag_message` | 问答会话/消息（`user_id`，每会话绑定 `kb_id`）；与 chat 同构、独立成表；`rag_message.sources` 存来源引用 JSON；多轮取最近 N 条历史 |
+| **知识库问答** | `rag_session` · `rag_message` | 问答会话/消息（`user_id`，每会话绑定 `kb_id`）；与 chat 同构、独立成表；`rag_session.system_prompt` 会话级提示词（来自提示词中心）；`rag_message.sources` 存来源引用 JSON；多轮取最近 N 条历史 |
 | **文件** | `file_info` | 文件中心，归属列 `upload_by` |
 | **Agent/Workflow** | `agent` · `workflow` | `tools`/`definition` 为 JSON 字符串（`create_by`）|
 | **自动化** | `sys_job` · `sys_job_log` | cron 任务（`status` 0=运行/1=暂停）；日志**物理删除**、仅 `create_time`、无 `deleted` 列 |
-| **能力扩展** | `prompt` · `tool` · `mcp_server` | 提示词/工具/MCP 注册表（`create_by`）；`mcp_server.transport` sse/stdio |
+| **能力扩展** | `prompt` · `tool` · `mcp_server` | 提示词/工具/MCP 注册表（`create_by`）；`prompt` 经 `/` 唤起的 PromptPicker 打通 chat 与知识库问答（插入输入框 / 设为会话系统提示词，支持 `{{变量}}` 填空）；`mcp_server.transport` sse/stdio |
 | **统计** | `usage_daily` | 按用户按日用量聚合 |
 
 ### 资源归属（强约束）

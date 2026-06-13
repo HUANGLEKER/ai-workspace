@@ -70,6 +70,7 @@ func registerKBRoutes(rg *gin.RouterGroup) {
 	rag.GET("/session/list", handler.ListRagSessions)
 	rag.POST("/session/add", handler.AddRagSession)
 	rag.PUT("/session/:id", handler.RenameRagSession)
+	rag.PUT("/session/:id/prompt", handler.UpdateRagSessionPrompt)
 	rag.DELETE("/session/:id", handler.DeleteRagSession)
 	rag.GET("/session/:id/messages", handler.ListRagMessages)
 	rag.DELETE("/session/:id/messages", handler.ClearRagMessages)

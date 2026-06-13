@@ -101,6 +101,14 @@
             <span class="flex shrink-0 items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
               <BookOpen class="h-3 w-3" />{{ selectedKbName }}
             </span>
+            <button
+              v-if="currentSession.systemPrompt"
+              class="flex shrink-0 items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-200 hover:text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+              :title="'系统提示词：' + currentSession.systemPrompt + '（点击移除）'"
+              @click="clearSystemPrompt"
+            >
+              <Sparkles class="h-3 w-3" />提示词<X class="h-3 w-3" />
+            </button>
           </div>
           <div class="flex items-center gap-1">
             <AppButton v-if="artifact.artifacts.value.length && !artifact.open.value" variant="ghost" size="sm" :icon="LayoutPanelLeft" @click="artifact.show(artifact.artifacts.value)">Artifact</AppButton>
@@ -152,6 +160,7 @@
 
             <!-- 输入区域 -->
             <div class="relative shrink-0 border-t border-zinc-200/80 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+              <PromptPicker ref="pickerRef" :open="pickerOpen" :query="pickerQuery" @use="handlePromptUse" />
               <div class="mb-2 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <AppSelect v-model="selectedModel" :options="modelOptions" placeholder="默认模型" class="!w-44 max-w-44" />
@@ -169,7 +178,7 @@
                     联网
                   </button>
                 </div>
-                <span class="text-xs text-zinc-400 dark:text-zinc-500">Enter 提问 · Shift + Enter 换行</span>
+                <span class="text-xs text-zinc-400 dark:text-zinc-500">Enter 提问 · Shift + Enter 换行 · / 提示词</span>
               </div>
               <div class="flex items-end gap-2.5">
                 <AppTextarea v-model="inputText" :rows="1" auto-grow placeholder="输入你的问题，回答将引用文档内容..." @keydown="onInputKeydown" />
@@ -228,13 +237,14 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'radix-vue'
-import { Plus, Trash2, Pencil, Send, CircleStop, FileSearch, BookOpen, PanelLeft, ArrowDown, LayoutPanelLeft, Globe } from 'lucide-vue-next'
+import { Plus, Trash2, Pencil, Send, CircleStop, FileSearch, BookOpen, PanelLeft, ArrowDown, LayoutPanelLeft, Globe, Sparkles, X } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import type { RagSession, ChatMessage, RagSource, TokenUsage } from '@/types'
-import { ragChatStream, clearRagMessages } from '@/api/kb'
+import { ragChatStream, clearRagMessages, updateRagSessionPrompt } from '@/api/kb'
 import { useRagStore } from '@/stores/rag'
 import { AppButton, AppEmpty, AppLoading, AppSelect, AppTextarea, AppTooltip, toast, confirm } from '@/components/ui'
 import ChatMessageList from '@/components/chat/ChatMessageList.vue'
+import PromptPicker from '@/components/chat/PromptPicker.vue'
 import ArtifactPanel from '@/components/chat/ArtifactPanel.vue'
 import { useStreamingMarkdown } from '@/composables/useStreamingMarkdown'
 import { useThinkingPhases } from '@/composables/useThinkingPhases'
@@ -403,7 +413,56 @@ onBeforeUnmount(() => {
   if (fadeTimer) clearTimeout(fadeTimer)
 })
 
+// ── 提示词选择器：输入框以 / 开头唤起（复用 chat 的 PromptPicker）──
+const pickerRef = ref<InstanceType<typeof PromptPicker> | null>(null)
+const pickerOpen = computed(() => !!currentSession.value && !streaming.value && inputText.value.startsWith('/'))
+const pickerQuery = computed(() => (pickerOpen.value ? inputText.value.slice(1) : ''))
+
+async function handlePromptUse(text: string, asSystem: boolean) {
+  if (!asSystem) {
+    inputText.value = text
+    return
+  }
+  if (!currentSession.value) return
+  try {
+    await updateRagSessionPrompt(currentSession.value.id, text)
+    currentSession.value.systemPrompt = text
+    inputText.value = ''
+    toast.success('已设为本会话系统提示词')
+  } catch {
+    toast.error('设置失败')
+  }
+}
+
+async function clearSystemPrompt() {
+  if (!currentSession.value) return
+  try {
+    await updateRagSessionPrompt(currentSession.value.id, '')
+    currentSession.value.systemPrompt = ''
+    toast.success('已移除系统提示词')
+  } catch {
+    toast.error('移除失败')
+  }
+}
+
 function onInputKeydown(e: KeyboardEvent) {
+  if (pickerOpen.value) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      pickerRef.value?.moveActive(e.key === 'ArrowDown' ? 1 : -1)
+      return
+    }
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault()
+      pickerRef.value?.chooseActive()
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      inputText.value = ''
+      return
+    }
+  }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault()
     handleSend()

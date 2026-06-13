@@ -12,6 +12,9 @@ type RagSession struct {
 	Title string `gorm:"column:title;size:200" json:"title"`
 	// 会话绑定的模型名称，新建时由前端选定，问答时随请求透传给 FastAPI
 	ModelName string `gorm:"column:model_name;size:100" json:"modelName"`
+	// 会话级系统提示词（来自提示词中心），非空时随 /rag/chat 透传，
+	// 在 FastAPI 侧与 RAG 引用规则一并作为 system 消息注入，约束回答风格/角色
+	SystemPrompt string `gorm:"column:system_prompt;type:text" json:"systemPrompt"`
 }
 
 func (RagSession) TableName() string { return "rag_session" }

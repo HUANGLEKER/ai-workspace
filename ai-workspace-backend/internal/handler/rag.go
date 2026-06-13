@@ -76,6 +76,27 @@ func RenameRagSession(c *gin.Context) {
 	common.OKMsg(c, "重命名成功")
 }
 
+// UpdateRagSessionPrompt PUT /api/rag/session/:id/prompt — 设置/清除会话级系统提示词
+// 来自提示词中心的「设为系统提示词」动作；空 systemPrompt 表示清除
+func UpdateRagSessionPrompt(c *gin.Context) {
+	id, err := parseID(c)
+	if err != nil {
+		return
+	}
+	var req struct {
+		SystemPrompt string `json:"systemPrompt"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.BadRequest(c, err.Error())
+		return
+	}
+	if err := service.RagSvc.SetSystemPrompt(id, middleware.CurrentUserID(c), req.SystemPrompt); err != nil {
+		handleBizError(c, err)
+		return
+	}
+	common.OKMsg(c, "已更新系统提示词")
+}
+
 // DeleteRagSession DELETE /api/rag/session/:id — 删除问答会话（级联删除消息）
 func DeleteRagSession(c *gin.Context) {
 	id, err := parseID(c)
@@ -195,6 +216,11 @@ func RAGChat(c *gin.Context) {
 		"stream":            true,
 		"enable_web_search": req.WebSearch,
 		"history":           historyMsgs,
+	}
+	// 会话绑定了系统提示词（来自提示词中心）：透传给 FastAPI，与 RAG 引用规则
+	// 一并注入为 system 消息，让回答符合提示词设定的风格/角色
+	if sess.SystemPrompt != "" {
+		body["system_prompt"] = sess.SystemPrompt
 	}
 	if req.Model != "" {
 		body["model"] = req.Model
