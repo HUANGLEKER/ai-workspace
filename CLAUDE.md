@@ -173,6 +173,8 @@ Chat 流式（`POST /api/chat/send`）用原生 `fetch()` 实现，而非 Axios�
 
 `kb_document.status` 状态流转：`PENDING` → `PROCESSING` → `DONE` / `FAILED`
 
+文档解析（`embedding/service.py:_load_document`）按扩展名分发 loader：pdf 用 `PyPDFLoader`、doc/docx 用 `Docx2txtLoader`、xls/xlsx 走自定义 `_load_excel`（xlsx 用 `openpyxl` 只读模式、xls 用 `xlrd`，每个工作表一段、单元格 `\t` 拼接、跳过空行），其余按纯文本 `TextLoader`。支持的扩展名须与后端 `config.yaml` 的 `upload.doc_exts` 白名单（pdf/txt/md/doc/docx/xls/xlsx）保持一致——任一处新增类型须同步另一处与前端 `views/knowledge/document/index.vue` 的 `accept`/`beforeUpload`。`kb_document.file_type` 存文件扩展名（如 xlsx，由 Go 侧 `KBService.UploadDocument` 从文件名取），MinIO 存储头才用嗅探出的真实 MIME。
+
 嵌入按 `EMBED_BATCH_SIZE`(64) 分批 `aembed_documents` + 分批 upsert（流式处理防大文档 OOM）。状态对账自愈：启动时 `RecoverInterruptedTasks` 重置遗留 RUNNING/PROCESSING；运行期由 cron JobHandler `embeddingReconcileJob`（`KBService.ReconcileStuck`，默认每 10 分钟、阈值 10 分钟，已在 init.sql 种子）收敛卡死在 PROCESSING 的文档，修复 MySQL 与 ChromaDB 的状态漂移。
 
 可观测性：分布式链路追踪（OpenTelemetry）串联 Gin → FastAPI。Go 侧 `pkg/tracing` + `otelgin` 中间件起 span，出站 FastAPI 调用经全局传播器注入 W3C `traceparent`；FastAPI 侧 `app/tracing.py`（`FastAPIInstrumentor` + `HTTPXClientInstrumentor`）续接同一条 trace。两端均经端点配置开关：Go `config.tracing.endpoint`、FastAPI `TRACING_ENDPOINT`（OTLP/HTTP，如 `http://localhost:4318`），留空即 no-op。与既有 `X-Request-ID` 文本关联头并存。
@@ -199,7 +201,7 @@ Auth：`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/info`�
 用户管理：`/api/user/`（page/add/update/delete/status）——仅管理员。密码经 bcrypt；更新时用户名不可变；列表响应中剥离哈希。  
 Chat：`POST /api/chat/send`（SSE），会话 CRUD 位于 `/api/chat/session/`  
 KB/RAG：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/rebuild`。知识库问答已对齐 chat 能力：问答会话独立持久化在 `rag_session`/`rag_message` 表（归属列 `user_id`，每会话绑定一个 `kb_id`），路由 `/api/rag/session/`（list?kbId=/add/`:id` 改名/`:id/prompt` 设置会话系统提示词/`:id` 删/`:id/messages` 历史/`:id/messages` DELETE 清空），handler 在 `internal/handler/rag.go`、service 为 `service.RagSvc`（`internal/service/rag.go`）。`RAGChat` 现以 `sessionId` 为键，持久化用户问题 + 断连保存 assistant 回复（含 `sources` JSON）、首条问题自动起名（推 `{type:'title'}` 帧）、把会话 `system_prompt` 透传给 FastAPI。前端 RAG 问答页（`views/knowledge/rag`，数据状态在 `stores/rag.ts`）复用 chat 的 `ChatMessageList`/Artifact/Thinking/用量条/`PromptPicker`，`api/kb.ts:ragChatStream`（按 `sessionId`）以 `extract` 取 token、`onMeta` 旁路分拣 `{type:'sources'|'usage'|'title'|'status'}`；来源卡片抽到共享组件 `components/chat/RagSources.vue`，assistant 消息的 `sources` 持久化为 JSON、加载时反序列化还原。  
-Files：`/api/file/`（基于 MinIO）。上传加固（P2-6）：服务端校验大小上限与扩展名白名单（`config.yaml` 的 `upload.*`，文件中心用 `file_exts`、知识库文档用 `doc_exts`），存储用 `http.DetectContentType` 嗅探的真实 MIME 而非客户端传入的 Content-Type；presign 过期 1h。校验逻辑在 `internal/common/upload.go`。  
+Files：`/api/file/`（基于 MinIO）。上传加固（P2-6）：服务端校验大小上限与扩展名白名单（`config.yaml` 的 `upload.*`，文件中心用 `file_exts`、知识库文档用 `doc_exts`（pdf/txt/md/doc/docx/xls/xlsx，须与 FastAPI 嵌入 loader 支持的类型对齐）），存储用 `http.DetectContentType` 嗅探的真实 MIME 而非客户端传入的 Content-Type；presign 过期 1h。校验逻辑在 `internal/common/upload.go`。  
 Monitor：`GET /api/dashboard/stats`（按用户计数）；`GET /api/monitor/server` + `GET /api/monitor/health`——仅管理员；服务器指标取自 `gopsutil`，健康检查探测 Redis/FastAPI/MinIO。  
 Agent：`/api/agent/`（list/get/add/update/delete + `POST /api/agent/{id}/run`）—— 用户私有（`create_by`）  
 Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）。`definition` 为画布序列化的图 JSON（`{nodes:[{id,type,data,position}], edges:[{source,target}]}`，节点类型 start/llm/http/search/end，其中 `search` 为联网搜索节点 `{query,topK}`），由前端 Vue Flow 画布（`components/workflow/WorkflowCanvas.vue`）编辑、FastAPI `app/workflow/engine.py` 拓扑执行（节点输出以 id 存入变量表供下游 `{{nodeId}}` 模板引用）；为空时回退默认单节点 LLM。  
@@ -239,3 +241,47 @@ FastAPI 健康检查：`GET http://localhost:8001/health`
 8. Sprint 8 ✓ —— Agent 运行时工具使用：真实 HTTP 工具执行 + SSE MCP 工具加载，贯通 Go → FastAPI 工具调用循环；agent UI 选择工具/MCP 服务器并展示执行轨迹
 9. Sprint 9 ✓ —— 架构优化：统一 FastApiClient、SSE/嵌入线程池隔离、聊天上下文有界化与断连保存、CORS/LLM 超时重试修复；前端统一 streamSSE 流式工具、新增 RAG 流式问答页、Element Plus 按需引入 + 路由级拆包（Element Plus 已废弃，UI 栈已迁移至 TailwindCSS 4 + Radix Vue）
 10. Sprint 10 ✓ —— 后端迁移至 Go（Gin + GORM），替换 Spring Boot 多模块架构
+
+<!-- superpowers-zh:begin (do not edit between these markers) -->
+# Superpowers-ZH 中文增强版
+
+本项目已安装 superpowers-zh 技能框架（20 个 skills）。
+
+## 核心规则
+
+1. **收到任务时，先检查是否有匹配的 skill** — 哪怕只有 1% 的可能性也要检查
+2. **设计先于编码** — 收到功能需求时，先用 brainstorming skill 做需求分析
+3. **测试先于实现** — 写代码前先写测试（TDD）
+4. **验证先于完成** — 声称完成前必须运行验证命令
+
+## 可用 Skills
+
+Skills 位于 `.claude/skills/` 目录，每个 skill 有独立的 `SKILL.md` 文件。
+
+- **brainstorming**: 在任何创造性工作之前必须使用此技能——创建功能、构建组件、添加功能或修改行为。在实现之前先探索用户意图、需求和设计。
+- **chinese-code-review**: 中文 review 沟通参考——话术模板、分级标注（必须修复/建议修改/仅供参考）、国内团队常见反模式应对。仅在用户显式 /chinese-code-review 时调用，不要根据上下文自动触发。
+- **chinese-commit-conventions**: 中文 commit 与 changelog 配置参考——Conventional Commits 中文适配、commitlint/husky/commitizen 中文模板、conventional-changelog 中文配置。仅在用户显式 /chinese-commit-conventions 时调用，不要根据上下文自动触发。
+- **chinese-documentation**: 中文文档排版参考——中英文空格、全半角标点、术语保留、链接格式、中文文案排版指北约定。仅在用户显式 /chinese-documentation 时调用，不要根据上下文自动触发。
+- **chinese-git-workflow**: 国内 Git 平台配置参考——Gitee、Coding.net、极狐 GitLab、CNB 的 SSH/HTTPS/凭据/CI 接入差异与镜像同步配置。仅在用户显式 /chinese-git-workflow 时调用，不要根据上下文自动触发。
+- **dispatching-parallel-agents**: 当面对 2 个以上可以独立进行、无共享状态或顺序依赖的任务时使用
+- **executing-plans**: 当你有一份书面实现计划需要在单独的会话中执行，并设有审查检查点时使用
+- **finishing-a-development-branch**: 当实现完成、所有测试通过、需要决定如何集成工作时使用——通过提供合并、PR 或清理等结构化选项来引导开发工作的收尾
+- **mcp-builder**: MCP 服务器构建方法论 — 系统化构建生产级 MCP 工具，让 AI 助手连接外部能力
+- **receiving-code-review**: 收到代码审查反馈后、实施建议之前使用，尤其当反馈不明确或技术上有疑问时——需要技术严谨性和验证，而非敷衍附和或盲目执行
+- **requesting-code-review**: 完成任务、实现重要功能或合并前使用，用于验证工作成果是否符合要求
+- **subagent-driven-development**: 当在当前会话中执行包含独立任务的实现计划时使用
+- **systematic-debugging**: 遇到任何 bug、测试失败或异常行为时使用，在提出修复方案之前执行
+- **test-driven-development**: 在实现任何功能或修复 bug 时使用，在编写实现代码之前
+- **using-git-worktrees**: 当需要开始与当前工作区隔离的功能开发，或在执行实现计划之前使用——通过原生工具或 git worktree 回退机制确保隔离工作区存在
+- **using-superpowers**: 在开始任何对话时使用——确立如何查找和使用技能，要求在任何响应（包括澄清性问题）之前调用 Skill 工具
+- **verification-before-completion**: 在宣称工作完成、已修复或测试通过之前使用，在提交或创建 PR 之前——必须运行验证命令并确认输出后才能声称成功；始终用证据支撑断言
+- **workflow-runner**: 在 Claude Code / OpenClaw / Cursor 中直接运行 agency-orchestrator YAML 工作流——无需 API key，使用当前会话的 LLM 作为执行引擎。当用户提供 .yaml 工作流文件或要求多角色协作完成任务时触发。
+- **writing-plans**: 当你有规格说明或需求用于多步骤任务时使用，在动手写代码之前
+- **writing-skills**: 当创建新技能、编辑现有技能或在部署前验证技能是否有效时使用
+
+## 如何使用
+
+当任务匹配某个 skill 时，使用 `Skill` 工具加载对应 skill 并严格遵循其流程。绝不要用 Read 工具读取 SKILL.md 文件。
+
+如果你认为哪怕只有 1% 的可能性某个 skill 适用于你正在做的事情，你必须调用该 skill 检查。
+<!-- superpowers-zh:end -->

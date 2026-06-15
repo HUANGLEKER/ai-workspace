@@ -163,7 +163,7 @@ AI Workspace/
 │   └── app/
 │       ├── chat/                  # LLM 调用 + SSE 流式
 │       ├── rag/                   # 向量检索 + rerank + 答案生成（多轮 history + sources/usage 帧）
-│       ├── embedding/             # 文档切片 + 嵌入 + 写入 ChromaDB
+│       ├── embedding/             # 文档解析（pdf/docx/excel/纯文本）+ 切片 + 嵌入 + 写入 ChromaDB
 │       ├── agent/                 # 工具调用 agent（HTTP 工具 + MCP 工具）
 │       ├── workflow/              # LangGraph 工作流引擎（engine.py 拓扑执行）
 │       ├── llm/provider.py        # LLM 提供方抽象（LRU 缓存多模型客户端）
@@ -270,7 +270,7 @@ docker-compose -f docker-compose.app.yml up -d --build
 | `fastapi` | `base_url` · `timeout: 120` | FastAPI 内网地址与超时 |
 | `minio` | `endpoint` · `access/secret_key` · `bucket` | 对象存储连接 |
 | `ratelimit` | `llm_per_minute: 20` · `llm_per_minute_admin: 60` | LLM 端点分级限流（每用户每分钟，≤0 关闭）|
-| `upload` | `max_size_mb: 50` · `file_exts` · `doc_exts` | 上传大小上限与扩展名白名单 |
+| `upload` | `max_size_mb: 50` · `file_exts` · `doc_exts` | 上传大小上限与扩展名白名单（`doc_exts` 为知识库文档，含 pdf/txt/md/doc/docx/xls/xlsx）|
 | `security` | `secret_key` | 敏感字段（api_key）AES-256-GCM 加密密钥，留空回退 `jwt.secret` |
 | `cors` | `allowed_origins` | 留空/含 `*` 放通；多用户部署填显式白名单 |
 | `tracing` | `service_name` · `endpoint` | OpenTelemetry OTLP/HTTP 端点（如 `localhost:4318`），留空则不启用追踪 |

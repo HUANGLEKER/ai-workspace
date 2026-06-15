@@ -32,10 +32,47 @@ def _get_minio_client() -> Minio:
     )
 
 
+def _load_excel(tmp_path: str, suffix: str) -> list[str]:
+    """解析 Excel 工作簿为纯文本：每个工作表一段，行内单元格用制表符拼接、行间换行。
+
+    .xlsx 用 openpyxl（只读模式，避免大文件占用内存）；.xls 用 xlrd。
+    空单元格记为空串，空行跳过，保证嵌入时不掺入大量空白噪声。
+    """
+    texts: list[str] = []
+    if suffix == "xlsx":
+        import openpyxl
+
+        wb = openpyxl.load_workbook(tmp_path, read_only=True, data_only=True)
+        try:
+            for ws in wb.worksheets:
+                lines: list[str] = []
+                for row in ws.iter_rows(values_only=True):
+                    cells = ["" if v is None else str(v) for v in row]
+                    if any(c.strip() for c in cells):
+                        lines.append("\t".join(cells))
+                if lines:
+                    texts.append(f"# {ws.title}\n" + "\n".join(lines))
+        finally:
+            wb.close()
+    else:  # xls
+        import xlrd
+
+        wb = xlrd.open_workbook(tmp_path)
+        for ws in wb.sheets():
+            lines = []
+            for r in range(ws.nrows):
+                cells = ["" if v is None else str(v) for v in ws.row_values(r)]
+                if any(c.strip() for c in cells):
+                    lines.append("\t".join(cells))
+            if lines:
+                texts.append(f"# {ws.name}\n" + "\n".join(lines))
+    return texts
+
+
 def _load_document(file_path: str, file_name: str) -> list[str]:
     """从 MinIO 下载文档并按扩展名选择加载器解析为纯文本段落列表。
 
-    流程：拉取对象 → 写入临时文件 → 按 pdf/docx/纯文本选择 Loader 解析 → 清理临时文件。
+    流程：拉取对象 → 写入临时文件 → 按 pdf/docx/excel/纯文本选择 Loader 解析 → 清理临时文件。
     """
     client = _get_minio_client()
     response = client.get_object(settings.minio_bucket, file_path)
@@ -57,6 +94,9 @@ def _load_document(file_path: str, file_name: str) -> list[str]:
     try:
         # 按文件类型选择对应的 LangChain 文档加载器
         loader: BaseLoader
+        if suffix in ("xlsx", "xls"):
+            # Excel 自定义解析，不走 LangChain loader
+            return _load_excel(tmp_path, suffix)
         if suffix == "pdf":
             loader = PyPDFLoader(tmp_path)
         elif suffix in ("docx", "doc"):

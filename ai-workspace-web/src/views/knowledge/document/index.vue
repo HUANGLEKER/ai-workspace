@@ -13,7 +13,7 @@
           action="/api/document/upload"
           :data="{ kbId }"
           multiple
-          accept=".pdf,.doc,.docx,.txt,.md"
+          accept=".pdf,.doc,.docx,.txt,.md,.xls,.xlsx"
           :before-upload="beforeUpload"
           @success="onUploadSuccess"
           @error="onUploadError"
@@ -116,11 +116,14 @@ async function loadDocuments() {
 function beforeUpload(file: File) {
   const allowed = ['application/pdf', 'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'text/plain', 'text/markdown']
   const maxSize = 50 * 1024 * 1024
-  // 部分浏览器对 .md 文件上报 MIME 为 text/plain 或空字符串，额外检查扩展名兜底
-  if (!allowed.includes(file.type) && !file.name.endsWith('.md')) {
-    toast.warning('仅支持 PDF、Word、TXT、Markdown 格式')
+  // 部分浏览器对 .md / .xls 文件上报 MIME 为 text/plain 或空字符串，额外检查扩展名兜底
+  const extOk = /\.(md|xls|xlsx)$/i.test(file.name)
+  if (!allowed.includes(file.type) && !extOk) {
+    toast.warning('仅支持 PDF、Word、Excel、TXT、Markdown 格式')
     return false
   }
   if (file.size > maxSize) {

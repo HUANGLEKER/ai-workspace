@@ -107,12 +107,16 @@ func (s *KBService) UploadDocument(ctx context.Context, kbID, userID int64, file
 		return nil, err
 	}
 
+	// 类型列存文件扩展名（如 xlsx/pdf），比嗅探出的 MIME 更直观；
+	// 嗅探出的真实 MIME（contentType）仅用于 MinIO 存储头。
+	fileType := strings.TrimPrefix(strings.ToLower(ext), ".")
+
 	doc := &model.KbDocument{
 		KbID:     kbID,
 		FileName: fileName,
 		FilePath: objectName,
 		FileSize: int64(len(data)),
-		FileType: contentType,
+		FileType: fileType,
 		Status:   model.DocStatusPending,
 	}
 	if err := s.db.Create(doc).Error; err != nil {
