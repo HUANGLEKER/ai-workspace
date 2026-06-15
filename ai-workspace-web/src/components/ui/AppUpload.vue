@@ -35,7 +35,8 @@ const props = defineProps<{
   beforeUpload?: (file: File) => boolean
 }>()
 
-const emit = defineEmits<{ success: [File]; error: [File] }>()
+// success 第二参为后端解析后的响应体（标准包装 {code,message,data}），调用方按需取用
+const emit = defineEmits<{ success: [File, unknown?]; error: [File] }>()
 
 const inputRef = ref<HTMLInputElement>()
 const uploading = ref(false)
@@ -60,7 +61,9 @@ async function onPick(e: Event) {
           body: form
         })
         if (!res.ok) throw new Error(String(res.status))
-        emit('success', file)
+        // 部分调用方需要后端返回体（如头像上传拿 presigned URL）；非 JSON 时回退 undefined
+        const body = await res.json().catch(() => undefined)
+        emit('success', file, body)
       } catch {
         emit('error', file)
       }

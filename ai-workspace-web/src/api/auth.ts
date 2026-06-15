@@ -8,7 +8,8 @@ import request from './request'
 import type { LoginRequest, LoginResponse, UserInfo } from '@/types'
 
 export const login = (data: LoginRequest) =>
-  request.post<unknown, LoginResponse>('/auth/login', data)
+  // silent：登录失败由登录页弹出提示框处理，不走拦截器的全局 toast
+  request.post<unknown, LoginResponse>('/auth/login', data, { silent: true } as never)
 
 export const logout = () =>
   request.post<unknown, void>('/auth/logout')
@@ -18,3 +19,7 @@ export const getUserInfo = () =>
 
 export const updatePassword = (data: { oldPassword: string; newPassword: string }) =>
   request.put<unknown, void>('/auth/password', data)
+
+// 修改当前用户资料（昵称、邮箱）；头像走 AppUpload 直传 /api/auth/avatar
+export const updateProfile = (data: { nickname: string; email: string }) =>
+  request.put<unknown, void>('/auth/profile', data)

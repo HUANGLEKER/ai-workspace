@@ -64,7 +64,7 @@ func Init() {
 	PromptSvc = NewPromptService(db)
 	ToolSvc = NewToolService(db)
 	MCPSvc = NewMCPService(db)
-	UserSvc = NewUserService(db)
+	UserSvc = NewUserService(db, minioStore{})
 	JobSvc = NewJobService(db)
 	DashboardSvc = NewDashboardService(db)
 	UsageSvc = NewUsageService(db)

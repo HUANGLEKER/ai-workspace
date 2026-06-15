@@ -64,7 +64,7 @@ import { ChevronRight, ChevronDown, CircleHelp, User, Lock, LogOut, Sun, Moon, M
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { logout, updatePassword } from '@/api/auth'
-import { confirm, alertBox, toast, AppDialog, AppFormItem, AppInput, AppButton, type DropdownItem } from '@/components/ui'
+import { confirm, toast, AppDialog, AppFormItem, AppInput, AppButton, type DropdownItem } from '@/components/ui'
 
 const route = useRoute()
 const router = useRouter()
@@ -102,7 +102,7 @@ const handleCommand = async (cmd: string) => {
     authStore.logout()
     router.push('/login')
   } else if (cmd === 'profile') {
-    alertBox({ message: '个人信息功能即将上线' })
+    router.push('/profile')
   } else if (cmd === 'password') {
     pwdDialogVisible.value = true
   }

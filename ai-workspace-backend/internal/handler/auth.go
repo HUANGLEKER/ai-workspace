@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"io"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -115,6 +116,7 @@ type authInfoResp struct {
 	UserID   int64    `json:"userId"`
 	Username string   `json:"username"`
 	Nickname string   `json:"nickname"`
+	Email    string   `json:"email"`
 	Avatar   string   `json:"avatar"`
 	Roles    []string `json:"roles"`
 	IsAdmin  bool     `json:"isAdmin"`
@@ -141,14 +143,59 @@ func GetAuthInfo(c *gin.Context) {
 	}
 
 	common.OK(c, authInfoResp{
-		UserID:        user.ID,
-		Username:      user.Username,
-		Nickname:      user.Nickname,
-		Avatar:        user.Avatar,
+		UserID:   user.ID,
+		Username: user.Username,
+		Nickname: user.Nickname,
+		Email:    user.Email,
+		// 头像在库中存的是 MinIO 对象路径，返回前临时签名成 1h 可访问 URL
+		Avatar:        service.UserSvc.AvatarURL(c.Request.Context(), user.Avatar),
 		Roles:         roles,
 		IsAdmin:       isAdmin,
 		MustChangePwd: user.MustChangePwd == 1,
 	})
+}
+
+// UpdateProfile PUT /api/auth/profile — 用户修改自己的资料（昵称、邮箱）
+func UpdateProfile(c *gin.Context) {
+	var req struct {
+		Nickname string `json:"nickname" binding:"required"`
+		Email    string `json:"email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.BadRequest(c, err.Error())
+		return
+	}
+	userID := middleware.CurrentUserID(c)
+	if err := service.UserSvc.UpdateProfile(userID, req.Nickname, req.Email); err != nil {
+		handleBizError(c, err)
+		return
+	}
+	common.OKMsg(c, "资料更新成功")
+}
+
+// UploadAvatar POST /api/auth/avatar — 用户上传/更换自己的头像（multipart/form-data）
+func UploadAvatar(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		common.BadRequest(c, "获取文件失败: "+err.Error())
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		common.ServerError(c, "读取文件失败")
+		return
+	}
+
+	// 存储用嗅探出的真实 MIME（不信任客户端 Content-Type），扩展名+大小校验在 service 层
+	url, err := service.UserSvc.UploadAvatar(c.Request.Context(), middleware.CurrentUserID(c),
+		header.Filename, data, common.SniffContentType(data))
+	if err != nil {
+		handleBizError(c, err)
+		return
+	}
+	common.OK(c, gin.H{"url": url})
 }
 
 // UpdatePassword PUT /api/auth/password — 用户修改自己的密码

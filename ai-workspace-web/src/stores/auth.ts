@@ -36,11 +36,16 @@ export const useAuthStore = defineStore('auth', () => {
     userInfo.value = info
   }
 
+  // 强制重拉 /auth/info 覆盖 userInfo（资料/头像保存后调用，让 Header 即时同步）
+  async function refreshUserInfo() {
+    userInfo.value = await getUserInfo()
+  }
+
   function logout() {
     token.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
   }
 
-  return { token, userInfo, isLoggedIn, isAdmin, setToken, setUserInfo, fetchUserInfo, logout }
+  return { token, userInfo, isLoggedIn, isAdmin, setToken, setUserInfo, fetchUserInfo, refreshUserInfo, logout }
 })

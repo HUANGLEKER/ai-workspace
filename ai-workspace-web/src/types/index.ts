@@ -31,6 +31,8 @@ export interface UserInfo {
   userId: number
   username: string
   nickname: string
+  email?: string
+  /** 后端返回时已临时签名为 1h 可访问 URL（库中存的是 MinIO 对象路径） */
   avatar: string
   roles: string[]
   isAdmin: boolean

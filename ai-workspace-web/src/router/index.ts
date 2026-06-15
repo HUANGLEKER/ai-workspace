@@ -32,6 +32,13 @@ const router = createRouter({
           meta: { title: '仪表盘', icon: 'Odometer' }
         },
         {
+          // 个人中心：仅头像下拉进入，侧边栏菜单为硬编码不含此项
+          path: 'profile',
+          name: 'Profile',
+          component: () => import('@/views/profile/index.vue'),
+          meta: { title: '个人信息' }
+        },
+        {
           path: 'chat',
           name: 'Chat',
           component: () => import('@/views/chat/index.vue'),

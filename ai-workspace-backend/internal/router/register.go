@@ -18,6 +18,9 @@ func registerAuthRoutes(rg *gin.RouterGroup) {
 	g.POST("/refresh", middleware.JWTAuth(), handler.RefreshToken)
 	// 修改密码
 	g.PUT("/password", middleware.JWTAuth(), handler.UpdatePassword)
+	// 个人中心：修改自己的资料 / 上传头像
+	g.PUT("/profile", middleware.JWTAuth(), handler.UpdateProfile)
+	g.POST("/avatar", middleware.JWTAuth(), handler.UploadAvatar)
 }
 
 func registerUserRoutes(rg *gin.RouterGroup) {
