@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **AI Workspace v1.0** —— 一个集成了 Chat、知识库、RAG、提示词中心、工作流、Agent、MCP、工具中心、文件中心与仪表盘的个人 AI 平台。目标是作为个人 AI 中枢，替代 ChatGPT + Dify + OpenWebUI + Notion AI 的组合。
 
+## 子项目文档（先看对应子目录的 CLAUDE.md）
+
+本仓库为三服务单体仓库，**改某一层前请先读该层的 `CLAUDE.md`**，本根文件只保留跨服务的架构、契约与约定：
+
+| 子项目 | 目录 | 文档 | 职责 |
+|---|---|---|---|
+| 前端 | `ai-workspace-web/` | [CLAUDE.md](ai-workspace-web/CLAUDE.md) | Vue3 + TS + Tailwind 4 + Radix Vue |
+| Go 后端 | `ai-workspace-backend/` | [CLAUDE.md](ai-workspace-backend/CLAUDE.md) | 鉴权 / RBAC / 业务逻辑 / 资源归属 |
+| AI 服务 | `ai-service/` | [CLAUDE.md](ai-service/CLAUDE.md) | 所有 LLM 交互（流式/嵌入/RAG/agent/工作流） |
+
 ## 技术栈
 
 | 层级 | 技术 |
@@ -20,262 +30,148 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 架构
 
-三层架构：Vue3 前端 → Go/Gin 后端（REST API）→ FastAPI AI 服务。Go 层负责鉴权 / RBAC / 业务逻辑；FastAPI 负责所有 LLM 交互（流式、嵌入、RAG、agent、工作流）。后端通过 HTTP 与 FastAPI 通信。
+三层架构：Vue3 前端 → Go/Gin 后端（REST API）→ FastAPI AI 服务。Go 层负责鉴权 / RBAC / 业务逻辑；FastAPI 负责所有 LLM 交互。**后端不读 LLM，FastAPI 不读 MySQL**，二者经 `pkg/fastapi/` 统一客户端 HTTP 通信。
 
 ```
 Vue3 (3000) → Go/Gin (8080) → FastAPI (8001) → [Redis, ChromaDB, MinIO] → LLM
 ```
 
-## 启动服务
+## 快速启动
 
-### 前端
-
-```bash
-# 在 ai-workspace-web/ 下（包管理器为 pnpm，版本由 package.json 的 packageManager 锁定，可经 corepack enable 激活）
-pnpm install
-pnpm dev         # 开发服务器运行于 3000 端口，代理到 localhost:8080
-pnpm build       # 生产构建（先 vue-tsc 再 vite build）
-pnpm exec vue-tsc --noEmit   # 仅类型检查，不输出文件
-```
-
-UI 栈已从 Element Plus 全面迁移为 **TailwindCSS 4（`@tailwindcss/vite` 插件 + `@tailwindcss/typography`）+ Radix Vue（headless 交互组件）+ lucide-vue-next（图标）**。规范：
-
-- 禁止引入 Element Plus / 其他组件库图标集；禁止 `<style scoped>`、`::v-deep`、`!important`，所有样式用 Tailwind utility class。
-- 统一组件库在 `src/components/ui`（AppButton/AppInput/AppDialog/AppTable/AppSelect/AppPagination 等，经 `index.ts` 出口统一引入）；`toast`（替代 ElMessage）与 `confirm`/`alertBox`（替代 ElMessageBox，Promise<boolean> 风格）也从该出口引入，渲染单例 `AppToaster`/`AppConfirm` 挂载在 `App.vue`（同时提供 Radix `TooltipProvider`）。
-- 设计基调：zinc 色阶、`rounded-xl/2xl`、`border-zinc-200/80`、品牌色 `bg-zinc-900 text-white`、动效 `transition-all duration-200 ease-out`。
-- 文件上传用 `AppUpload`（原生 fetch + FormData，手动注入 Authorization 头）。
-- `build.rollupOptions.output.manualChunks` 仅强制拆分框架核心（`vue-vendor`）与较重的 markdown 栈（`markdown`，随 chat/RAG 懒加载）。
-
-### Go 后端
+> 各服务的完整命令、配置项、规范见对应子目录 `CLAUDE.md`。下表为最小启动序列。
 
 ```bash
-# 在 ai-workspace-backend/ 下
-go mod tidy                              # 同步依赖（首次或依赖变更后）
-make run                                 # 等价于 go run ./cmd/server -config config.yaml
-make build                               # 编译为 bin/ai-workspace-backend
-make swag                                # 重新生成 Swagger 文档（需安装 swag CLI）
-go vet ./...                             # 静态检查
-gofmt -l -w .                           # 格式化所有 Go 文件
+# 1. 基础设施（MySQL/Redis/MinIO/ChromaDB 全 Docker 化）
+docker-compose -f docker-compose.infra.yml up -d
+
+# 2. 前端（ai-workspace-web/，pnpm）
+pnpm install && pnpm dev            # 3000，代理 /api → :8080
+
+# 3. Go 后端（ai-workspace-backend/）
+make run                            # 8080，config.yaml
+
+# 4. AI 服务（ai-service/，uv）
+cp .env.example .env && uv sync && uv run python main.py   # 8001
 ```
 
-配置文件：`ai-workspace-backend/config.yaml`（服务端口、DSN、Redis、JWT、FastAPI、MinIO、日志）。  
-默认凭证：MySQL `root / 123456`，管理员账号 `admin / 123456`（首次登录会被强制改密，见 P3-6）。
+默认凭证：MySQL `root/123456`，管理员 `admin/123456`（首登强制改密）。FastAPI 用 Redis DB 1，Go 用 DB 0。**注意**：应用容器与本机开发进程端口冲突（3000/8080/8001），二者择一。
 
-多用户收尾（P3-6）：`chat_model.api_key` 经 AES-256-GCM 加密落库（`pkg/crypto`，密钥取 `config.security.secret_key`，空则回退 `jwt.secret`；密文带 `enc:v1:` 前缀，解密对历史明文向后兼容）；CORS 由 `config.cors.allowed_origins` 控制（空/含 `*` 放通，否则白名单回显）；限流分级 `ratelimit.llm_per_minute`（普通）/ `llm_per_minute_admin`（管理员，更宽松）；`sys_user.must_change_pwd` 标记强制改密，`/auth/info` 暴露 `mustChangePwd`，前端 `ForcePasswordChange` 弹不可绕过的改密框。
-
-Go 后端结构（`internal/`）：
-- `handler/` —— Gin handler，对应各业务模块（auth/chat/kb/file/agent/workflow/job/prompt/tool/mcp/user/monitor/dashboard）
-- `service/` —— 业务逻辑层
-- `model/` —— GORM 模型（软删除通过 `gorm.io/plugin/soft_delete`）
-- `router/router.go` —— 路由分层：`public`（无 JWT）→ `auth`（需登录）→ `admin`（需登录 + ADMIN 角色）
-- `middleware/` —— JWT（`CtxUserID`/`CtxRoles` 注入 gin.Context）、CORS、RequestLogger、Recovery、AdminRequired
-- `config/` —— Viper 配置加载，全局 `config.Global`
-- `scheduler/` —— 动态 cron 调度器（`manager.go` 管理 `robfig/cron/v3` 实例，`handler.go` 注册 JobHandler）
-- `repository/` —— 数据访问层（DAO）：泛型 `OwnedRepository[T]`（`owned.go`）封装用户私有资源的 CRUD 与归属语义，把 GORM 操作从 service 剥离以提升可测性。prompt/tool/agent/workflow/mcp 已迁移为持有 repository（构造函数仍收 `*gorm.DB`，内部建仓储，DI 与测试不变）；kb/chat/user/job 等复杂查询服务仍直接持有 db，`service/owned.go` 的 `getOwnedResource`/`ownedScope` 现委托到 repository 作为单一真相来源
-- `common/` —— 标准响应包装（`result.go`）
-- `pkg/` —— 基础设施客户端：`database/`（GORM）、`redis/`、`minio/`、`logger/`（zap + lumberjack）、`fastapi/`（FastAPI HTTP 客户端）、`tracing/`（OpenTelemetry 初始化）
-
-### FastAPI AI 服务
+### 容器化整栈（可选）
 
 ```bash
-# 在 ai-service/ 下
-cp .env.example .env          # 填入 LLM key 与服务配置（首次必做）
-uv sync                       # 按 uv.lock 安装依赖（首次或依赖变更后）
-uv add <pkg>                  # 新增依赖（会同步更新 uv.lock）
-uv run python main.py         # 以 uvicorn 运行于 8001 端口，开启自动重载
+docker-compose -f docker-compose.infra.yml up -d
+docker-compose -f docker-compose.app.yml up -d --build      # 入口 http://localhost:3000
 ```
 
-`ai-service/` 未配置 linter；`pyproject.toml` 中无 `ruff`/`black` 等工具，如需格式化请手动安装后运行 `uv run ruff check .`。
+两个 compose 共享网络 `ai-workspace-net`；后端用 `config.docker.yaml`，AI 服务配置经环境变量注入；前端 nginx 反代 `/api`（已配 SSE 透传 `proxy_buffering off`）；后端公开 `GET /health` 供健康检查。
 
-依赖通过 `pyproject.toml` + `uv.lock` 管理。新增包用 `uv add <pkg>`。
+### 本地基础设施（`docker-compose.infra.yml`）
 
-关键 `.env` 变量：
-- **Chat LLM**：`LLM_API_KEY`、`LLM_API_BASE`、`LLM_MODEL`、`LLM_TIMEOUT`、`LLM_MAX_RETRIES`
-- **Embedding（独立）**：`EMBEDDING_API_KEY`、`EMBEDDING_API_BASE`、`EMBEDDING_MODEL`。DeepSeek 不提供嵌入端点，需单独配置其他 OpenAI 兼容提供商（推荐硅基流动 `BAAI/bge-m3`）。`EMBEDDING_API_KEY` / `EMBEDDING_API_BASE` 为空时自动回退使用 `LLM_*` 配置。
-- **基础设施**：`REDIS_HOST`、`CHROMA_HOST`、`CHROMA_COLLECTION_PREFIX`、`MINIO_ENDPOINT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET`
-
-FastAPI 使用 Redis DB 1；Go 后端使用 DB 0。切换嵌入模型后必须重建知识库索引（旧向量与新模型不兼容）。
-
-嵌入管道的临时文件已使用 `tempfile.gettempdir()`（跨平台），Windows 原生运行 AI 服务可用。
+MySQL 8（3306，`mysql-data`）、Redis 7（6379，AOF）、MinIO（9000 API / 9011 控制台）、ChromaDB（8000），各自持久化卷。
 
 ### 数据库
 
-`docker-compose.infra.yml` 将 `ai-workspace/sql/init.sql` 挂载为 MySQL 初始化脚本（仅数据卷首次初始化时执行），包含全部 21 张表的 DDL 与种子数据（admin/123456、ROLE_ADMIN、默认 chat_model）。**维护约定：任何表结构变更必须同步更新 init.sql**（可用 `docker exec ai-workspace-mysql mysqldump -uroot -p123456 --no-data ai_workspace` 重新导出）。
-
-### 容器化整栈运行（可选）
-
-三个应用服务均有 Dockerfile，经 `docker-compose.app.yml` 编排（先起基础设施）：
-
-```bash
-docker-compose -f docker-compose.infra.yml up -d
-docker-compose -f docker-compose.app.yml up -d --build   # 入口 http://localhost:3000
-```
-
-- 两个 compose 共享命名网络 `ai-workspace-net`；后端容器配置用 `ai-workspace-backend/config.docker.yaml`（主机名为 compose 服务名），AI 服务配置经环境变量注入（LLM key 从宿主环境透传）。
-- 前端容器 nginx 反代 `/api` 到 backend（`nginx.conf` 已配 SSE 透传：`proxy_buffering off`）。
-- 后端有公开 `GET /health`（容器健康检查用，无业务信息）。
-- 注意：应用容器与本机开发进程端口冲突（3000/8080/8001），二者择一运行。
-- CI（`.github/workflows/ci.yml`）：Go gofmt/vet/test/build、前端 vue-tsc/vitest/build、AI 服务 uv 冻结安装 + 导入冒烟。
-
-### 本地基础设施（全部 Docker 化）
-
-所有基础设施（MySQL、Redis、MinIO、ChromaDB）均通过 `docker-compose.infra.yml` 统一管理：
-
-```bash
-docker-compose -f docker-compose.infra.yml up -d
-```
-
-- MySQL 8.0（3306）：数据持久化到 `mysql-data` volume
-- Redis 7（6379）：开启 AOF 持久化，数据持久化到 `redis-data` volume
-- MinIO（9000 S3 API / 9011 控制台）：数据持久化到 `minio-data` volume
-- ChromaDB（8000）：数据持久化到 `chroma-data` volume
+`docker-compose.infra.yml` 把 `ai-workspace/sql/init.sql` 挂为 MySQL 初始化脚本（仅数据卷首次执行），含全部 21 张表 DDL 与种子数据。**维护约定：任何表结构变更必须同步更新 init.sql**（`docker exec ai-workspace-mysql mysqldump -uroot -p123456 --no-data ai_workspace` 重导出）。
 
 ## 测试
 
-目前尚无测试套件。Go 后端与 AI 服务均无自动化测试配置。
+- 前端：vitest（`pnpm test`），覆盖 utils/api/composables。
+- Go 后端：`go test ./...`，service 层已有覆盖。
+- AI 服务：无自动化测试。
+- CI（`.github/workflows/ci.yml`）：Go gofmt/vet/test/build、前端 vue-tsc/vitest/build、AI 服务 uv 冻结安装 + 导入冒烟。
 
-## 模块结构
+## 跨服务契约（关键，改任一端都要核对）
 
-**FastAPI（`ai-service/app`）：**
+- **SSE 流式**：Chat/RAG 用原生 `fetch()`（Axios 不支持 SSE）。前端共用 `api/sse.ts:streamSSE`；FastAPI 产出 token 帧 + 旁路帧 `{type:'sources'|'usage'|'title'|'status'}`；Go handler 透传到浏览器。RAG 须先发 `sources` 帧再逐 token，流尾补 `{type:'usage'}`。
+- **多模型路由**：Go 按会话/请求模型名查 `chat_model`，把 `api_url`/`api_key` 以 `llm_config {api_base, api_key}` 随 `/chat`、`/rag/chat` 透传，FastAPI 按请求构建（LRU 缓存）客户端；未配置回退 `.env` 的 `LLM_*`。`llm_config` 仅内网流转。
+- **嵌入管道**：Go 异步调 FastAPI `POST /embedding/build`；状态流转 `kb_document.status`：PENDING→PROCESSING→DONE/FAILED；`kb_chunk_task.task_status`：PENDING/RUNNING/SUCCESS/FAILED。文档类型白名单须三处对齐：后端 `config.yaml` 的 `doc_exts`（pdf/txt/md/doc/docx/xls/xlsx）、FastAPI 嵌入 loader、前端 `accept`。
+- **链路追踪**：OpenTelemetry 串联 Gin→FastAPI，W3C `traceparent` 传播；两端经端点开关（Go `config.tracing.endpoint`、FastAPI `TRACING_ENDPOINT`），留空 no-op。与既有 `X-Request-ID` 并存。
+- **FastAPI 内部接口**（不对客户端暴露）：`POST /chat`、`/rag/chat`、`/embedding/build`、`/agent/run`、`/workflow/run`，`DELETE /embedding/delete`。健康检查 `GET :8001/health`。
 
-- `chat/` —— LLM 调用、SSE 流式（`POST /chat`）
-- `rag/` —— 向量检索 + 答案生成（`POST /rag/chat`）。检索部分由 `rag/graph.py` 的 **LangGraph StateGraph** 编排：`recall`（本地向量召回）与 `web`（联网搜索，按 `enable_web_search` 短路）并行 fan-out → `merge`（多路融合 + rerank 精排）产出 `sources`；生成仍在图外做 token 流式，以保住「先发 sources 帧再逐 token」的 SSE 契约。`rag/service.py` 只负责图外的上下文拼接 / 流式生成 / 引用对齐。多轮：请求体含 `history`（Go 侧组装的有界上下文），仅注入生成阶段（检索仍只用当前 `question`）；流尾补一帧 `{type:'usage'}`（与 chat 对齐，供前端用量条 + Go 落库）。提示词中心：请求体可选 `system_prompt`（会话级提示词），注入顺序为「`system_prompt`（角色/风格）→ RAG 引用规则+上下文 → history → 当前问题」——引用规则离问题最近、优先级不被覆盖，回答既符合提示词设定又遵守来源标注。
-- `embedding/` —— 文档切片、嵌入、写入 ChromaDB（`POST /embedding/build`、`DELETE /embedding/delete`）
-- `agent/` —— 工具调用 agent（`POST /agent/run`）：绑定由 `HttpToolSpec` 构建的 HTTP 工具（经 `httpx` 执行），外加通过 `langchain-mcp-adapters`（`MultiServerMCPClient`）从 SSE MCP 服务器加载的工具，然后运行有界的 think→act 循环，返回答案与 `steps` 轨迹。MCP 导入做了保护，缺少该可选库时服务仍可运行。
-- `workflow/` —— 基于 LangGraph 的引擎（`POST /workflow/run`）
-- `llm/provider.py` —— LLM 提供方抽象（通过 LangChain 接 OpenAI）
-- `vectorstore/chroma_client.py` —— ChromaDB HTTP 客户端
-- `utils/web_search.py` —— 联网搜索工具层：provider 可插拔（`WEB_SEARCH_PROVIDER`，默认 duckduckgo 免费，预留 tavily），统一收口三项防御（`asyncio.wait_for` 硬超时 / 正文截断 / 全异常 fail-open 降级）。对外暴露 `search_web_results`（结构化 `SourceDocument`，供 RAG 检索图与 workflow `search` 节点）与 `@tool web_search`（供 Chat 侧 LLM tool-calling）
-- `config/settings.py` —— 从 `.env` 加载的 Pydantic `BaseSettings`
+## 资源归属（防 IDOR，Go 后端强约束）
 
-**前端（`ai-workspace-web/src`）：**
-
-- `api/` —— 各功能的 Axios HTTP 客户端模块（`sse.ts` 为共用 SSE 工具）
-- `views/` —— 页面组件
-- `components/ui/` —— 统一组件库（AppButton/AppInput/AppDialog… 经 `index.ts` 出口）
-- `composables/` —— 可复用组合式函数
-- `stores/` —— Pinia 状态管理
-- `router/` —— Vue Router 配置
-- `layout/` —— 外壳/布局组件
-- `types/` —— TypeScript 类型定义
-
-## SSE 流式
-
-Chat 流式（`POST /api/chat/send`）用原生 `fetch()` 实现，而非 Axios——Axios 不支持 SSE。所有 SSE 消费方共用同一个工具 `api/sse.ts:streamSSE`，它统一处理传输层关注点：鉴权头、UTF-8 增量解码、`\n` 行缓冲、`data: <json>` 解析、`data: [DONE]` 哨兵，以及 `AbortSignal` 取消。调用方只需提供 URL/body、一个 `extract` 映射器（载荷 → 展示文本）以及 `onChunk/onDone/onError`。`api/chat.ts:sendMessageStream` 是其薄封装；新的流式端点（如 RAG）应复用 `streamSSE` 并自定义 `extract`，而不要重新实现读取循环。Go handler 将 FastAPI 的 SSE 透传到浏览器。
-
-## 嵌入管道
-
-文档上传后，Go 后端向 FastAPI `POST /embedding/build` 发起异步 HTTP 调用（goroutine），流程：
-1. 插入一条 `kb_chunk_task` 记录，`task_status=RUNNING`
-2. 置 `kb_document.status=PROCESSING`
-3. 调用 FastAPI `/embedding/build`
-4. 成功：两者分别置 SUCCESS/DONE；失败：置 FAILED 并写 `error_msg`
-
-`kb_document.status` 状态流转：`PENDING` → `PROCESSING` → `DONE` / `FAILED`
-
-文档解析（`embedding/service.py:_load_document`）按扩展名分发 loader：pdf 用 `PyPDFLoader`、doc/docx 用 `Docx2txtLoader`、xls/xlsx 走自定义 `_load_excel`（xlsx 用 `openpyxl` 只读模式、xls 用 `xlrd`，每个工作表一段、单元格 `\t` 拼接、跳过空行），其余按纯文本 `TextLoader`。支持的扩展名须与后端 `config.yaml` 的 `upload.doc_exts` 白名单（pdf/txt/md/doc/docx/xls/xlsx）保持一致——任一处新增类型须同步另一处与前端 `views/knowledge/document/index.vue` 的 `accept`/`beforeUpload`。`kb_document.file_type` 存文件扩展名（如 xlsx，由 Go 侧 `KBService.UploadDocument` 从文件名取），MinIO 存储头才用嗅探出的真实 MIME。
-
-嵌入按 `EMBED_BATCH_SIZE`(64) 分批 `aembed_documents` + 分批 upsert（流式处理防大文档 OOM）。状态对账自愈：启动时 `RecoverInterruptedTasks` 重置遗留 RUNNING/PROCESSING；运行期由 cron JobHandler `embeddingReconcileJob`（`KBService.ReconcileStuck`，默认每 10 分钟、阈值 10 分钟，已在 init.sql 种子）收敛卡死在 PROCESSING 的文档，修复 MySQL 与 ChromaDB 的状态漂移。
-
-可观测性：分布式链路追踪（OpenTelemetry）串联 Gin → FastAPI。Go 侧 `pkg/tracing` + `otelgin` 中间件起 span，出站 FastAPI 调用经全局传播器注入 W3C `traceparent`；FastAPI 侧 `app/tracing.py`（`FastAPIInstrumentor` + `HTTPXClientInstrumentor`）续接同一条 trace。两端均经端点配置开关：Go `config.tracing.endpoint`、FastAPI `TRACING_ENDPOINT`（OTLP/HTTP，如 `http://localhost:4318`），留空即 no-op。与既有 `X-Request-ID` 文本关联头并存。
-
-## 资源归属
-
-用户私有资源按当前用户隔离——每个 list/get/update/delete 路径都必须对调用者的 user id 校验归属。各模块归属列名不一致：
-
-- KB/文档/Agent/Workflow/Prompt/Tool/MCP：`create_by`
-- Chat 会话/消息：`user_id`
-- 文件：`upload_by`
-
-归属过滤的强制入口是 `internal/service/owned.go` 的泛型 helper：单条记录校验用 `getOwnedResource[T]`（404/403 三态语义），列表/统计过滤用 `db.Scopes(ownedScope[T](userID))`。列名由模型实现 `model.Owned` 接口声明（`internal/model/owned.go`），新模块嵌入 `UserOwnedModel` 即自动获得 `create_by` 归属。**禁止在 service 层手写 `Where("create_by = ?")` 等字面量归属条件**——此前曾因 list/presign 路径未按 `upload_by` 隔离而出现 IDOR 漏洞。
+用户私有资源按当前用户隔离。归属列名不一致：KB/文档/Agent/Workflow/Prompt/Tool/MCP→`create_by`；Chat/RAG 会话/消息→`user_id`；文件→`upload_by`。**唯一强制入口**是 `internal/service/owned.go` 的泛型 helper（`getOwnedResource[T]` 单条 404/403 三态、`ownedScope[T]` 列表过滤）；**禁止手写 `Where("create_by = ?")` 字面量**。详见后端 CLAUDE.md。
 
 ## RBAC / 鉴权
 
-JWT Claims 包含 `userID`、`username`、`roles`（`[]string`，角色码已带 `ROLE_` 前缀）。中间件解析后注入 `gin.Context`，handler 通过 `c.GetInt64(middleware.CtxUserID)` 取当前用户，通过 `c.GetStringSlice(middleware.CtxRoles)` 取角色。`middleware.AdminRequired()` 中间件检查 roles 是否含 `ROLE_ADMIN`。前端从 `/auth/info` 的 roles 暴露 `isAdmin`，对非管理员隐藏系统菜单，并在路由守卫里加载用户信息。
+JWT Claims：`userID`、`username`、`roles`（带 `ROLE_` 前缀）。中间件注入 `gin.Context`，`AdminRequired()` 校验 `ROLE_ADMIN`。前端从 `/auth/info` 的 roles 暴露 `isAdmin`，隐藏系统菜单、路由守卫加载用户信息。`chat_model.api_key` AES-256-GCM 加密落库；CORS 白名单、限流分级、强制改密详见后端 CLAUDE.md。
 
 ## 关键 API 约定
 
-所有端点以 `/api/` 为前缀。标准响应包装（`code`、`message`、`data`）来自 `internal/common/result.go`。
+所有端点以 `/api/` 为前缀，标准响应包装（`code`/`message`/`data`）来自 `internal/common/result.go`。
 
-Auth：`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/info`（返回 roles）  
-用户管理：`/api/user/`（page/add/update/delete/status）——仅管理员。密码经 bcrypt；更新时用户名不可变；列表响应中剥离哈希。  
-Chat：`POST /api/chat/send`（SSE），会话 CRUD 位于 `/api/chat/session/`  
-KB/RAG：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/rebuild`。知识库问答已对齐 chat 能力：问答会话独立持久化在 `rag_session`/`rag_message` 表（归属列 `user_id`，每会话绑定一个 `kb_id`），路由 `/api/rag/session/`（list?kbId=/add/`:id` 改名/`:id/prompt` 设置会话系统提示词/`:id` 删/`:id/messages` 历史/`:id/messages` DELETE 清空），handler 在 `internal/handler/rag.go`、service 为 `service.RagSvc`（`internal/service/rag.go`）。`RAGChat` 现以 `sessionId` 为键，持久化用户问题 + 断连保存 assistant 回复（含 `sources` JSON）、首条问题自动起名（推 `{type:'title'}` 帧）、把会话 `system_prompt` 透传给 FastAPI。前端 RAG 问答页（`views/knowledge/rag`，数据状态在 `stores/rag.ts`）复用 chat 的 `ChatMessageList`/Artifact/Thinking/用量条/`PromptPicker`，`api/kb.ts:ragChatStream`（按 `sessionId`）以 `extract` 取 token、`onMeta` 旁路分拣 `{type:'sources'|'usage'|'title'|'status'}`；来源卡片抽到共享组件 `components/chat/RagSources.vue`，assistant 消息的 `sources` 持久化为 JSON、加载时反序列化还原。  
-Files：`/api/file/`（基于 MinIO）。上传加固（P2-6）：服务端校验大小上限与扩展名白名单（`config.yaml` 的 `upload.*`，文件中心用 `file_exts`、知识库文档用 `doc_exts`（pdf/txt/md/doc/docx/xls/xlsx，须与 FastAPI 嵌入 loader 支持的类型对齐）），存储用 `http.DetectContentType` 嗅探的真实 MIME 而非客户端传入的 Content-Type；presign 过期 1h。校验逻辑在 `internal/common/upload.go`。  
-Monitor：`GET /api/dashboard/stats`（按用户计数）；`GET /api/monitor/server` + `GET /api/monitor/health`——仅管理员；服务器指标取自 `gopsutil`，健康检查探测 Redis/FastAPI/MinIO。  
-Agent：`/api/agent/`（list/get/add/update/delete + `POST /api/agent/{id}/run`）—— 用户私有（`create_by`）  
-Workflow：`/api/workflow/`（list/get/add/update/delete + `POST /api/workflow/{id}/run`）—— 用户私有（`create_by`）。`definition` 为画布序列化的图 JSON（`{nodes:[{id,type,data,position}], edges:[{source,target}]}`，节点类型 start/llm/http/search/end，其中 `search` 为联网搜索节点 `{query,topK}`），由前端 Vue Flow 画布（`components/workflow/WorkflowCanvas.vue`）编辑、FastAPI `app/workflow/engine.py` 拓扑执行（节点输出以 id 存入变量表供下游 `{{nodeId}}` 模板引用）；为空时回退默认单节点 LLM。  
-Job：`/api/job/`（page/handlers/add/update/delete/status + `POST /api/job/run/{id}`、`GET /api/job/log/page`、`DELETE /api/job/log/clean`）——仅管理员；cron 通过 `robfig/cron/v3` 调度  
-Prompt：`/api/prompt/`（list/get/add/update/delete）—— 用户私有（`create_by`）。提示词中心与 chat / 知识库问答打通：两个模块的输入框以 `/` 唤起共享组件 `components/chat/PromptPicker.vue`，可「插入到输入框」或「设为会话系统提示词」（含 `{{变量}}` 填空，`utils/promptVars`）；后者分别写入 `chat_session.system_prompt` / `rag_session.system_prompt`（路由 `PUT /api/chat/session/:id/prompt`、`PUT /api/rag/session/:id/prompt`），由对应 SSE 端点拼为 system 消息注入，约束回答风格/角色。  
-Tool：`/api/tool/`（list/get/add/update/delete）—— 用户私有（`create_by`）；`tool_type` 为 http/builtin，`config` 为 JSON 字符串  
-MCP：`/api/mcp/`（list/get/add/update/delete + `POST /api/mcp/test/{id}`）—— 用户私有（`create_by`）  
-FastAPI 内部接口（由 Go 后端调用，不对客户端暴露）：`POST /chat`、`POST /rag/chat`、`POST /embedding/build`、`POST /agent/run`、`POST /workflow/run`。所有调用经由 `pkg/fastapi/` 统一客户端，base URL 与超时来自 `config.yaml` 的 `fastapi.*`。  
-
-FastAPI 健康检查：`GET http://localhost:8001/health`
+- **Auth**：`POST /api/auth/login`、`/logout`、`GET /api/auth/info`
+- **用户管理**：`/api/user/`（page/add/update/delete/status）—— 仅管理员；bcrypt，更新时用户名不可变
+- **Chat**：`POST /api/chat/send`（SSE），会话 CRUD `/api/chat/session/`
+- **KB/RAG**：`/api/kb/`、`/api/document/`、`/api/rag/chat`（SSE）、`/api/rag/rebuild`。问答会话独立持久化（`rag_session`/`rag_message`，归属 `user_id`，每会话绑一个 `kb_id`），路由 `/api/rag/session/`（list?kbId=/add/`:id` 改名/`:id/prompt`/`:id` 删/`:id/messages` 历史与清空）。`RAGChat` 以 `sessionId` 为键，持久化问题+断连保存回复（含 `sources` JSON）、首问自动起名（`{type:'title'}` 帧）、透传会话 `system_prompt`。
+- **Files**：`/api/file/`（MinIO）。服务端校验大小上限与扩展名白名单（`upload.file_exts`/`doc_exts`），存储用 `http.DetectContentType` 嗅探真实 MIME；presign 过期 1h；校验逻辑在 `internal/common/upload.go`。
+- **Monitor**：`GET /api/dashboard/stats`（按用户计数）；`/api/monitor/server`、`/health` —— 仅管理员，指标取自 `gopsutil`，探测 Redis/FastAPI/MinIO。
+- **Agent**：`/api/agent/`（CRUD + `POST /{id}/run`）—— 私有 `create_by`
+- **Workflow**：`/api/workflow/`（CRUD + `POST /{id}/run`）—— 私有。`definition` 为画布图 JSON（节点 start/llm/http/search/end），Vue Flow 画布编辑、FastAPI `engine.py` 拓扑执行
+- **Job**：`/api/job/`（page/handlers/add/update/delete/status + `run/{id}`、`log/page`、`log/clean`）—— 仅管理员；`robfig/cron/v3`
+- **Prompt**：`/api/prompt/`（CRUD）—— 私有。与 chat/RAG 打通：输入框 `/` 唤起 `PromptPicker`，可插入或「设为会话系统提示词」（写 `chat_session`/`rag_session` 的 `system_prompt`）
+- **Tool**：`/api/tool/`（CRUD）—— 私有；`tool_type` http/builtin，`config` 为 JSON
+- **MCP**：`/api/mcp/`（CRUD + `POST /test/{id}`）—— 私有；`transport` sse/stdio
 
 ## 数据库关键表
 
-- `sys_user`、`sys_role`、`sys_user_role` —— RBAC 系统（`role_code` 带 `ROLE_` 前缀）
-- `chat_session`、`chat_message`、`chat_model` —— chat 模块。`chat_session.summary` + `summary_upto_id` 为会话滚动摘要（P3-2 Memory 层）：消息数超 `summarizeThreshold`(40) 时，Go 侧异步调 FastAPI `/chat/summarize` 把「最近 20 条之前、未摘要」的旧消息压缩进 `summary` 并推进 `summary_upto_id`；上下文组装为「system prompt + summary（作 system 消息）+ id>summary_upto_id 的最近消息」。`chat_model` 由 Go 后端完全管理；FastAPI **不**读 MySQL。多模型路由：Go 按会话/请求的模型名查 `chat_model`，将 `api_url`/`api_key` 以 `llm_config {api_base, api_key}` 字段随 `/chat`、`/rag/chat` 请求透传，FastAPI 据此按请求构建（LRU 缓存）LLM 客户端；未配置时回退 `.env` 的 `LLM_*`。`llm_config` 仅在服务间内网流转，不对客户端暴露。
-- `kb_knowledge_base`、`kb_document`、`kb_chunk_task` —— 知识库 + RAG 管道（`kb_chunk_task.task_status`：PENDING/RUNNING/SUCCESS/FAILED；`kb_document.status`：PENDING/PROCESSING/DONE/FAILED）
-- `rag_session`、`rag_message` —— 知识库问答会话/消息（与 chat 同构但独立成表）。`rag_session` 归属列 `user_id`、绑定 `kb_id`、`system_prompt` 存会话级提示词（来自提示词中心）；`rag_message.sources` 存 assistant 回复的引用来源 JSON。多轮上下文取最近 N 条历史（不做滚动摘要）。
-- `file_info` —— 文件中心（归属列 `upload_by`）
-- `agent` —— Agent 定义，`tools` 是 JSON 数组字符串
-- `workflow` —— 工作流定义，`definition` 是 JSON 字符串
-- `sys_job`、`sys_job_log` —— cron 任务 + 执行日志。`sys_job.status`：0=运行，1=暂停；`invoke_target` 引用 JobHandler 名。`sys_job_log` **没有** `deleted` 列（清理为物理删除），且只有 `create_time`。
-- `prompt` —— 提示词库
-- `tool` —— 工具注册表
-- `mcp_server` —— MCP 服务器注册表；`transport` 为 sse/stdio
+- `sys_user`/`sys_role`/`sys_user_role` —— RBAC（`role_code` 带 `ROLE_` 前缀）
+- `chat_session`/`chat_message`/`chat_model` —— chat。`chat_session.summary`+`summary_upto_id` 为滚动摘要（超 `summarizeThreshold`(40) 时 Go 异步调 FastAPI `/chat/summarize` 压缩旧消息）；上下文 = system prompt + summary + id>summary_upto_id 的最近消息。`chat_model` 由 Go 完全管理，FastAPI 不读 MySQL。
+- `kb_knowledge_base`/`kb_document`/`kb_chunk_task` —— 知识库 + RAG 管道
+- `rag_session`/`rag_message` —— 知识库问答（与 chat 同构独立成表，归属 `user_id`、绑 `kb_id`、`system_prompt`、`sources` JSON）；多轮取最近 N 条历史，不做滚动摘要
+- `file_info` —— 文件中心（`upload_by`）
+- `agent`（`tools` JSON 数组）、`workflow`（`definition` JSON）
+- `sys_job`/`sys_job_log` —— cron + 日志（`sys_job.status` 0=运行/1=暂停；`sys_job_log` 无 `deleted`、物理删除、仅 `create_time`）
+- `prompt`、`tool`、`mcp_server`（`transport` sse/stdio）
 
-所有表均使用 `BIGINT AUTO_INCREMENT` 主键、`deleted BIGINT` 软删除（GORM soft_delete 插件 **milli 模式**：0=未删除，非 0=删除时刻毫秒时间戳）、`utf8mb4` 排序规则。`sys_user`/`sys_role` 的唯一键为 `(username, deleted)` / `(role_code, deleted)` 复合键，软删后可重建同名记录。时间戳由 GORM 的 `AutoCreateTime`/`AutoUpdateTime` 自动填充（`sys_job_log` 例外——只有 `create_time`）。
+所有表用 `BIGINT AUTO_INCREMENT` 主键、`deleted BIGINT` 软删除（GORM soft_delete **milli 模式**：0=未删，非 0=删除毫秒时间戳）、`utf8mb4`。`sys_user`/`sys_role` 唯一键为复合 `(username, deleted)`/`(role_code, deleted)`，软删后可重建同名。时间戳由 GORM 自动填充（`sys_job_log` 例外）。
 
 ## Sprint 路线图
 
-1. Sprint 1 ✓ —— Spring Boot 初始化、JWT 认证、RBAC（Spring Boot 已废弃，见 Sprint 10）
-2. Sprint 2 ✓ —— 带 SSE 流式与 Markdown 渲染的 Chat
+1. Sprint 1 ✓ —— JWT 认证、RBAC（Spring Boot 已废弃，见 S10）
+2. Sprint 2 ✓ —— SSE 流式 + Markdown 的 Chat
 3. Sprint 3 ✓ —— 文件中心（MinIO）+ 知识库 CRUD + 文档管理
-4. Sprint 4 ✓ —— RAG 管道：异步嵌入管道；到 FastAPI 的 SSE 代理
+4. Sprint 4 ✓ —— RAG 管道：异步嵌入；SSE 代理
 5. Sprint 5 ✓ —— 仪表盘统计
-6. Sprint 6 ✓ —— 系统监控；Agent + Workflow 模块（CRUD + 运行代理到 FastAPI）；动态 cron 调度器
-7. Sprint 7 ✓ —— 提示词中心、工具中心、MCP 服务器注册表；MCP 连通性检测
-8. Sprint 8 ✓ —— Agent 运行时工具使用：真实 HTTP 工具执行 + SSE MCP 工具加载，贯通 Go → FastAPI 工具调用循环；agent UI 选择工具/MCP 服务器并展示执行轨迹
-9. Sprint 9 ✓ —— 架构优化：统一 FastApiClient、SSE/嵌入线程池隔离、聊天上下文有界化与断连保存、CORS/LLM 超时重试修复；前端统一 streamSSE 流式工具、新增 RAG 流式问答页、Element Plus 按需引入 + 路由级拆包（Element Plus 已废弃，UI 栈已迁移至 TailwindCSS 4 + Radix Vue）
-10. Sprint 10 ✓ —— 后端迁移至 Go（Gin + GORM），替换 Spring Boot 多模块架构
+6. Sprint 6 ✓ —— 系统监控；Agent + Workflow；动态 cron 调度
+7. Sprint 7 ✓ —— 提示词中心、工具中心、MCP 注册表；MCP 连通性检测
+8. Sprint 8 ✓ —— Agent 运行时工具使用：真实 HTTP 工具 + SSE MCP 工具加载
+9. Sprint 9 ✓ —— 架构优化：统一 FastApiClient、线程池隔离、上下文有界化、前端 streamSSE（Element Plus 已废弃，UI 栈迁移至 Tailwind 4 + Radix Vue）
+10. Sprint 10 ✓ —— 后端迁移至 Go（Gin + GORM），替换 Spring Boot
 
-<!-- superpowers-zh:begin (do not edit between these markers) -->
 # Superpowers-ZH 中文增强版
 
 本项目已安装 superpowers-zh 技能框架（20 个 skills）。
 
 ## 核心规则
 
-1. **收到任务时，先检查是否有匹配的 skill** — 哪怕只有 1% 的可能性也要检查
-2. **设计先于编码** — 收到功能需求时，先用 brainstorming skill 做需求分析
-3. **测试先于实现** — 写代码前先写测试（TDD）
-4. **验证先于完成** — 声称完成前必须运行验证命令
+1. **收到任务时，先检查是否有匹配的 skill** —— 哪怕只有 1% 的可能性也要检查
+2. **设计先于编码** —— 收到功能需求时，先用 brainstorming skill 做需求分析
+3. **测试先于实现** —— 写代码前先写测试（TDD）
+4. **验证先于完成** —— 声称完成前必须运行验证命令
 
 ## 可用 Skills
 
 Skills 位于 `.claude/skills/` 目录，每个 skill 有独立的 `SKILL.md` 文件。
 
 - **brainstorming**: 在任何创造性工作之前必须使用此技能——创建功能、构建组件、添加功能或修改行为。在实现之前先探索用户意图、需求和设计。
-- **chinese-code-review**: 中文 review 沟通参考——话术模板、分级标注（必须修复/建议修改/仅供参考）、国内团队常见反模式应对。仅在用户显式 /chinese-code-review 时调用，不要根据上下文自动触发。
-- **chinese-commit-conventions**: 中文 commit 与 changelog 配置参考——Conventional Commits 中文适配、commitlint/husky/commitizen 中文模板、conventional-changelog 中文配置。仅在用户显式 /chinese-commit-conventions 时调用，不要根据上下文自动触发。
-- **chinese-documentation**: 中文文档排版参考——中英文空格、全半角标点、术语保留、链接格式、中文文案排版指北约定。仅在用户显式 /chinese-documentation 时调用，不要根据上下文自动触发。
-- **chinese-git-workflow**: 国内 Git 平台配置参考——Gitee、Coding.net、极狐 GitLab、CNB 的 SSH/HTTPS/凭据/CI 接入差异与镜像同步配置。仅在用户显式 /chinese-git-workflow 时调用，不要根据上下文自动触发。
+- **chinese-code-review**: 中文 review 沟通参考——话术模板、分级标注、国内团队常见反模式应对。仅在用户显式 /chinese-code-review 时调用。
+- **chinese-commit-conventions**: 中文 commit 与 changelog 配置参考。仅在用户显式 /chinese-commit-conventions 时调用。
+- **chinese-documentation**: 中文文档排版参考——中英文空格、全半角标点、术语保留。仅在用户显式 /chinese-documentation 时调用。
+- **chinese-git-workflow**: 国内 Git 平台配置参考——Gitee、Coding.net、极狐 GitLab、CNB。仅在用户显式 /chinese-git-workflow 时调用。
 - **dispatching-parallel-agents**: 当面对 2 个以上可以独立进行、无共享状态或顺序依赖的任务时使用
 - **executing-plans**: 当你有一份书面实现计划需要在单独的会话中执行，并设有审查检查点时使用
-- **finishing-a-development-branch**: 当实现完成、所有测试通过、需要决定如何集成工作时使用——通过提供合并、PR 或清理等结构化选项来引导开发工作的收尾
-- **mcp-builder**: MCP 服务器构建方法论 — 系统化构建生产级 MCP 工具，让 AI 助手连接外部能力
-- **receiving-code-review**: 收到代码审查反馈后、实施建议之前使用，尤其当反馈不明确或技术上有疑问时——需要技术严谨性和验证，而非敷衍附和或盲目执行
+- **finishing-a-development-branch**: 当实现完成、所有测试通过、需要决定如何集成工作时使用
+- **mcp-builder**: MCP 服务器构建方法论 —— 系统化构建生产级 MCP 工具
+- **receiving-code-review**: 收到代码审查反馈后、实施建议之前使用
 - **requesting-code-review**: 完成任务、实现重要功能或合并前使用，用于验证工作成果是否符合要求
 - **subagent-driven-development**: 当在当前会话中执行包含独立任务的实现计划时使用
 - **systematic-debugging**: 遇到任何 bug、测试失败或异常行为时使用，在提出修复方案之前执行
 - **test-driven-development**: 在实现任何功能或修复 bug 时使用，在编写实现代码之前
-- **using-git-worktrees**: 当需要开始与当前工作区隔离的功能开发，或在执行实现计划之前使用——通过原生工具或 git worktree 回退机制确保隔离工作区存在
-- **using-superpowers**: 在开始任何对话时使用——确立如何查找和使用技能，要求在任何响应（包括澄清性问题）之前调用 Skill 工具
-- **verification-before-completion**: 在宣称工作完成、已修复或测试通过之前使用，在提交或创建 PR 之前——必须运行验证命令并确认输出后才能声称成功；始终用证据支撑断言
-- **workflow-runner**: 在 Claude Code / OpenClaw / Cursor 中直接运行 agency-orchestrator YAML 工作流——无需 API key，使用当前会话的 LLM 作为执行引擎。当用户提供 .yaml 工作流文件或要求多角色协作完成任务时触发。
+- **using-git-worktrees**: 当需要开始与当前工作区隔离的功能开发，或在执行实现计划之前使用
+- **using-superpowers**: 在开始任何对话时使用——确立如何查找和使用技能
+- **verification-before-completion**: 在宣称工作完成、已修复或测试通过之前使用，必须运行验证命令并确认输出
+- **workflow-runner**: 在 Claude Code / OpenClaw / Cursor 中直接运行 agency-orchestrator YAML 工作流
 - **writing-plans**: 当你有规格说明或需求用于多步骤任务时使用，在动手写代码之前
 - **writing-skills**: 当创建新技能、编辑现有技能或在部署前验证技能是否有效时使用
 
@@ -284,4 +180,3 @@ Skills 位于 `.claude/skills/` 目录，每个 skill 有独立的 `SKILL.md` �
 当任务匹配某个 skill 时，使用 `Skill` 工具加载对应 skill 并严格遵循其流程。绝不要用 Read 工具读取 SKILL.md 文件。
 
 如果你认为哪怕只有 1% 的可能性某个 skill 适用于你正在做的事情，你必须调用该 skill 检查。
-<!-- superpowers-zh:end -->
