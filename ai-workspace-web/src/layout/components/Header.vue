@@ -1,9 +1,17 @@
 <template>
   <header
-    class="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b border-zinc-200/80 bg-white px-6 dark:border-zinc-800 dark:bg-zinc-900"
+    class="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b border-line bg-surface px-4 sm:px-6"
   >
-    <div class="min-w-0">
-      <div class="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500">
+    <div class="flex min-w-0 items-center gap-2">
+      <button
+        class="-ml-1 rounded-xl p-2 text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-100/50 hover:text-zinc-800 md:hidden dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+        aria-label="打开导航菜单"
+        @click="$emit('toggle-nav')"
+      >
+        <Menu class="h-5 w-5" />
+      </button>
+      <div class="min-w-0">
+      <div class="hidden items-center gap-1.5 text-xs text-zinc-400 sm:flex dark:text-zinc-500">
         <router-link to="/" class="transition-all duration-200 ease-out hover:text-zinc-700 dark:hover:text-zinc-200">
           工作台
         </router-link>
@@ -11,6 +19,7 @@
         <span class="truncate">{{ currentSection }}</span>
       </div>
       <div class="mt-0.5 truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{{ currentTitle }}</div>
+      </div>
     </div>
 
     <div class="flex items-center gap-2">
@@ -65,7 +74,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown, ChevronRight, CircleHelp, Lock, LogOut, MonitorCog, Moon, Sun, User } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, CircleHelp, Lock, LogOut, Menu, MonitorCog, Moon, Sun, User } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { logout, updatePassword } from '@/api/auth'
@@ -81,6 +90,8 @@ import {
   toast,
   type DropdownItem
 } from '@/components/ui'
+
+defineEmits<{ 'toggle-nav': [] }>()
 
 const route = useRoute()
 const router = useRouter()

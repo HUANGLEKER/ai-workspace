@@ -1,12 +1,22 @@
 <template>
-  <div class="flex h-screen overflow-hidden bg-white text-zinc-800 dark:bg-zinc-950 dark:text-zinc-100">
-    <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
+  <div class="flex h-screen overflow-hidden bg-canvas text-ink">
+    <!-- 移动端抽屉遮罩：仅 <md 显示，点击关闭侧栏 -->
+    <div
+      v-if="mobileNavOpen"
+      class="fixed inset-0 z-[6999] bg-zinc-950/40 md:hidden"
+      @click="mobileNavOpen = false"
+    />
+    <Sidebar
+      :collapsed="sidebarCollapsed"
+      :mobile-open="mobileNavOpen"
+      @toggle="sidebarCollapsed = !sidebarCollapsed"
+    />
     <div class="flex flex-1 flex-col overflow-hidden">
-      <Header />
+      <Header @toggle-nav="mobileNavOpen = !mobileNavOpen" />
       <router-view v-slot="{ Component, route }">
         <main
           class="flex flex-1 flex-col overflow-hidden scroll-smooth"
-          :class="route.meta.fullPage ? 'bg-white dark:bg-zinc-900' : 'overflow-y-auto bg-zinc-50 p-6 dark:bg-zinc-950'"
+          :class="route.meta.fullPage ? 'bg-surface' : 'overflow-y-auto bg-canvas p-6'"
         >
           <transition
             mode="out-in"
@@ -31,10 +41,20 @@
  * 用户信息由路由守卫（router.beforeEach）统一拉取并写入 Store，
  * 布局层不再重复拉取，避免逻辑分散与冗余请求。
  */
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import Sidebar from './components/Sidebar.vue'
 import Header from './components/Header.vue'
 import ForcePasswordChange from './components/ForcePasswordChange.vue'
 
 const sidebarCollapsed = ref(false)
+// 移动端抽屉式侧栏开关；路由切换后自动收起，避免跳转后遮罩残留
+const mobileNavOpen = ref(false)
+const route = useRoute()
+watch(
+  () => route.path,
+  () => {
+    mobileNavOpen.value = false
+  }
+)
 </script>
