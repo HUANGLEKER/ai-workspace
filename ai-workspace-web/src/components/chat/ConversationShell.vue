@@ -1,13 +1,15 @@
 <template>
-  <!--
-    对话/问答页通用外壳：左侧可折叠会话侧栏 + 右侧主区域。
-    Chat 与 RAG 共用，消除两页重复的两栏骨架与折叠逻辑。
-    - sidebar-header 插槽：新建按钮（RAG 额外放知识库选择器）
-    - sidebar-list  插槽：会话列表（通常用 <ConversationList>）
-    - 默认插槽：主区域（空态 / 标题栏 / 消息流）
-    折叠态由本组件内部持有，并通过插槽作用域 `collapsed` 暴露给上述两个具名插槽。
-  -->
   <div class="flex flex-1 overflow-hidden bg-surface">
+    <!--
+      对话/问答页通用外壳：左侧可折叠会话侧栏 + 右侧主区域。
+      Chat 与 RAG 共用，消除两页重复的两栏骨架与折叠逻辑。
+      - sidebar-header 插槽：新建按钮（RAG 额外放知识库选择器）
+      - sidebar-list  插槽：会话列表（通常用 <ConversationList>）
+      - 默认插槽：主区域（空态 / 标题栏 / 消息流）
+      折叠态由本组件内部持有，并通过插槽作用域 `collapsed` 暴露给上述两个具名插槽。
+      ⚠️ 注释必须放在根元素内部：根元素前的注释会让组件编译成多根 fragment，
+         被 layout 的 <transition> 包裹时切换路由会渲染空白（dev 模式）。
+    -->
     <!-- 会话列表侧边栏 -->
     <div
       class="relative flex shrink-0 flex-col border-r border-line bg-canvas transition-all duration-200 ease-out"
