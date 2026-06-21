@@ -1,5 +1,5 @@
 <template>
-  <PageShell gap="lg">
+  <PageShell gap="lg" scroll>
     <PageHeader
       title="个人 AI 工作台"
       :icon="LayoutDashboard"
