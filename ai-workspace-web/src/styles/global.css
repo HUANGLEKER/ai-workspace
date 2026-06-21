@@ -4,6 +4,44 @@
 /* 暗色模式采用 class 策略：祖先元素带 .dark 时 dark: 变体生效（由 theme store 切换 documentElement）。 */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── 设计令牌（单一来源）─────────────────────────────────────────────
+ * 品牌色与中性面板色统一抽成 CSS 变量，并经 @theme 注册为 Tailwind 工具类
+ * （bg-primary / text-ink / border-line / bg-canvas / bg-surface 等）。
+ * 亮/暗值在 :root 与 .dark 下切换，dark: 前缀无需再逐处书写中性色。
+ * 换肤：只改下方 :root / .dark 的变量即可，未来可由 theme store 运行时 setProperty。 */
+@theme {
+  --color-primary: var(--c-primary);
+  --color-primary-hover: var(--c-primary-hover);
+  --color-primary-fg: var(--c-primary-fg);
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-line: var(--c-line);
+  --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+}
+
+:root {
+  --c-primary: #10a37f;
+  --c-primary-hover: #0e8e6e;
+  --c-primary-fg: #ffffff;
+  --c-canvas: #f7f7f8;
+  --c-surface: #ffffff;
+  --c-line: #e5e7eb;
+  --c-ink: #111827;
+  --c-ink-muted: #6b7280;
+}
+
+.dark {
+  --c-primary: #10a37f;
+  --c-primary-hover: #14b890;
+  --c-primary-fg: #ffffff;
+  --c-canvas: #212121;
+  --c-surface: #2f2f2f;
+  --c-line: #444444;
+  --c-ink: #ececec;
+  --c-ink-muted: #b4b4b4;
+}
+
 html,
 body,
 #app {

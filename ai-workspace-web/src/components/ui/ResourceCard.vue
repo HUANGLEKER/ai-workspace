@@ -1,6 +1,6 @@
 <template>
   <article
-    class="flex h-full flex-col rounded-xl border border-zinc-200/80 bg-white p-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+    class="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:shadow-md"
   >
     <div class="flex items-start gap-3">
       <div v-if="icon" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
@@ -18,7 +18,7 @@
       <slot name="meta" />
     </div>
 
-    <div v-if="$slots.actions" class="mt-4 flex flex-wrap gap-2 border-t border-zinc-200/80 pt-3 dark:border-zinc-800">
+    <div v-if="$slots.actions" class="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
       <slot name="actions" />
     </div>
   </article>

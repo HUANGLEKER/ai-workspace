@@ -7,7 +7,7 @@
       <DropdownMenuContent
         :side-offset="6"
         align="end"
-        class="z-[8500] min-w-[160px] rounded-2xl border border-zinc-200/80 bg-white p-1.5 shadow-md transition-all duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-900"
+        class="z-[8500] min-w-[160px] rounded-2xl border border-line bg-surface p-1.5 shadow-md transition-all duration-200 ease-out"
       >
         <template v-for="(item, idx) in items" :key="item.key">
           <div v-if="item.divided && idx > 0" class="my-1 h-px bg-zinc-200/80 dark:bg-zinc-800" />

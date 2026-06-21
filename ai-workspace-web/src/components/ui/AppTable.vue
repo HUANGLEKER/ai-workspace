@@ -1,8 +1,8 @@
 <template>
-  <div class="relative overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+  <div class="relative overflow-x-auto rounded-xl border border-line">
     <table class="w-full border-collapse text-sm">
       <thead>
-        <tr class="border-b border-zinc-200/80 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
+        <tr class="border-b border-line bg-canvas">
           <th
             v-for="col in columns"
             :key="col.key"
@@ -18,7 +18,7 @@
         <tr
           v-for="(row, rIdx) in data"
           :key="rIdx"
-          class="border-b border-zinc-200/80 last:border-b-0 transition-all duration-200 ease-out hover:bg-zinc-100/50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
+          class="border-b border-line last:border-b-0 transition-all duration-200 ease-out hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
         >
           <td
             v-for="col in columns"

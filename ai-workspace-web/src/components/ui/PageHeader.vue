@@ -3,7 +3,7 @@
     <div class="flex min-w-0 items-start gap-3">
       <div
         v-if="icon"
-        class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+        class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-fg"
       >
         <component :is="icon" class="h-5 w-5" />
       </div>

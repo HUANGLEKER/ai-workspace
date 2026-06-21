@@ -1,6 +1,6 @@
 <template>
   <div
-    class="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900"
+    class="rounded-xl border border-line bg-surface p-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)]"
   >
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0">
@@ -9,7 +9,7 @@
           {{ value }}
         </div>
       </div>
-      <div v-if="icon" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+      <div v-if="icon" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         <component :is="icon" class="h-4.5 w-4.5" />
       </div>
     </div>
