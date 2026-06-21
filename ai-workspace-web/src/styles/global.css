@@ -20,26 +20,28 @@
   --color-ink-muted: var(--c-ink-muted);
 }
 
+/* 主题色对齐 ChatGPT 2025 品牌焕新：弃用旧标志绿 #10A37F，改为黑白单色（monochrome）——
+ * 主操作色亮色为黑、暗色为白；暗色背景更接近纯黑（沿用 ChatGPT 新版 #171717/#212121 层级）。 */
 :root {
-  --c-primary: #10a37f;
-  --c-primary-hover: #0e8e6e;
+  --c-primary: #171717;
+  --c-primary-hover: #2f2f2f;
   --c-primary-fg: #ffffff;
-  --c-canvas: #f7f7f8;
+  --c-canvas: #f9f9f9;
   --c-surface: #ffffff;
-  --c-line: #e5e7eb;
-  --c-ink: #111827;
-  --c-ink-muted: #6b7280;
+  --c-line: #e5e5e5;
+  --c-ink: #0d0d0d;
+  --c-ink-muted: #5d5d5d;
 }
 
 .dark {
-  --c-primary: #10a37f;
-  --c-primary-hover: #14b890;
-  --c-primary-fg: #ffffff;
-  --c-canvas: #212121;
-  --c-surface: #2f2f2f;
-  --c-line: #444444;
+  --c-primary: #ffffff;
+  --c-primary-hover: #ececec;
+  --c-primary-fg: #0d0d0d;
+  --c-canvas: #171717;
+  --c-surface: #212121;
+  --c-line: #2f2f2f;
   --c-ink: #ececec;
-  --c-ink-muted: #b4b4b4;
+  --c-ink-muted: #afafaf;
 }
 
 html,

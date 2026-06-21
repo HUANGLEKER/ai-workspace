@@ -24,7 +24,7 @@ pnpm test:watch               # vitest watch
 - 页面级布局原语（同在 `components/ui`，新页面的标准骨架）：`PageShell`（页面外壳，纯语义容器——只管 `max-width`/`gap`/纵向 flex，**不带 padding/滚动**）、`PageHeader`（标题区）、`PageToolbar`（操作/筛选条）、`MetricCard`（仪表盘指标卡）、`ResourceCard`（资源列表卡）。新页面优先复用这些，不要每页手写一套结构。
 - **滚动与外边距唯一归属是 `layout/index.vue` 的 `<main>`**：非 fullPage 页由 main 负责 `overflow-y-auto + p-6`，fullPage 页（Chat/RAG，`route.meta.fullPage`）`overflow-hidden` 自管理。页面内**不要再套 `overflow-y-auto`/`p-6`**，避免双层滚动。
 - 命令式反馈：`toast`（替代 ElMessage）、`confirm`/`alertBox`（替代 ElMessageBox，`Promise<boolean>` 风格），均从 `components/ui` 出口引入。单例 `AppToaster`/`AppConfirm` 挂在 `App.vue`（同时提供 Radix `TooltipProvider`）。
-- **设计令牌（单一来源在 `styles/global.css` 的 `@theme` + `:root`/`.dark` CSS 变量）**：品牌色用 `primary`/`primary-hover`/`primary-fg`（主色 `#10A37F`），中性面板色用 `canvas`（页面/侧栏背景）、`surface`（卡片/浮层）、`line`（边框）、`ink`/`ink-muted`（正文/次要文本）。**优先用 `bg-primary`/`bg-surface`/`border-line`/`text-ink` 等 token 工具类，它们自带亮/暗适配，无需再写 `dark:` 中性色变体**；换肤只改变量。zinc 色阶仅用于 hover/占位等增量细节。
+- **设计令牌（单一来源在 `styles/global.css` 的 `@theme` + `:root`/`.dark` CSS 变量）**：品牌色用 `primary`/`primary-hover`/`primary-fg`（对齐 ChatGPT 2025 焕新的黑白单色：主色亮色 `#171717`、暗色 `#FFFFFF`），中性面板色用 `canvas`（页面/侧栏背景）、`surface`（卡片/浮层）、`line`（边框）、`ink`/`ink-muted`（正文/次要文本）。**优先用 `bg-primary`/`bg-surface`/`border-line`/`text-ink` 等 token 工具类，它们自带亮/暗适配，无需再写 `dark:` 中性色变体**；换肤只改变量。zinc 色阶仅用于 hover/占位等增量细节。
 - 其余基调：`rounded-xl/2xl`、动效 `transition-all duration-200 ease-out`。
 - 移动端（<md）：侧栏 `Sidebar` 为抽屉（`fixed` + `-translate-x-full`，`md:` 起回归常驻），由 `Header` 汉堡按钮经 `layout` 的 `mobileNavOpen` 控制，路由切换自动收起。新增需固定定位的浮层注意 z 轴层级（遮罩 `z-[6999]`、抽屉 `z-[7000]`）。
 - 文件上传统一用 `AppUpload`（原生 fetch + FormData，手动注入 Authorization 头）。
