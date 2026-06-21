@@ -1,5 +1,5 @@
 <template>
-  <PageShell gap="lg" scroll>
+  <PageShell gap="lg">
     <PageHeader
       title="知识库"
       description="管理个人知识库，进入文档管理后可上传资料并构建 RAG 索引。"
