@@ -1,75 +1,130 @@
 <template>
-  <div class="pb-6">
-    <div class="mb-6 flex items-start justify-between gap-4">
-      <div>
-        <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">仪表盘</h2>
-        <p class="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{{ todayText }}</p>
-      </div>
-    </div>
+  <PageShell gap="lg">
+    <PageHeader
+      title="个人 AI 工作台"
+      :icon="LayoutDashboard"
+      :description="todayText + '，从这里进入对话、知识库、自动化和资源管理。'"
+    >
+      <template #actions>
+        <AppButton variant="primary" :icon="MessageSquare" @click="router.push('/chat')">新建对话</AppButton>
+        <AppButton :icon="FileSearch" @click="router.push('/knowledge/rag')">知识库问答</AppButton>
+      </template>
+    </PageHeader>
 
-    <!-- 统计卡片 -->
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <div
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+      <MetricCard
         v-for="stat in stats"
         :key="stat.label"
-        class="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
-      >
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ stat.label }}</span>
-          <component :is="stat.icon" class="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
-        </div>
-        <div class="mt-3 text-3xl font-semibold tracking-tight text-zinc-800 dark:text-zinc-100">{{ stat.value }}</div>
-      </div>
+        :label="stat.label"
+        :value="stat.value"
+        :hint="stat.hint"
+        :icon="stat.icon"
+      />
     </div>
 
-    <div class="mt-4">
-      <!-- 快速入口 -->
-      <AppCard title="快速入口">
-        <div class="grid grid-cols-3 gap-3 lg:grid-cols-6">
-          <button
+    <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <AppCard title="快捷入口">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ResourceCard
             v-for="action in quickActions"
             :key="action.label"
-            class="flex flex-col items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-white px-2 py-5 text-sm text-zinc-500 transition-all duration-200 ease-out hover:bg-zinc-50 hover:text-zinc-800 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-            @click="router.push(action.path)"
+            :title="action.label"
+            :description="action.description"
+            :icon="action.icon"
           >
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100/50 dark:bg-zinc-800">
-              <component :is="action.icon" class="h-5 w-5 text-zinc-800 dark:text-zinc-100" />
-            </div>
-            {{ action.label }}
-          </button>
+            <template #actions>
+              <AppButton size="sm" :icon="ArrowRight" @click="router.push(action.path)">进入</AppButton>
+            </template>
+          </ResourceCard>
         </div>
       </AppCard>
+
+      <div class="flex flex-col gap-4">
+        <AppCard title="推荐工作流">
+          <div class="space-y-3">
+            <button
+              v-for="item in recommendations"
+              :key="item.title"
+              class="flex w-full items-start gap-3 rounded-lg p-2 text-left transition-all duration-200 ease-out hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              @click="router.push(item.path)"
+            >
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                <component :is="item.icon" class="h-4 w-4" />
+              </div>
+              <div class="min-w-0">
+                <div class="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ item.title }}</div>
+                <p class="mt-0.5 line-clamp-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{{ item.description }}</p>
+              </div>
+            </button>
+          </div>
+        </AppCard>
+
+        <AppCard title="运行状态">
+          <div class="space-y-3 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-zinc-500 dark:text-zinc-400">前端</span>
+              <span class="font-medium text-emerald-600 dark:text-emerald-400">可用</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-zinc-500 dark:text-zinc-400">权限</span>
+              <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ authStore.isAdmin ? '管理员' : '普通用户' }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-zinc-500 dark:text-zinc-400">主题</span>
+              <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ themeLabel }}</span>
+            </div>
+          </div>
+        </AppCard>
+      </div>
     </div>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
-/**
- * 仪表盘页：当前用户统计概览 + 快速入口 + 系统技术栈信息
- */
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  MessageSquare, BookOpen, FileText, Folder, Sparkles, Workflow, Cpu, Zap } from 'lucide-vue-next'
+  ArrowRight,
+  BookOpen,
+  Cpu,
+  FileSearch,
+  FileText,
+  Folder,
+  LayoutDashboard,
+  MessageSquare,
+  Sparkles,
+  Workflow,
+  Zap
+} from 'lucide-vue-next'
 import { getDashboardStats } from '@/api/dashboard'
-import { AppCard } from '@/components/ui'
+import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
+import { AppButton, AppCard, MetricCard, PageHeader, PageShell, ResourceCard } from '@/components/ui'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const themeStore = useThemeStore()
 
 const todayText = new Date().toLocaleDateString('zh-CN', {
-  year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  weekday: 'long'
 })
 
-const stats = ref<{ label: string; value: number | string; icon: unknown }[]>([
-  { label: '今日对话', value: 0, icon: MessageSquare },
-  { label: '知识库数量', value: 0, icon: BookOpen },
-  { label: '文档总数', value: 0, icon: FileText },
-  { label: '文件总数', value: 0, icon: Folder },
-  { label: '今日 Token', value: 0, icon: Zap },
-  { label: '累计 Token', value: 0, icon: Zap }
+const themeLabel = computed(() =>
+  themeStore.preference === 'light' ? '亮色' : themeStore.preference === 'dark' ? '暗色' : '跟随系统'
+)
+
+const stats = ref<{ label: string; value: number | string; hint: string; icon: Component }[]>([
+  { label: '今日对话', value: 0, hint: '当天创建的会话', icon: MessageSquare },
+  { label: '知识库', value: 0, hint: '个人可用知识库', icon: BookOpen },
+  { label: '文档', value: 0, hint: '知识库文档总数', icon: FileText },
+  { label: '文件', value: 0, hint: '文件中心资源', icon: Folder },
+  { label: '今日 Token', value: 0, hint: '当天消耗估算', icon: Zap },
+  { label: '累计 Token', value: 0, hint: '历史消耗统计', icon: Zap }
 ])
 
-/** token 数字缩写展示：12.3k / 4.5M */
 function fmtTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k'
@@ -86,19 +141,22 @@ onMounted(async () => {
     stats.value[4].value = fmtTokens(data.todayTokens ?? 0)
     stats.value[5].value = fmtTokens(data.tokenTotal ?? 0)
   } catch (err) {
-    // 拉取失败时统计保持 0，记录便于排查
-    console.error('[dashboard] 加载统计数据失败：', err)
+    console.error('[dashboard] failed to load stats', err)
   }
 })
 
 const quickActions = [
-  { label: '新建对话', icon: MessageSquare, path: '/chat' },
-  { label: '知识库管理', icon: BookOpen, path: '/knowledge/base' },
-  { label: '上传文件', icon: Folder, path: '/file' },
-  { label: '提示词中心', icon: Sparkles, path: '/prompt' },
-  { label: '工作流', icon: Workflow, path: '/workflow' },
-  { label: 'Agent', icon: Cpu, path: '/agent' }
+  { label: 'AI 对话', description: '直接进入多模型聊天、联网搜索和 Artifact 预览。', icon: MessageSquare, path: '/chat' },
+  { label: '知识库问答', description: '基于已上传文档进行 RAG 问答和来源追踪。', icon: FileSearch, path: '/knowledge/rag' },
+  { label: '知识库管理', description: '创建知识库、管理文档和重建嵌入索引。', icon: BookOpen, path: '/knowledge/base' },
+  { label: '提示词中心', description: '沉淀常用提示词，并插入到 Chat 或 RAG 会话。', icon: Sparkles, path: '/prompt' },
+  { label: '工作流', description: '用画布编排 LLM、HTTP、搜索和结束节点。', icon: Workflow, path: '/workflow' },
+  { label: 'Agent', description: '配置工具调用能力，运行面向任务的智能体。', icon: Cpu, path: '/agent' }
 ]
 
-
+const recommendations = [
+  { title: '先上传文件，再构建知识库', description: '适合把本地资料快速变成可问答的个人知识源。', icon: Folder, path: '/file' },
+  { title: '沉淀提示词模板', description: '把高频工作提示词放入提示词中心，减少重复输入。', icon: Sparkles, path: '/prompt' },
+  { title: '编排自动化流程', description: '将固定步骤沉淀为工作流，适合资料处理和批量任务。', icon: Workflow, path: '/workflow' }
+]
 </script>

@@ -1,28 +1,26 @@
 <template>
-  <div class="mx-auto max-w-2xl pb-6">
+  <div class="mx-auto max-w-5xl pb-6">
     <div class="mb-6">
       <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">个人信息</h2>
       <p class="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">查看并编辑你的资料与账号安全</p>
     </div>
 
-    <!-- 资料卡 -->
-    <AppCard title="基本资料">
-      <!-- 头像 + 用户名/角色 -->
-      <div class="mb-6 flex items-center gap-4">
-        <div class="h-16 w-16 shrink-0 overflow-hidden rounded-2xl">
-          <img v-if="avatarUrl" :src="avatarUrl" alt="头像" class="h-16 w-16 object-cover" />
-          <AppAvatar v-else :icon="User" variant="dark" size="lg" class="!h-16 !w-16 !rounded-2xl" />
-        </div>
-        <div class="min-w-0">
-          <div class="truncate text-base font-medium text-zinc-800 dark:text-zinc-100">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <!-- 左：资料概览卡 -->
+      <AppCard class="lg:col-span-1">
+        <div class="flex flex-col items-center py-2 text-center">
+          <div class="h-20 w-20 shrink-0 overflow-hidden rounded-2xl">
+            <img v-if="avatarUrl" :src="avatarUrl" alt="头像" class="h-20 w-20 object-cover" />
+            <AppAvatar v-else :icon="User" variant="dark" size="lg" class="!h-20 !w-20 !rounded-2xl" />
+          </div>
+          <div class="mt-3 truncate text-base font-medium text-zinc-800 dark:text-zinc-100">
             {{ userInfo?.nickname || userInfo?.username }}
           </div>
-          <div class="mt-1 flex flex-wrap gap-1.5">
+          <div class="mt-2 flex flex-wrap justify-center gap-1.5">
             <AppTag v-for="r in userInfo?.roles || []" :key="r">{{ roleLabel(r) }}</AppTag>
           </div>
-        </div>
-        <div class="ml-auto">
           <AppUpload
+            class="mt-4"
             action="/api/auth/avatar"
             accept="image/*"
             :before-upload="beforeAvatarUpload"
@@ -32,34 +30,35 @@
             <AppButton :icon="Camera">更换头像</AppButton>
           </AppUpload>
         </div>
-      </div>
-
-      <AppFormItem label="用户名">
-        <AppInput :model-value="userInfo?.username || ''" disabled />
-      </AppFormItem>
-      <AppFormItem label="昵称" required>
-        <AppInput v-model="form.nickname" placeholder="请输入昵称" />
-      </AppFormItem>
-      <AppFormItem label="邮箱">
-        <AppInput v-model="form.email" placeholder="请输入邮箱" />
-      </AppFormItem>
-
-      <div class="flex justify-end">
-        <AppButton variant="primary" :loading="saving" @click="handleSaveProfile">保存修改</AppButton>
-      </div>
-    </AppCard>
-
-    <!-- 安全卡 -->
-    <div class="mt-4">
-      <AppCard title="账号安全">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-sm text-zinc-800 dark:text-zinc-100">登录密码</div>
-            <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">建议定期修改以保证账号安全</div>
-          </div>
-          <AppButton :icon="Lock" @click="pwdDialogVisible = true">修改密码</AppButton>
-        </div>
       </AppCard>
+
+      <!-- 右：表单 + 安全 -->
+      <div class="flex flex-col gap-4 lg:col-span-2">
+        <AppCard title="基本资料">
+          <AppFormItem label="用户名">
+            <AppInput :model-value="userInfo?.username || ''" disabled />
+          </AppFormItem>
+          <AppFormItem label="昵称" required>
+            <AppInput v-model="form.nickname" placeholder="请输入昵称" />
+          </AppFormItem>
+          <AppFormItem label="邮箱">
+            <AppInput v-model="form.email" placeholder="请输入邮箱" />
+          </AppFormItem>
+          <div class="flex justify-end">
+            <AppButton variant="primary" :loading="saving" @click="handleSaveProfile">保存修改</AppButton>
+          </div>
+        </AppCard>
+
+        <AppCard title="账号安全">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm text-zinc-800 dark:text-zinc-100">登录密码</div>
+              <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">建议定期修改以保证账号安全</div>
+            </div>
+            <AppButton :icon="Lock" @click="pwdDialogVisible = true">修改密码</AppButton>
+          </div>
+        </AppCard>
+      </div>
     </div>
 
     <!-- 修改密码弹窗 -->

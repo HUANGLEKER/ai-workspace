@@ -21,6 +21,7 @@ pnpm test:watch               # vitest watch
 
 - **禁止**引入 Element Plus / 其他组件库或图标集；**禁止** `<style scoped>`、`::v-deep`、`!important`。所有样式用 Tailwind utility class。
 - 统一组件库在 `src/components/ui`（AppButton/AppInput/AppDialog/AppTable/AppSelect/AppPagination/AppUpload 等），经 `index.ts` 出口统一引入。
+- 页面级布局原语（同在 `components/ui`，新页面的标准骨架）：`PageShell`（页面外壳）、`PageHeader`（标题区）、`PageToolbar`（操作/筛选条）、`MetricCard`（仪表盘指标卡）、`ResourceCard`（资源列表卡）。新页面优先复用这些，不要每页手写一套结构。
 - 命令式反馈：`toast`（替代 ElMessage）、`confirm`/`alertBox`（替代 ElMessageBox，`Promise<boolean>` 风格），均从 `components/ui` 出口引入。单例 `AppToaster`/`AppConfirm` 挂在 `App.vue`（同时提供 Radix `TooltipProvider`）。
 - 设计基调：zinc 色阶、`rounded-xl/2xl`、`border-zinc-200/80`、品牌色 `bg-zinc-900 text-white`、动效 `transition-all duration-200 ease-out`。
 - 文件上传统一用 `AppUpload`（原生 fetch + FormData，手动注入 Authorization 头）。
@@ -33,7 +34,7 @@ pnpm test:watch               # vitest watch
 - `composables/` —— 可复用组合式函数（流式 markdown、滚动、动效、artifact 面板等）
 - `stores/` —— Pinia（auth / chat / rag / theme）
 - `router/` —— 路由配置（守卫加载用户信息，非管理员隐藏系统菜单）
-- `layout/` —— 外壳/布局
+- `layout/` —— 外壳/布局；侧边栏菜单的**单一数据源**是 `layout/navigation.ts`（`navGroups` 分组配置 + `getVisibleNavGroups(isAdmin)` 过滤 `admin` 分组 + `isNavItemActive` 高亮判定）。增删菜单只改这里，勿在 `Sidebar.vue` 内硬编码
 - `utils/` —— markdown 渲染（含 worker）、highlight、artifacts、promptVars
 - `types/` —— TS 类型定义
 

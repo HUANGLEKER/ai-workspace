@@ -1,47 +1,53 @@
 <template>
-  <div class="pb-6">
-    <div class="mb-4 flex items-start justify-between gap-4">
-      <h2 class="text-lg font-semibold text-zinc-800 dark:text-zinc-100">知识库管理</h2>
-      <AppButton variant="primary" :icon="Plus" @click="openCreateDialog">新建知识库</AppButton>
-    </div>
+  <PageShell gap="lg">
+    <PageHeader
+      title="知识库"
+      description="管理个人知识库，进入文档管理后可上传资料并构建 RAG 索引。"
+      :icon="BookOpen"
+    >
+      <template #actions>
+        <AppButton variant="primary" :icon="Plus" @click="openCreateDialog">新建知识库</AppButton>
+      </template>
+    </PageHeader>
 
-    <!-- 知识库卡片网格 -->
-    <div class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <div
-        v-for="kb in knowledgeBases"
-        :key="kb.id"
-        class="flex flex-col rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
-      >
-        <div class="mb-3 flex items-start gap-3.5">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800/50">
-            <BookOpen class="h-5 w-5 text-zinc-800 dark:text-zinc-100" />
-          </div>
-          <div class="min-w-0">
-            <div class="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ kb.kbName }}</div>
-            <p class="mt-1 line-clamp-2 text-sm text-zinc-500 dark:text-zinc-400">{{ kb.description || '暂无描述' }}</p>
-          </div>
-        </div>
-        <div class="flex gap-3 text-xs text-zinc-400 dark:text-zinc-500">
-          <span>创建人：{{ kb.createBy }}</span>
-          <span>{{ formatDate(kb.createTime) }}</span>
-        </div>
-        <div class="mt-4 flex gap-2 border-t border-zinc-200/80 dark:border-zinc-800 pt-3">
-          <AppButton size="sm" :icon="FileText" @click="goDocuments(kb)">文档管理</AppButton>
-          <AppButton size="sm" :icon="Pencil" @click="openEditDialog(kb)">编辑</AppButton>
-          <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(kb.id)">删除</AppButton>
-        </div>
+    <PageToolbar>
+      <AppInput v-model="keyword" placeholder="搜索知识库名称或描述" class="w-full sm:w-80" />
+      <span class="text-sm text-zinc-400 dark:text-zinc-500">共 {{ knowledgeBases.length }} 个知识库</span>
+      <template #actions>
+        <AppButton :icon="RefreshCcw" :loading="loading" @click="loadList">刷新</AppButton>
+      </template>
+    </PageToolbar>
+
+    <div class="relative min-h-[320px]">
+      <div v-if="filteredKnowledgeBases.length" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ResourceCard
+          v-for="kb in filteredKnowledgeBases"
+          :key="kb.id"
+          :title="kb.kbName"
+          :description="kb.description || '暂无描述'"
+          :icon="BookOpen"
+        >
+          <template #meta>
+            <span>创建人：{{ creatorName }}</span>
+            <span>{{ formatDate(kb.createTime) }}</span>
+          </template>
+          <template #actions>
+            <AppButton size="sm" :icon="FileText" @click="goDocuments(kb)">文档管理</AppButton>
+            <AppButton size="sm" :icon="Pencil" @click="openEditDialog(kb)">编辑</AppButton>
+            <AppButton size="sm" variant="danger-ghost" :icon="Trash2" @click="handleDelete(kb.id)">删除</AppButton>
+          </template>
+        </ResourceCard>
       </div>
 
       <AppEmpty
-        v-if="!loading && knowledgeBases.length === 0"
-        class="col-span-full py-20"
-        description="暂无知识库，点击右上角新建"
+        v-if="!loading && !filteredKnowledgeBases.length"
+        class="py-20"
+        :description="keyword ? '没有匹配的知识库' : '暂无知识库，点击右上角新建'"
         :icon="BookOpen"
       />
       <AppLoading v-if="loading" overlay />
     </div>
 
-    <!-- 新建/编辑弹窗 -->
     <AppDialog v-model="dialogVisible" :title="editingKb ? '编辑知识库' : '新建知识库'" width="480px" @close="resetForm">
       <AppFormItem label="名称" required>
         <AppInput v-model="form.kbName" placeholder="请输入知识库名称" />
@@ -56,33 +62,54 @@
         </AppButton>
       </template>
     </AppDialog>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
-/**
- * 知识库管理页：Card Grid 展示当前用户所有知识库，支持新建/编辑/删除，
- * 跳转文档管理页（携带 kbId、kbName 查询参数）。
- */
-import { ref, reactive, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, BookOpen, FileText, Pencil, Trash2 } from 'lucide-vue-next'
+import { BookOpen, FileText, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-vue-next'
 import type { KnowledgeBase } from '@/types'
-import { listKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } from '@/api/kb'
+import { createKnowledgeBase, deleteKnowledgeBase, listKnowledgeBases, updateKnowledgeBase } from '@/api/kb'
+import { useAuthStore } from '@/stores/auth'
 import {
-  AppButton, AppDialog, AppInput, AppTextarea, AppFormItem, AppEmpty, AppLoading, toast, confirm
+  AppButton,
+  AppDialog,
+  AppEmpty,
+  AppFormItem,
+  AppInput,
+  AppLoading,
+  AppTextarea,
+  PageHeader,
+  PageShell,
+  PageToolbar,
+  ResourceCard,
+  confirm,
+  toast
 } from '@/components/ui'
 
 const router = useRouter()
+const authStore = useAuthStore()
+
+const creatorName = computed(() => authStore.userInfo?.nickname || authStore.userInfo?.username || '我')
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
 const editingKb = ref<KnowledgeBase | null>(null)
 const knowledgeBases = ref<KnowledgeBase[]>([])
+const keyword = ref('')
 
 const form = reactive({ kbName: '', description: '' })
 
-const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('zh-CN') : ''
+const filteredKnowledgeBases = computed(() => {
+  const q = keyword.value.trim().toLowerCase()
+  if (!q) return knowledgeBases.value
+  return knowledgeBases.value.filter((kb) =>
+    [kb.kbName, kb.description || ''].some((text) => text.toLowerCase().includes(q))
+  )
+})
+
+const formatDate = (d: string) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
 onMounted(loadList)
 
@@ -130,9 +157,7 @@ async function handleSubmit() {
       toast.success('创建成功')
     }
     dialogVisible.value = false
-    loadList()
-  } catch {
-    // 由拦截器处理
+    await loadList()
   } finally {
     submitting.value = false
   }
@@ -146,10 +171,11 @@ async function handleDelete(id: number) {
     danger: true
   })
   if (!ok) return
+
   try {
     await deleteKnowledgeBase(id)
     toast.success('删除成功')
-    loadList()
+    await loadList()
   } catch {
     toast.error('删除失败')
   }

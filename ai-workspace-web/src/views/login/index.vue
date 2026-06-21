@@ -30,7 +30,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { Bot, User, Lock } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { login } from '@/api/auth'
-import { AppInput, AppButton, toast } from '@/components/ui'
+import { AppInput, AppButton, toast, alertBox } from '@/components/ui'
 
 const router = useRouter()
 const route = useRoute()
@@ -51,8 +51,10 @@ const handleLogin = async () => {
     toast.success('登录成功')
     const redirect = (route.query.redirect as string) || '/dashboard'
     router.push(redirect)
-  } catch {
-    // 错误已由拦截器处理
+  } catch (err) {
+    // 登录失败弹出提示框（账户或密码错误等）
+    const msg = err instanceof Error ? err.message : '登录失败，请重试'
+    await alertBox({ title: '登录失败', message: msg })
   } finally {
     loading.value = false
   }

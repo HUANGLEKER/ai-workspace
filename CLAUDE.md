@@ -71,7 +71,7 @@ MySQL 8（3306，`mysql-data`）、Redis 7（6379，AOF）、MinIO（9000 API / 
 
 ### 数据库
 
-`docker-compose.infra.yml` 把 `ai-workspace/sql/init.sql` 挂为 MySQL 初始化脚本（仅数据卷首次执行），含全部 21 张表 DDL 与种子数据。**维护约定：任何表结构变更必须同步更新 init.sql**（`docker exec ai-workspace-mysql mysqldump -uroot -p123456 --no-data ai_workspace` 重导出）。
+`docker-compose.infra.yml` 把 `ai-workspace/sql/init.sql` 挂为 MySQL 初始化脚本（仅数据卷首次执行），含全部 22 张表 DDL 与种子数据。**维护约定：任何表结构变更必须同步更新 init.sql**（`docker exec ai-workspace-mysql mysqldump -uroot -p123456 --no-data ai_workspace` 重导出）。
 
 ## 测试
 
@@ -115,7 +115,8 @@ JWT Claims：`userID`、`username`、`roles`（带 `ROLE_` 前缀）。中间件
 
 ## 数据库关键表
 
-- `sys_user`/`sys_role`/`sys_user_role` —— RBAC（`role_code` 带 `ROLE_` 前缀）
+- `sys_user`/`sys_role`/`sys_user_role`（+ `sys_menu`/`sys_role_menu`）—— RBAC（`role_code` 带 `ROLE_` 前缀）
+- `usage_daily` —— 按用户/日聚合的用量统计，仪表盘数据源
 - `chat_session`/`chat_message`/`chat_model` —— chat。`chat_session.summary`+`summary_upto_id` 为滚动摘要（超 `summarizeThreshold`(40) 时 Go 异步调 FastAPI `/chat/summarize` 压缩旧消息）；上下文 = system prompt + summary + id>summary_upto_id 的最近消息。`chat_model` 由 Go 完全管理，FastAPI 不读 MySQL。
 - `kb_knowledge_base`/`kb_document`/`kb_chunk_task` —— 知识库 + RAG 管道
 - `rag_session`/`rag_message` —— 知识库问答（与 chat 同构独立成表，归属 `user_id`、绑 `kb_id`、`system_prompt`、`sources` JSON）；多轮取最近 N 条历史，不做滚动摘要

@@ -30,9 +30,10 @@ request.interceptors.request.use(config => {
   return config
 })
 
-/** 标记已重试过的请求，防止刷新后仍 401 时无限循环 */
+/** 标记已重试过的请求，防止刷新后仍 401 时无限循环；silent 表示由调用方自行处理错误提示 */
 interface RetriableConfig extends InternalAxiosRequestConfig {
   _retried?: boolean
+  silent?: boolean
 }
 
 /** 并发 401 共享同一个刷新 Promise，避免同时发出多个 /auth/refresh（旧 token 已被轮换吊销会连环失败） */
@@ -70,8 +71,12 @@ function redirectToLogin() {
 }
 
 /** 401 统一处理：先静默刷新重放一次，失败再跳登录 */
-async function handleUnauthorized(config: RetriableConfig | undefined): Promise<unknown> {
-  const isAuthPath = !!config?.url && /\/auth\/(login|refresh|logout)/.test(config.url)
+async function handleUnauthorized(config: RetriableConfig | undefined, serverMsg?: string): Promise<unknown> {
+  // 登录接口自身返回 401（账户或密码错误）：直接把后端消息抛给登录页，不刷新、不跳转
+  if (config?.url && /\/auth\/login/.test(config.url)) {
+    return Promise.reject(new Error(serverMsg || '账户或密码错误'))
+  }
+  const isAuthPath = !!config?.url && /\/auth\/(refresh|logout)/.test(config.url)
   if (config && !config._retried && !isAuthPath && (await tryRefreshToken())) {
     config._retried = true
     return request(config) // 重放：请求拦截器会注入新 token
@@ -88,18 +93,23 @@ request.interceptors.response.use(
     }
     // 后端 401 走 HTTP 200 + body code（common.Unauthorized）
     if (res.code === 401) {
-      return handleUnauthorized(response.config as RetriableConfig)
+      return handleUnauthorized(response.config as RetriableConfig, res.message)
     }
-    toast.error(res.message || '操作失败')
-    return Promise.reject(new Error(res.message || '操作失败'))
+    const msg = res.message || '操作失败'
+    if (!(response.config as RetriableConfig).silent) {
+      toast.error(msg)
+    }
+    return Promise.reject(new Error(msg))
   },
   error => {
     if (error.response?.status === 401) {
-      return handleUnauthorized(error.config as RetriableConfig)
+      return handleUnauthorized(error.config as RetriableConfig, error.response?.data?.message)
     }
     const msg = error.response?.data?.message || error.message || '网络连接失败'
-    toast.error(msg)
-    return Promise.reject(error)
+    if (!(error.config as RetriableConfig)?.silent) {
+      toast.error(msg)
+    }
+    return Promise.reject(new Error(msg))
   }
 )
 

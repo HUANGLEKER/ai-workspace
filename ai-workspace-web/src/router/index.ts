@@ -1,12 +1,3 @@
-/**
- * Vue Router 配置
- *
- * 路由守卫逻辑：
- * 1. 公开页（requiresAuth: false）：已登录则重定向首页，否则放行
- * 2. 未登录访问受保护页：跳转 /login 并附带 redirect 参数
- * 3. 已登录但 userInfo 为空（刷新后 Store 丢失）：异步拉取用户信息以确保 isAdmin 正确
- * 4. 管理员专属页（requiresAdmin: true）：非管理员重定向仪表盘
- */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Layout from '@/layout/index.vue'
@@ -29,10 +20,9 @@ const router = createRouter({
           path: 'dashboard',
           name: 'Dashboard',
           component: () => import('@/views/dashboard/index.vue'),
-          meta: { title: '仪表盘', icon: 'Odometer' }
+          meta: { title: '仪表盘' }
         },
         {
-          // 个人中心：仅头像下拉进入，侧边栏菜单为硬编码不含此项
           path: 'profile',
           name: 'Profile',
           component: () => import('@/views/profile/index.vue'),
@@ -42,85 +32,85 @@ const router = createRouter({
           path: 'chat',
           name: 'Chat',
           component: () => import('@/views/chat/index.vue'),
-          meta: { title: 'AI 对话', icon: 'ChatDotRound', fullPage: true }
+          meta: { title: 'AI 对话', fullPage: true }
         },
         {
           path: 'knowledge/base',
           name: 'KnowledgeBase',
           component: () => import('@/views/knowledge/base/index.vue'),
-          meta: { title: '知识库管理', icon: 'Reading' }
+          meta: { title: '知识库' }
         },
         {
           path: 'knowledge/document',
           name: 'KnowledgeDocument',
           component: () => import('@/views/knowledge/document/index.vue'),
-          meta: { title: '文档管理', icon: 'Document' }
+          meta: { title: '文档管理' }
         },
         {
           path: 'knowledge/rag',
           name: 'KnowledgeRag',
           component: () => import('@/views/knowledge/rag/index.vue'),
-          meta: { title: '知识库问答', icon: 'Search', fullPage: true }
+          meta: { title: '知识库问答', fullPage: true }
         },
         {
           path: 'file',
           name: 'File',
           component: () => import('@/views/file/index.vue'),
-          meta: { title: '文件中心', icon: 'Folder' }
+          meta: { title: '文件中心' }
         },
         {
           path: 'prompt',
           name: 'Prompt',
           component: () => import('@/views/prompt/index.vue'),
-          meta: { title: '提示词中心', icon: 'MagicStick' }
+          meta: { title: '提示词中心' }
         },
         {
           path: 'workflow',
           name: 'Workflow',
           component: () => import('@/views/workflow/index.vue'),
-          meta: { title: '工作流', icon: 'Connection' }
+          meta: { title: '工作流' }
         },
         {
           path: 'agent',
           name: 'Agent',
           component: () => import('@/views/agent/index.vue'),
-          meta: { title: 'Agent', icon: 'Cpu' }
+          meta: { title: 'Agent' }
         },
         {
           path: 'tool',
           name: 'Tool',
           component: () => import('@/views/tool/index.vue'),
-          meta: { title: '工具中心', icon: 'Tools' }
+          meta: { title: '工具中心' }
         },
         {
           path: 'mcp',
           name: 'Mcp',
           component: () => import('@/views/mcp/index.vue'),
-          meta: { title: 'MCP 服务器', icon: 'Link' }
+          meta: { title: 'MCP 服务' }
         },
         {
           path: 'monitor',
           name: 'Monitor',
           component: () => import('@/views/monitor/index.vue'),
-          meta: { title: '监控', icon: 'Monitor', requiresAdmin: true }
+          meta: { title: '系统监控', requiresAdmin: true }
         },
         {
           path: 'system/user',
           name: 'SystemUser',
           component: () => import('@/views/system/user/index.vue'),
-          meta: { title: '用户管理', icon: 'User', requiresAdmin: true }
+          meta: { title: '用户管理', requiresAdmin: true }
         },
         {
           path: 'system/model',
           name: 'SystemModel',
           component: () => import('@/views/system/model/index.vue'),
-          meta: { title: '模型管理', icon: 'Cpu', requiresAdmin: true }
+          meta: { title: '模型管理', requiresAdmin: true }
         },
         {
           path: 'system/job',
           name: 'SystemJob',
           component: () => import('@/views/system/job/index.vue'),
-          meta: { title: '定时任务', icon: 'Timer', requiresAdmin: true }
+          meta: { title: '定时任务', requiresAdmin: true }
         }
       ]
     },
@@ -145,14 +135,11 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  // 直接导航或刷新时 userInfo 可能为空，需先拉取以确保 isAdmin 等计算属性正确
-  // token 失效时 getUserInfo 会 401，由响应拦截器统一处理跳转
   if (!authStore.userInfo) {
     try {
       await authStore.fetchUserInfo()
     } catch (err) {
-      // token 失效时拦截器已处理 401 跳转，此处仅记录便于排查非鉴权类异常
-      console.warn('[router] 拉取用户信息失败：', err)
+      console.warn('[router] failed to fetch user info', err)
     }
   }
 

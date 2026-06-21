@@ -25,6 +25,7 @@
           <AppTag variant="info">{{ row.fileType?.toUpperCase() || '—' }}</AppTag>
         </template>
         <template #cell-fileSize="{ row }">{{ formatSize(row.fileSize) }}</template>
+        <template #cell-uploadBy>{{ uploaderName }}</template>
         <template #cell-createTime="{ row }">{{ formatDate(row.createTime) }}</template>
         <template #cell-actions="{ row }">
           <div class="flex justify-center gap-1">
@@ -51,16 +52,21 @@
  * 文件中心页：文件分页列表（按 uploadBy 隔离）、上传、
  * 下载（后端返回 MinIO 预签名 URL）、删除（软删除）。
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   Upload, RefreshCw, Trash2, Download, FileText, Image, Video, Headphones, Archive, File as FileIcon
 } from 'lucide-vue-next'
 import type { FileInfo } from '@/types'
 import { listFiles, deleteFile, getFileUrl } from '@/api/file'
+import { useAuthStore } from '@/stores/auth'
 import {
   AppButton, AppCard, AppSearch, AppTable, AppTag, AppUpload, AppPagination,
   toast, confirm, type TableColumn
 } from '@/components/ui'
+
+const authStore = useAuthStore()
+// 列表只返回当前用户上传的文件，上传人恒为当前登录用户
+const uploaderName = computed(() => authStore.userInfo?.nickname || authStore.userInfo?.username || '我')
 
 const loading = ref(false)
 const files = ref<FileInfo[]>([])

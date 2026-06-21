@@ -3,12 +3,17 @@
 通过 Pydantic BaseSettings 从 `.env` 文件加载（字段名大写后即对应环境变量），
 覆盖 LLM、嵌入、Redis、ChromaDB、MinIO 与服务自身等所有可配置项。
 """
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# .env 锚定到 ai-service/ 根目录（本文件位于 app/config/settings.py，上溯三级），
+# 避免因启动工作目录不同（如从项目根运行）而读不到 .env 进而回退默认占位配置。
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",  # 忽略 .env 中未声明的额外变量
     )
