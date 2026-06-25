@@ -441,3 +441,8 @@ flowchart TB
 - **后端**：归属过滤必走 `owned.go` / `repository.OwnedRepository`，禁止字面量 `Where`；表结构变更同步 `init.sql`。
 - **AI 服务**：依赖用 `uv add`；嵌入临时文件已用 `tempfile.gettempdir()`（跨平台），按 `EMBED_BATCH_SIZE` 分批嵌入防 OOM。
 - **分层铁律**：Go 不直接调 LLM，FastAPI 不直接读 MySQL；`llm_config` 仅服务间内网流转，不对客户端暴露。
+
+---
+
+## Lincese
+Copyright (c) 2026 Leker Huang. All rights reserved
