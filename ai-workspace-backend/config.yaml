@@ -39,6 +39,7 @@ log:
 ratelimit:
   llm_per_minute: 20
   llm_per_minute_admin: 60  # 每用户每分钟 LLM 端点请求上限；<=0 关闭
+  login_per_minute: 5       # 每 IP 每分钟登录请求上限（防爆破）；<=0 关闭
 
 upload:
   max_size_mb: 50  # 单文件大小上限 MB；<=0 不限制
@@ -47,6 +48,7 @@ upload:
 
 security:
   secret_key: ""  # 敏感字段加密密钥；留空回退 jwt.secret，生产务必单独配置
+  captcha_enabled: true  # 登录滑块拼图验证；false 则登录跳过验证码
 
 cors:
   allowed_origins: []  # 留空或含 "*" 放通所有来源；多用户部署改为显式来源如 ["https://app.example.com"]

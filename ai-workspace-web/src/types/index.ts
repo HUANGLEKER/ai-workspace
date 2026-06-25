@@ -17,6 +17,23 @@ export interface PageResult<T> {
 export interface LoginRequest {
   username: string
   password: string
+  // 滑块验证通过后下发的一次性令牌；后端开启验证码时必填
+  captchaToken?: string
+}
+
+// 滑块拼图验证：init 返回底图/拼图块（base64 data URI）与拼图块定位
+export interface SlideCaptchaInit {
+  captchaId: string
+  masterImage: string
+  tileImage: string
+  tileX: number
+  tileY: number
+  tileWidth: number
+}
+
+export interface SlideCaptchaVerifyResult {
+  success: boolean
+  captchaToken?: string
 }
 
 export interface LoginResponse {

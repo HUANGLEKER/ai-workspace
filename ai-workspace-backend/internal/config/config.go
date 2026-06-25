@@ -33,6 +33,8 @@ type TracingConfig struct {
 type SecurityConfig struct {
 	// 敏感字段（chat_model.api_key 等）落库加密的密钥；生产务必改并保密
 	SecretKey string `mapstructure:"secret_key"`
+	// 是否启用登录滑块拼图验证；关闭则登录跳过验证码（便于本地/测试）
+	CaptchaEnabled bool `mapstructure:"captcha_enabled"`
 }
 
 type CORSConfig struct {
@@ -45,6 +47,8 @@ type RateLimitConfig struct {
 	LLMPerMinute int `mapstructure:"llm_per_minute"`
 	// 管理员每分钟限额（通常更宽松）；<=0 时回退用 LLMPerMinute
 	LLMPerMinuteAdmin int `mapstructure:"llm_per_minute_admin"`
+	// 登录接口每分钟每 IP 允许的请求数（防爆破）；<=0 表示关闭
+	LoginPerMinute int `mapstructure:"login_per_minute"`
 }
 
 type UploadConfig struct {

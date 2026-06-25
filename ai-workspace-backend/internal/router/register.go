@@ -9,8 +9,11 @@ import (
 
 func registerAuthRoutes(rg *gin.RouterGroup) {
 	g := rg.Group("/auth")
-	// 登录/登出无需 JWT
-	g.POST("/login", handler.Login)
+	// 滑块拼图验证（公开，登录前调用）；init 也挂限流防刷图
+	g.GET("/captcha/slide/init", middleware.LoginRateLimit(), handler.InitSlideCaptcha)
+	g.POST("/captcha/slide/verify", middleware.LoginRateLimit(), handler.VerifySlideCaptcha)
+	// 登录/登出无需 JWT；登录挂 IP 限流防爆破
+	g.POST("/login", middleware.LoginRateLimit(), handler.Login)
 	g.POST("/logout", handler.Logout)
 	// /info 需要登录才能查询
 	g.GET("/info", middleware.JWTAuth(), handler.GetAuthInfo)

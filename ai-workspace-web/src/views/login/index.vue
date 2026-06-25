@@ -17,6 +17,9 @@
         </AppButton>
       </form>
     </div>
+
+    <!-- 滑块拼图验证：点击登录后弹出，通过后携 captchaToken 提交登录 -->
+    <AppSliderCaptcha v-model="captchaOpen" @success="onCaptchaPassed" />
   </div>
 </template>
 
@@ -30,23 +33,30 @@ import { useRouter, useRoute } from 'vue-router'
 import { Bot, User, Lock } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { login } from '@/api/auth'
-import { AppInput, AppButton, toast, alertBox } from '@/components/ui'
+import { AppInput, AppButton, AppSliderCaptcha, toast, alertBox } from '@/components/ui'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
 const loading = ref(false)
+const captchaOpen = ref(false)
 const form = reactive({ username: '', password: '' })
 
-const handleLogin = async () => {
+// 点击登录：先校验非空，再弹出滑块验证；不直接提交
+const handleLogin = () => {
   if (!form.username.trim() || !form.password) {
     toast.warning('请输入用户名和密码')
     return
   }
+  captchaOpen.value = true
+}
+
+// 滑块通过：携一次性 captchaToken 提交登录
+const onCaptchaPassed = async (captchaToken: string) => {
   loading.value = true
   try {
-    const res = await login(form)
+    const res = await login({ ...form, captchaToken })
     authStore.setToken(res.token)
     toast.success('登录成功')
     const redirect = (route.query.redirect as string) || '/dashboard'

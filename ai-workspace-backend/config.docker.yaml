@@ -41,6 +41,7 @@ log:
 ratelimit:
   llm_per_minute: 20
   llm_per_minute_admin: 60
+  login_per_minute: 5
 
 upload:
   max_size_mb: 50
@@ -49,6 +50,7 @@ upload:
 
 security:
   secret_key: ""
+  captcha_enabled: true
 
 cors:
   allowed_origins: []

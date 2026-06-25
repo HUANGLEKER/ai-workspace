@@ -10,7 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/aiworkspace/backend/internal/captcha"
 	"github.com/aiworkspace/backend/internal/common"
+	"github.com/aiworkspace/backend/internal/config"
 	"github.com/aiworkspace/backend/internal/middleware"
 	"github.com/aiworkspace/backend/internal/model"
 	"github.com/aiworkspace/backend/internal/service"
@@ -20,6 +22,8 @@ import (
 type loginReq struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	// 滑块验证通过后下发的一次性令牌；security.captcha_enabled 开启时必填
+	CaptchaToken string `json:"captchaToken"`
 }
 
 type loginResp struct {
@@ -36,6 +40,14 @@ func Login(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.BadRequest(c, "参数错误: "+err.Error())
 		return
+	}
+
+	// 滑块验证：开启时校验并消费一次性通行令牌（防重放），未通过直接拒绝
+	if config.Global.Security.CaptchaEnabled {
+		if !captcha.ConsumePassToken(c.Request.Context(), req.CaptchaToken) {
+			common.Fail(c, common.CodeUnauth, "请完成滑块验证")
+			return
+		}
 	}
 
 	var user model.SysUser

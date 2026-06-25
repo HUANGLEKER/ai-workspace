@@ -53,3 +53,35 @@ func LLMRateLimit() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// LoginRateLimit 按客户端 IP 对登录接口做固定窗口限流，防口令爆破/撞库。
+// 登录发生在鉴权前、无 userID，故以 IP 为隔离键；限额取 config.ratelimit.login_per_minute（<=0 关闭）。
+// 与 LLMRateLimit 一致：Redis 不可用时 fail-open，限流不应成为登录的可用性单点。
+func LoginRateLimit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		limit := config.Global.RateLimit.LoginPerMinute
+		if limit <= 0 {
+			c.Next()
+			return
+		}
+
+		key := fmt.Sprintf("rl:login:%s:%d", c.ClientIP(), time.Now().Unix()/60)
+
+		ctx := c.Request.Context()
+		count, err := redis.Client.Incr(ctx, key).Result()
+		if err != nil {
+			logger.Log.Warn("login ratelimit redis unavailable, fail-open", zap.Error(err))
+			c.Next()
+			return
+		}
+		if count == 1 {
+			redis.Client.Expire(ctx, key, 65*time.Second)
+		}
+		if count > int64(limit) {
+			common.Fail(c, common.CodeTooManyRequests, "登录尝试过于频繁，请稍后再试")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
