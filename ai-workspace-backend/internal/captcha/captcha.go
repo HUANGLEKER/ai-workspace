@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,6 +80,14 @@ func getBuilder() (slide.Builder, error) {
 	return builder, builderErr
 }
 
+// ensureDataURI 给裸 base64 补上 data URI 前缀；若已带前缀则原样返回（兼容不同库版本）。
+func ensureDataURI(b64, mime string) string {
+	if strings.HasPrefix(b64, "data:") {
+		return b64
+	}
+	return "data:" + mime + ";base64," + b64
+}
+
 // randHex 返回 n 字节的十六进制随机串，用作 captchaId / 通行令牌。
 func randHex(n int) (string, error) {
 	buf := make([]byte, n)
@@ -104,6 +113,8 @@ func Generate(ctx context.Context) (*GenResult, error) {
 		return nil, fmt.Errorf("empty captcha block")
 	}
 
+	// 注意：go-captcha v2.0.5 的 ToBase64Data 返回裸 base64（不含 data URI scheme），
+	// 需自行补前缀，否则前端 <img src> 无法识别（master 为 JPEG、tile 为 PNG）。
 	masterB64, err := data.GetMasterImage().ToBase64Data()
 	if err != nil {
 		return nil, fmt.Errorf("master to base64: %w", err)
@@ -112,6 +123,8 @@ func Generate(ctx context.Context) (*GenResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("tile to base64: %w", err)
 	}
+	masterURI := ensureDataURI(masterB64, "image/jpeg")
+	tileURI := ensureDataURI(tileB64, "image/png")
 
 	captchaID, err := randHex(16)
 	if err != nil {
@@ -124,8 +137,8 @@ func Generate(ctx context.Context) (*GenResult, error) {
 
 	return &GenResult{
 		CaptchaID:   captchaID,
-		MasterImage: masterB64,
-		TileImage:   tileB64,
+		MasterImage: masterURI,
+		TileImage:   tileURI,
 		TileX:       block.DX,
 		TileY:       block.DY,
 		TileWidth:   block.Width,

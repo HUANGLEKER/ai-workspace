@@ -32,6 +32,19 @@ func TestBuilderGenerates(t *testing.T) {
 	}
 }
 
+// TestEnsureDataURI 锁定前端可直接用作 <img src> 的 data URI 拼装：
+// go-captcha 的 ToBase64Data 返回裸 base64，必须补前缀，且对已带前缀的输入幂等。
+func TestEnsureDataURI(t *testing.T) {
+	got := ensureDataURI("/9j/2wCEAAEB", "image/jpeg")
+	if got != "data:image/jpeg;base64,/9j/2wCEAAEB" {
+		t.Fatalf("raw base64 not prefixed: %q", got)
+	}
+	already := "data:image/png;base64,iVBORw0K"
+	if ensureDataURI(already, "image/png") != already {
+		t.Fatal("prefixed input should be returned unchanged")
+	}
+}
+
 // TestValidateSemantics 锁定坐标语义：落点等于答案 X 时通过、偏离超过容差时失败。
 // 这正是前端上报 reportX 后端校验的判定逻辑（仅横向，srcY 取答案 Y）。
 func TestValidateSemantics(t *testing.T) {

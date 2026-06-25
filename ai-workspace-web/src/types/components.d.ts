@@ -26,6 +26,7 @@ declare module 'vue' {
     AppRadioGroup: typeof import('./../components/ui/AppRadioGroup.vue')['default']
     AppSearch: typeof import('./../components/ui/AppSearch.vue')['default']
     AppSelect: typeof import('./../components/ui/AppSelect.vue')['default']
+    AppSliderCaptcha: typeof import('./../components/ui/AppSliderCaptcha.vue')['default']
     AppSwitch: typeof import('./../components/ui/AppSwitch.vue')['default']
     AppTable: typeof import('./../components/ui/AppTable.vue')['default']
     AppTabs: typeof import('./../components/ui/AppTabs.vue')['default']
