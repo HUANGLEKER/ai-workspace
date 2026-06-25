@@ -444,5 +444,5 @@ flowchart TB
 
 ---
 
-## Lincese
+## License
 Copyright (c) 2026 Leker Huang. All rights reserved
